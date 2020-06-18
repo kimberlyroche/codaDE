@@ -2,7 +2,7 @@
 % Please edit documentation in R/simulate.R
 \name{call_DE}
 \alias{call_DE}
-\title{Fit NBID model to null and full models and evaluate differential expression for a focal gene}
+\title{Fit negative binomial model to null and full models and evaluate differential expression for a focal gene}
 \usage{
 call_DE(data, feature_idx, call_abundances = TRUE)
 }
@@ -14,8 +14,8 @@ call_DE(data, feature_idx, call_abundances = TRUE)
 \item{call_abundances}{if TRUE, call DE on abundances; if FALSE, on observed counts}
 }
 \value{
-p-value from likelihood ratio test of differential expression
+p-value from NB GLM fit with MASS::glm.nb
 }
 \description{
-Fit NBID model to null and full models and evaluate differential expression for a focal gene
+Fit negative binomial model to null and full models and evaluate differential expression for a focal gene
 }

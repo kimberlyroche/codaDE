@@ -5,14 +5,9 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
 differential expression calls and write these to an output file}
 \usage{
-run_RNAseq_evaluation_instance(
-  p,
-  n,
-  proportion_de,
-  run_label,
-  output_file = "results.txt",
-  alpha = 0.05
-)
+run_RNAseq_evaluation_instance(p, n, proportion_de, run_label,
+  size_factor_correlation = 0, output_file = "results.txt",
+  alpha = 0.05)
 }
 \arguments{
 \item{p}{number of genes}
@@ -22,6 +17,8 @@ run_RNAseq_evaluation_instance(
 \item{proportion_de}{proportion of differentially expressed genes}
 
 \item{run_label}{human-readable string identifier for this simulation run}
+
+\item{size_factor_correlation}{correlation of observed abundances to original total abundances}
 
 \item{output_file}{output file to append to}
 

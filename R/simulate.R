@@ -224,6 +224,20 @@ call_DE_original <- function(data, feature_idx, call_abundances = TRUE) {
   return(calc_LRT.NBID(res_H0, res_H1, base_params))
 }
 
+#' Write simulation result to a file
+#'
+#' @param out_str string to write to file
+#' @param out_file log file path and name
+#' @return NULL
+#' @import filelock
+#' @export
+record_result <- function(out_str, out_file) {
+  lock_file <- paste0(out_file, ".lck")
+  lck <- lock(lock_file, timeout = Inf)
+  write(out_str, file = out_file, append = TRUE)
+  unlock(lck)
+}
+
 #' Generate simulated data with randomly perturbed features, evaluate false negatives and positives in
 #' differential expression calls and write these to an output file
 #'
@@ -239,6 +253,7 @@ call_DE_original <- function(data, feature_idx, call_abundances = TRUE) {
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @import LaplacesDemon
+#' @import filelock
 #' @export
 run_evaluation_instance <- function(p, fold_change, proportion_perturbed_features, run_label, mean_size_factor = 5000,
                                     size_factor_correlation = 0, bimodal = FALSE, output_file = "results.txt", alpha = 0.05) {
@@ -292,7 +307,7 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
                     FP,"\t",
                     TN,"\t",
                     FN)
-  write(out_str, file = file.path("output", output_file), append = TRUE)
+  record_result(out_str, file.path("output","results.tsv"))
 }
 
 #' Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
@@ -349,7 +364,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
                     FP,"\t",
                     TN,"\t",
                     FN)
-  write(out_str, file = file.path("output", output_file), append = TRUE)
+  record_result(out_str, file.path("output","results_RNAseq.tsv"))
 }
 
 #' Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
