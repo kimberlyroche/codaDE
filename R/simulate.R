@@ -13,14 +13,19 @@ simcor <- function(x, ymean = 0, ysd = 1, correlation = 0) {
 #' @param p number of genes
 #' @param n number of samples per group
 #' @param proportion_de proportion of differentially expressed genes
+#' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @return named list of true abundances, observed abundances, and group assignments
 #' @export
-simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5) {
+simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_correlation = 0) {
   data_dir <- "GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct"
   GTEx_stats <- readRDS(file.path(data_dir, "empirical_sample.rds"))
   groups <- c(rep(0, n), rep(1, n))
   theta <- rep(0.25, 2) # fix the dispersions between groups for simplicity now
-  beta.0 <- sample(rep(log(GTEx_stats$mean_abundance_profiles + 0.5), ceiling(length(GTEx_stats$mean_abundance_profiles)/p)))[1:p]
+  empirical_mean_abundances <- log(GTEx_stats$mean_abundance_profiles + 0.5)
+  if(p > length(empirical_mean_abundances)) {
+    empirical_mean_abundances <- rep(empirical_mean_abundances, ceiling(p/length(empirical_mean_abundances)))
+  }
+  beta.0 <- sample(empirical_mean_abundances)[1:p]
   de_elements <- sort(sample(1:p)[1:round(proportion_de*p)])
   # simulate a random fold change between (+/-) 3 and 5 for these
   beta.1 <- sapply(1:p, function(idx) {
@@ -49,9 +54,12 @@ simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5) {
   sampled_proportions <- apply(abundances, 1, function(x) x/sum(x))
   # genes x samples
 
-  # total observed counts
-  size_factors.observed_counts <- sample(rep(GTEx_stats$total_read_profiles, ceiling(length(GTEx_stats$total_read_profiles)/(n*2))))[1:(n*2)]
-
+  realized_total_counts <- rowSums(abundances)
+  size_factors.observed_counts <- round(simcor(realized_total_counts, mean(realized_total_counts), sd(realized_total_counts),
+                                               size_factor_correlation))
+  # reflect any negative counts; this increases correlation but barely
+  size_factors.observed_counts <- abs(size_factors.observed_counts)
+  
   observed_counts <- sapply(1:(n*2), function(i) {
     if(is.na(size_factors.observed_counts[i])) {
       print(i)
@@ -145,6 +153,47 @@ simulate_data <- function(p, n, proportions, perturbed_features, fold_change = N
               relative_entropy = relative_entropy))
 }
 
+#' Fit negative binomial model to null and full models and evaluate differential expression for a focal gene
+#'
+#' @param data simulated data set
+#' @param feature_idx index of gene to test for differential expression
+#' @param call_abundances if TRUE, call DE on abundances; if FALSE, on observed counts
+#' @return p-value from NB GLM fit with MASS::glm.nb
+#' @import MASS
+#' @export
+call_DE <- function(data, feature_idx, call_abundances = TRUE) {
+  if(call_abundances) {
+    gene_data <- data.frame(counts = data$abundances[,feature_idx], groups = data$groups)
+  } else {
+    gene_data <- data.frame(counts = data$observed_counts[,feature_idx], groups = data$groups)
+  }
+  fit <- tryCatch({
+    glm.nb(counts ~ groups, data = gene_data)
+  }, warning = function(w) {
+    # this is typically "iteration limit reached"
+  }, error = function(err) {
+    # this is typically "NaNs produced", produced from under/overflow and ultimately Poisson-like dispersion
+    # https://r.789695.n4.nabble.com/R-Error-Warning-Messages-with-library-MASS-using-glm-td4556771.html
+    # using a quasipoisson here seems to work well
+  })
+  if(is.null(fit)) {
+    fit <- tryCatch({
+      glm(counts ~ groups, family = quasipoisson(), data = gene_data)
+    }, warning = function(w) {}, error = function(err) { })
+  }
+  if(!is.null(fit)) {
+    return(coef(summary(fit))[2,4])
+  } else {
+    # model fit failed
+    data_type <- "abundances"
+    if(!call_abundances) {
+      data_type <- "observed counts"
+    }
+    cat(paste0("Fit failed on ",data_type," #",feature_idx,"\n"))
+    return(gene_data)
+  }
+}
+
 #' Fit NBID model to null and full models and evaluate differential expression for a focal gene
 #'
 #' @param data simulated data set
@@ -152,25 +201,25 @@ simulate_data <- function(p, n, proportions, perturbed_features, fold_change = N
 #' @param call_abundances if TRUE, call DE on abundances; if FALSE, on observed counts
 #' @return p-value from likelihood ratio test of differential expression
 #' @export
-call_DE <- function(data, feature_idx, call_abundances = TRUE) {
+call_DE_original <- function(data, feature_idx, call_abundances = TRUE) {
   if(call_abundances) {
     base_params <- list(x = data$abundances[,feature_idx], groups = data$groups, size_factor = data$size_factors.abundances)
   } else {
     base_params <- list(x = data$observed_counts[,feature_idx], groups = data$groups, size_factor = data$size_factors.observed_counts)
   }
-
+  
   # fit null model
   params_initial_H0 <- c(runif(2, min = 0.001, max = 1), runif(1, min = -1, max = 1))
   params_H0 <- base_params
   params_H0$null_model <- TRUE
   res_H0 <- optimize.NBID(params_initial_H0, params_H0)
-
+  
   # fit full model
   params_initial_H1 <- c(params_initial_H0, runif(1, min = -1, max = 1))
   params_H1 <- base_params
   params_H1$null_model <- FALSE
   res_H1 <- optimize.NBID(params_initial_H1, params_H1)
-
+  
   # apply LRT to give p-value
   return(calc_LRT.NBID(res_H0, res_H1, base_params))
 }
@@ -221,8 +270,10 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
   for(i in 1:p) {
     pval.abundances <- call_DE(data, i, call_abundances = TRUE)
     pval.observed_counts <- call_DE(data, i, call_abundances = FALSE)
-    calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
-    calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+    if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+      calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
+      calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+    }
   }
   FN <- sum(calls.abundances == TRUE & calls.observed_counts == FALSE)
   FP <- sum(calls.abundances == FALSE & calls.observed_counts == TRUE)
@@ -251,16 +302,17 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
 #' @param n number of samples per group
 #' @param proportion_de proportion of differentially expressed genes
 #' @param run_label human-readable string identifier for this simulation run
+#' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param output_file output file to append to
 #' @param alpha significant level below which to call a feature differentially expressed
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
-run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, output_file = "results.txt", alpha = 0.05) {
+run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_factor_correlation = 0, output_file = "results.txt", alpha = 0.05) {
   all_taxa_observed <- FALSE
   while(!all_taxa_observed) {
     cat("Simulating data...\n")
-    data <- simulate_RNAseq(p = p, n = n, proportion_de = proportion_de)
+    data <- simulate_RNAseq(p = p, n = n, proportion_de = proportion_de, size_factor_correlation = size_factor_correlation)
     g0.ab <- data$abundances[data$groups == 0,] # samples x genes
     g1.ab <- data$abundances[data$groups == 1,] # samples x genes
     g0.oc <- data$observed_counts[data$groups == 0,] # samples x genes
@@ -274,13 +326,16 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, outpu
   }
 
   # calculate and compare differential expression calls
+  cat("Evaluating differential expression...\n")
   calls.abundances <- c()
   calls.observed_counts <- c()
   for(i in 1:p) {
     pval.abundances <- call_DE(data, i, call_abundances = TRUE)
     pval.observed_counts <- call_DE(data, i, call_abundances = FALSE)
-    calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
-    calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+    if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+      calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
+      calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+    }
   }
   FN <- sum(calls.abundances == TRUE & calls.observed_counts == FALSE)
   FP <- sum(calls.abundances == FALSE & calls.observed_counts == TRUE)
@@ -288,7 +343,6 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, outpu
   TP <- sum(calls.abundances == TRUE & calls.observed_counts == TRUE)
   out_str <- paste0(run_label,"\t",
                     p,"\t",
-                    length(data$proportion),"\t",
                     proportion_de,"\t",
                     alpha,"\t",
                     TP,"\t",
@@ -297,6 +351,36 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, outpu
                     FN)
   write(out_str, file = file.path("output", output_file), append = TRUE)
 }
+
+#' Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
+#' differential expression calls and write these to an output file
+#'
+#' @param p number of genes
+#' @param n number of samples per group
+#' @param run_label human-readable string identifier for this simulation run
+#' @param de_sweep vector of proportions of differentially expressed genes to simulate
+#' @param corr_sweep vector of correlations of size factors (true vs. observed abundances) to simulate
+#' @param output_file output file to append to
+#' @param alpha significant level below which to call a feature differentially expressed
+#' @details Writes out error and simulation run statistics to a file.
+#' @return NULL
+#' @export
+sweep_RNAseq <- function(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+                         corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt", alpha = 0.05) {
+  for(de_prop in de_sweep) {
+    for(sf_corr in corr_sweep) {
+      cat("Evaluating size factor correlation =",round(sf_corr, 2),"and DE proportion =",round(de_prop, 2),"\n")
+      run_RNAseq_evaluation_instance(p, n, proportion_de = de_prop, run_label = "RNAseq_like_sweep", size_factor_correlation = sf_corr,
+                                     output_file = "results.txt", alpha = 0.05)
+    }
+  }
+}
+
+
+
+
+
+
 
 
 
