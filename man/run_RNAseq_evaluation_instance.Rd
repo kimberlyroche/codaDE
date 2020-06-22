@@ -12,7 +12,8 @@ run_RNAseq_evaluation_instance(
   run_label,
   size_factor_correlation = 0,
   output_file = "results.txt",
-  alpha = 0.05
+  alpha = 0.05,
+  rarefy = FALSE
 )
 }
 \arguments{
@@ -29,6 +30,8 @@ run_RNAseq_evaluation_instance(
 \item{output_file}{output file to append to}
 
 \item{alpha}{significant level below which to call a feature differentially expressed}
+
+\item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }
 \description{
 Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in

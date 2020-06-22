@@ -320,10 +320,12 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param output_file output file to append to
 #' @param alpha significant level below which to call a feature differentially expressed
+#' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
-run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_factor_correlation = 0, output_file = "results.txt", alpha = 0.05) {
+run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_factor_correlation = 0,
+                                           output_file = "results.txt", alpha = 0.05, rarefy = FALSE) {
   all_taxa_observed <- FALSE
   while(!all_taxa_observed) {
     cat("Simulating data...\n")
@@ -339,14 +341,20 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
       all_taxa_observed <- TRUE
     }
   }
+  
+  if(rarefy) {
+    rarefy_total <- min(apply(data$observed_counts, 1, sum))
+  } else {
+    rarefy_total <- 0
+  }
 
   # calculate and compare differential expression calls
   cat("Evaluating differential expression...\n")
   calls.abundances <- c()
   calls.observed_counts <- c()
   for(i in 1:p) {
-    pval.abundances <- call_DE(data, i, call_abundances = TRUE)
-    pval.observed_counts <- call_DE(data, i, call_abundances = FALSE)
+    pval.abundances <- call_DE(data, i, call_abundances = TRUE, rarefy = rarefy_total)
+    pval.observed_counts <- call_DE(data, i, call_abundances = FALSE, rarefy = rarefy_total)
     if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
       calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
       calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
@@ -377,16 +385,17 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
 #' @param corr_sweep vector of correlations of size factors (true vs. observed abundances) to simulate
 #' @param output_file output file to append to
 #' @param alpha significant level below which to call a feature differentially expressed
+#' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
 sweep_RNAseq <- function(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-                         corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt", alpha = 0.05) {
+                         corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt", alpha = 0.05, rarefy = FALSE) {
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
       cat("Evaluating size factor correlation =",round(sf_corr, 2),"and DE proportion =",round(de_prop, 2),"\n")
       run_RNAseq_evaluation_instance(p, n, proportion_de = de_prop, run_label = "RNAseq_like_sweep", size_factor_correlation = sf_corr,
-                                     output_file = "results.txt", alpha = 0.05)
+                                     output_file = "results.txt", alpha = 0.05, rarefy = rarefy)
     }
   }
 }
