@@ -359,7 +359,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
   out_str <- paste0(run_label,"\t",
                     p,"\t",
                     proportion_de,"\t",
-                    alpha,"\t",
+                    size_factor_correlation,"\t",
                     TP,"\t",
                     FP,"\t",
                     TN,"\t",
