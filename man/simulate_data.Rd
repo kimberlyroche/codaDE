@@ -4,8 +4,15 @@
 \alias{simulate_data}
 \title{Simulate counts for control vs. treatment groups}
 \usage{
-simulate_data(p, n, proportions, perturbed_features, fold_change = NULL,
-  mean_size_factor = 5000, size_factor_correlation = 0)
+simulate_data(
+  p,
+  n,
+  proportions,
+  perturbed_features,
+  fold_change = NULL,
+  mean_size_factor = 5000,
+  size_factor_correlation = 0
+)
 }
 \arguments{
 \item{p}{number of genes}

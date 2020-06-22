@@ -4,7 +4,7 @@
 \alias{call_DE}
 \title{Fit negative binomial model to null and full models and evaluate differential expression for a focal gene}
 \usage{
-call_DE(data, feature_idx, call_abundances = TRUE)
+call_DE(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0)
 }
 \arguments{
 \item{data}{simulated data set}
@@ -12,6 +12,8 @@ call_DE(data, feature_idx, call_abundances = TRUE)
 \item{feature_idx}{index of gene to test for differential expression}
 
 \item{call_abundances}{if TRUE, call DE on abundances; if FALSE, on observed counts}
+
+\item{rarefy_depth}{if non-zero, specifies the depth at which to resample the counts}
 }
 \value{
 p-value from NB GLM fit with MASS::glm.nb
