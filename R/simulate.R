@@ -21,11 +21,7 @@ simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_
   GTEx_stats <- readRDS(file.path(data_dir, "empirical_sample.rds"))
   groups <- c(rep(0, n), rep(1, n))
   theta <- rep(0.25, 2) # fix the dispersions between groups for simplicity now
-  empirical_mean_abundances <- log(GTEx_stats$mean_abundance_profiles + 0.5)
-  if(p > length(empirical_mean_abundances)) {
-    empirical_mean_abundances <- rep(empirical_mean_abundances, ceiling(p/length(empirical_mean_abundances)))
-  }
-  beta.0 <- sample(empirical_mean_abundances)[1:p]
+  beta.0 <- sample(log(GTEx_stats$mean_abundance_profiles + 0.5), size = p, replace = TRUE)
   de_elements <- sort(sample(1:p)[1:round(proportion_de*p)])
   # simulate a random fold change between (+/-) 3 and 5 for these
   beta.1 <- sapply(1:p, function(idx) {
