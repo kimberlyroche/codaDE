@@ -11,7 +11,7 @@
 #' @name negativeLL_NBID
 #' @export
 negativeLL_NBID <- function(x, counts, groups, size_factors, null_model) {
-    .Call(`_codaDE_negativeLL_NBID`, x, counts, groups, size_factors, null_model)
+    .Call('_codaDE_negativeLL_NBID', PACKAGE = 'codaDE', x, counts, groups, size_factors, null_model)
 }
 
 #' Calculate gradient
@@ -24,7 +24,7 @@ negativeLL_NBID <- function(x, counts, groups, size_factors, null_model) {
 #' @name gradient_NBID
 #' @export
 gradient_NBID <- function(x, counts, groups, size_factors, null_model) {
-    .Call(`_codaDE_gradient_NBID`, x, counts, groups, size_factors, null_model)
+    .Call('_codaDE_gradient_NBID', PACKAGE = 'codaDE', x, counts, groups, size_factors, null_model)
 }
 
 #' Optimize the NBID model
@@ -38,6 +38,6 @@ gradient_NBID <- function(x, counts, groups, size_factors, null_model) {
 #' @name optim_NBID
 #' @export
 optimize_NBID <- function(theta_init, counts, groups, size_factors, null_model, maxit) {
-    .Call(`_codaDE_optimize_NBID`, theta_init, counts, groups, size_factors, null_model, maxit)
+    .Call('_codaDE_optimize_NBID', PACKAGE = 'codaDE', theta_init, counts, groups, size_factors, null_model, maxit)
 }
 

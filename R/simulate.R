@@ -154,14 +154,18 @@ simulate_data <- function(p, n, proportions, perturbed_features, fold_change = N
 #' @param data simulated data set
 #' @param feature_idx index of gene to test for differential expression
 #' @param call_abundances if TRUE, call DE on abundances; if FALSE, on observed counts
+#' @param rarefy_depth if non-zero, specifies the depth at which to resample the counts
 #' @return p-value from NB GLM fit with MASS::glm.nb
 #' @import MASS
 #' @export
-call_DE <- function(data, feature_idx, call_abundances = TRUE) {
+call_DE <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0) {
   if(call_abundances) {
     gene_data <- data.frame(counts = data$abundances[,feature_idx], groups = data$groups)
   } else {
     gene_data <- data.frame(counts = data$observed_counts[,feature_idx], groups = data$groups)
+  }
+  if(rarefy_depth > 0) {
+    gene_data$counts <- round(gene_data$counts * (rarefy_depth / sum(gene_data$counts)))
   }
   fit <- tryCatch({
     glm.nb(counts ~ groups, data = gene_data)

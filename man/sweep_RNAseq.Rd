@@ -5,9 +5,15 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
 differential expression calls and write these to an output file}
 \usage{
-sweep_RNAseq(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by =
-  0.1), corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-  output_file = "results.txt", alpha = 0.05)
+sweep_RNAseq(
+  p,
+  n,
+  run_label,
+  de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  output_file = "results.txt",
+  alpha = 0.05
+)
 }
 \arguments{
 \item{p}{number of genes}
