@@ -394,7 +394,7 @@ sweep_RNAseq <- function(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, b
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
       cat("Evaluating size factor correlation =",round(sf_corr, 2),"and DE proportion =",round(de_prop, 2),"\n")
-      run_RNAseq_evaluation_instance(p, n, proportion_de = de_prop, run_label = "RNAseq_like_sweep", size_factor_correlation = sf_corr,
+      run_RNAseq_evaluation_instance(p, n, proportion_de = de_prop, run_label = run_label, size_factor_correlation = sf_corr,
                                      output_file = "results.txt", alpha = 0.05, rarefy = rarefy)
     }
   }
