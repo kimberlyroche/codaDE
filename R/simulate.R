@@ -230,13 +230,15 @@ get_logratios <- function(data, call_abundances = TRUE) {
 #'
 #' @param logratios data in ALR format
 #' @param feature_idx index of gene to test for differential expression
+#' @param groups treatment group assignments across samples
 #' @return p-value from lm
 #' @export
-call_DE_CODA <- function(logratios, feature_idx) {
+call_DE_CODA <- function(logratios, feature_idx, groups) {
   # adjust the indexing
-  gene_data <- data.frame(logratios = logratios[,feature_idx], groups = data$groups)
+  gene_data <- data.frame(logratios = logratios[,feature_idx], groups = groups)
   fit <- lm(logratios ~ groups, data = gene_data)
-  return(coef(summary(fit))[2,4])
+  pval <- coef(summary(fit))[2,4]
+  return(pval)
 }
 
 #' Fit NBID model to null and full models and evaluate differential expression for a focal gene
@@ -403,8 +405,8 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
     logratios.abundances <- get_logratios(data, call_abundances = TRUE)
     logratios.observed_counts <- get_logratios(data, call_abundances = FALSE)
     for(i in 1:p) {
-      pval.abundances <- call_DE_CODA(logratios.abundances, i)
-      pval.observed_counts <- call_DE_CODA(logratios.observed_counts, i)
+      pval.abundances <- call_DE_CODA(logratios.abundances, i, data$groups)
+      pval.observed_counts <- call_DE_CODA(logratios.observed_counts, i, data$groups)
       if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
         calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
         calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)

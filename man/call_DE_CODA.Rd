@@ -6,12 +6,14 @@
 NOTE: probably need something better than a normal here; it's not a great fit :(
       predict from fitted model for a few of these and see if this is the case}
 \usage{
-call_DE_CODA(logratios, feature_idx)
+call_DE_CODA(logratios, feature_idx, groups)
 }
 \arguments{
 \item{logratios}{data in ALR format}
 
 \item{feature_idx}{index of gene to test for differential expression}
+
+\item{groups}{treatment group assignments across samples}
 }
 \value{
 p-value from lm
