@@ -403,7 +403,6 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
     logratios.abundances <- get_logratios(data, call_abundances = TRUE)
     logratios.observed_counts <- get_logratios(data, call_abundances = FALSE)
     for(i in 1:p) {
-      cat(i,"\n")
       pval.abundances <- call_DE_CODA(logratios.abundances, i)
       pval.observed_counts <- call_DE_CODA(logratios.observed_counts, i)
       if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
