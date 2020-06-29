@@ -8,7 +8,8 @@ simulate_RNAseq(
   p = 5000,
   n = 500,
   proportion_de = 0.5,
-  size_factor_correlation = 0
+  size_factor_correlation = 0,
+  spike_in = FALSE
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ simulate_RNAseq(
 \item{proportion_de}{proportion of differentially expressed genes}
 
 \item{size_factor_correlation}{correlation of observed abundances to original total abundances}
+
+\item{spike_in}{simulate a control spike in with low dispersion}
 }
 \value{
 named list of true abundances, observed abundances, and group assignments
