@@ -14,17 +14,23 @@ simcor <- function(x, ymean = 0, ysd = 1, correlation = 0) {
 #' @param n number of samples per group
 #' @param proportion_de proportion of differentially expressed genes
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
+#' @param spike_in simulate a control spike in with low dispersion
 #' @return named list of true abundances, observed abundances, and group assignments
 #' @export
-simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_correlation = 0) {
+simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_correlation = 0, spike_in = FALSE) {
   data_dir <- "GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct"
   GTEx_stats <- readRDS(file.path(data_dir, "empirical_sample.rds"))
   groups <- c(rep(0, n), rep(1, n))
   theta <- rep(0.25, 2) # fix the dispersions between groups for simplicity now
   beta.0 <- sample(log(GTEx_stats$mean_abundance_profiles + 0.5), size = p, replace = TRUE)
+  if(spike_in) {
+    spike_in_beta <- median(beta.0)
+    cat("Spike in has abundance:",spike_in_beta,"\n")
+    beta.0 <- c(beta.0, spike_in_beta)
+  }
   de_elements <- sort(sample(1:p)[1:round(proportion_de*p)])
   # simulate a random fold change between (+/-) 3 and 5 for these
-  beta.1 <- sapply(1:p, function(idx) {
+  beta.1 <- sapply(1:length(beta.0), function(idx) {
     if(idx %in% de_elements) {
       fc <- sample(c(3:5))[1]
       fc_sign <- 1
@@ -38,11 +44,16 @@ simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_
   })
   theta <- c(theta, c(rbind(beta.0, beta.1)))
 
+  # the commented-out code below just shuffles the original abundances
   # size_factors.abundances <- sample(rep(GTEx_stats$total_read_profiles, ceiling(length(GTEx_stats$total_read_profiles)/(n*2))))[1:(n*2)]
-  abundances <- sapply(1:p, function(j) {
+  abundances <- sapply(1:length(beta.0), function(j) {
     offset <- 2 + (j-1)*2 + 1
     mu.ij <- exp(theta[offset] + groups*theta[offset+1])
-    rnbinom((n*2), mu = mu.ij, size = theta[1])
+    if(spike_in & (j == length(beta.0))) {
+      rnbinom((n*2), mu = mu.ij, size = 10) # less dispersion
+    } else {
+      rnbinom((n*2), mu = mu.ij, size = theta[1])
+    }
   })
   # samples x genes
 
@@ -192,6 +203,40 @@ call_DE <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0)
     cat(paste0("Fit failed on ",data_type," #",feature_idx,"\n"))
     return(gene_data)
   }
+}
+
+#' Get additive logratios from the data set
+#'
+#' @param data simulated data set
+#' @param call_abundances if TRUE, call DE on abundances; if FALSE, on observed counts
+#' @return logratios
+#' @import driver
+#' @export
+get_logratios <- function(data, call_abundances = TRUE) {
+  if(call_abundances) {
+    # does it make sense to call these with NB or ALR-normal model?
+    counts <- data$abundances
+  } else {
+    # use median abundance feature as the ALR reference
+    counts <- data$observed_counts
+  }
+  logratios <- driver::alr(counts + 0.5)
+  return(logratios)
+}
+
+#' Fit normal model to logratios and evaluate differential expression for a focal gene
+#' NOTE: probably need something better than a normal here; it's not a great fit :(
+#'       predict from fitted model for a few of these and see if this is the case
+#'
+#' @param logratios data in ALR format
+#' @param feature_idx index of gene to test for differential expression
+#' @return p-value from lm
+#' @export
+call_DE_CODA <- function(logratios, feature_idx) {
+  # adjust the indexing
+  gene_data <- data.frame(logratios = logratios[,feature_idx], groups = data$groups)
+  fit <- lm(logratios ~ groups, data = gene_data)
+  return(coef(summary(fit))[2,4])
 }
 
 #' Fit NBID model to null and full models and evaluate differential expression for a focal gene
