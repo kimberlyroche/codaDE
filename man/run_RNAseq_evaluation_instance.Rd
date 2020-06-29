@@ -7,7 +7,7 @@ differential expression calls and write these to an output file}
 \usage{
 run_RNAseq_evaluation_instance(p, n, proportion_de, run_label,
   size_factor_correlation = 0, output_file = "results.txt",
-  alpha = 0.05, rarefy = FALSE)
+  alpha = 0.05, use_ALR = FALSE, rarefy = FALSE)
 }
 \arguments{
 \item{p}{number of genes}
@@ -23,6 +23,8 @@ run_RNAseq_evaluation_instance(p, n, proportion_de, run_label,
 \item{output_file}{output file to append to}
 
 \item{alpha}{significant level below which to call a feature differentially expressed}
+
+\item{use_ALR}{if TRUE, evaluates differential expression using a spike-in and the additive logratio}
 
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }

@@ -7,7 +7,8 @@ differential expression calls and write these to an output file}
 \usage{
 sweep_RNAseq(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by =
   0.1), corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-  output_file = "results.txt", alpha = 0.05, rarefy = FALSE)
+  output_file = "results.txt", alpha = 0.05, use_ALR = FALSE,
+  rarefy = FALSE)
 }
 \arguments{
 \item{p}{number of genes}
@@ -23,6 +24,8 @@ sweep_RNAseq(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by =
 \item{output_file}{output file to append to}
 
 \item{alpha}{significant level below which to call a feature differentially expressed}
+
+\item{use_ALR}{if TRUE, evaluates differential expression using a spike-in and the additive logratio}
 
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }

@@ -365,16 +365,17 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param output_file output file to append to
 #' @param alpha significant level below which to call a feature differentially expressed
+#' @param use_ALR if TRUE, evaluates differential expression using a spike-in and the additive logratio
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
 run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_factor_correlation = 0,
-                                           output_file = "results.txt", alpha = 0.05, rarefy = FALSE) {
+                                           output_file = "results.txt", alpha = 0.05, use_ALR = FALSE, rarefy = FALSE) {
   all_taxa_observed <- FALSE
   while(!all_taxa_observed) {
     cat("Simulating data...\n")
-    data <- simulate_RNAseq(p = p, n = n, proportion_de = proportion_de, size_factor_correlation = size_factor_correlation)
+    data <- simulate_RNAseq(p = p, n = n, proportion_de = proportion_de, size_factor_correlation = size_factor_correlation, spike_in = use_ALR)
     g0.ab <- data$abundances[data$groups == 0,] # samples x genes
     g1.ab <- data$abundances[data$groups == 1,] # samples x genes
     g0.oc <- data$observed_counts[data$groups == 0,] # samples x genes
@@ -397,14 +398,30 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
   cat("Evaluating differential expression...\n")
   calls.abundances <- c()
   calls.observed_counts <- c()
-  for(i in 1:p) {
-    pval.abundances <- call_DE(data, i, call_abundances = TRUE, rarefy = rarefy_total)
-    pval.observed_counts <- call_DE(data, i, call_abundances = FALSE, rarefy = rarefy_total)
-    if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-      calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
-      calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+
+  if(use_ALR) {
+    logratios.abundances <- get_logratios(data, call_abundances = TRUE)
+    logratios.observed_counts <- get_logratios(data, call_abundances = FALSE)
+    for(i in 1:p) {
+      cat(i,"\n")
+      pval.abundances <- call_DE_CODA(logratios.abundances, i)
+      pval.observed_counts <- call_DE_CODA(logratios.observed_counts, i)
+      if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+        calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
+        calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+      }
+    }
+  } else {
+    for(i in 1:p) {
+      pval.abundances <- call_DE(data, i, call_abundances = TRUE, rarefy = rarefy_total)
+      pval.observed_counts <- call_DE(data, i, call_abundances = FALSE, rarefy = rarefy_total)
+      if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+        calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
+        calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+      }
     }
   }
+
   FN <- sum(calls.abundances == TRUE & calls.observed_counts == FALSE)
   FP <- sum(calls.abundances == FALSE & calls.observed_counts == TRUE)
   TN <- sum(calls.abundances == FALSE & calls.observed_counts == FALSE)
@@ -430,17 +447,18 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
 #' @param corr_sweep vector of correlations of size factors (true vs. observed abundances) to simulate
 #' @param output_file output file to append to
 #' @param alpha significant level below which to call a feature differentially expressed
+#' @param use_ALR if TRUE, evaluates differential expression using a spike-in and the additive logratio
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
 sweep_RNAseq <- function(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-                         corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt", alpha = 0.05, rarefy = FALSE) {
+                         corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt", alpha = 0.05, use_ALR = FALSE, rarefy = FALSE) {
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
       cat("Evaluating size factor correlation =",round(sf_corr, 2),"and DE proportion =",round(de_prop, 2),"\n")
       run_RNAseq_evaluation_instance(p, n, proportion_de = de_prop, run_label = run_label, size_factor_correlation = sf_corr,
-                                     output_file = "results.txt", alpha = 0.05, rarefy = rarefy)
+                                     output_file = "results.txt", alpha = 0.05, use_ALR = use_ALR, rarefy = rarefy)
     }
   }
 }
