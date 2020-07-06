@@ -5,17 +5,9 @@
 \title{Generate simulated data with randomly perturbed features, evaluate false negatives and positives in
 differential abundance calls and write these to an output file}
 \usage{
-run_evaluation_instance(
-  p,
-  fold_change,
-  proportion_perturbed_features,
-  run_label,
-  mean_size_factor = 5000,
-  size_factor_correlation = 0,
-  bimodal = FALSE,
-  output_file = "results.txt",
-  alpha = 0.05
-)
+run_evaluation_instance(p, fold_change, proportion_perturbed_features,
+  run_label, mean_size_factor = 5000, size_factor_correlation = 0,
+  bimodal = FALSE, output_file = "results.txt", alpha = 0.05)
 }
 \arguments{
 \item{p}{number of genes}

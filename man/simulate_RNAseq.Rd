@@ -4,13 +4,8 @@
 \alias{simulate_RNAseq}
 \title{Simulate RNA-seq (like) data}
 \usage{
-simulate_RNAseq(
-  p = 5000,
-  n = 500,
-  proportion_de = 0.5,
-  size_factor_correlation = 0,
-  spike_in = FALSE
-)
+simulate_RNAseq(p = 5000, n = 500, proportion_de = 0.5,
+  size_factor_correlation = 0, spike_in = FALSE)
 }
 \arguments{
 \item{p}{number of genes}
