@@ -5,15 +5,37 @@ library(codaDE)
 plot_ROC <- FALSE
 plot_DE <- TRUE
 
-if(plot_ROCE) {
-  data <- read.table("output/results_RNAseq.tsv", header = F)
-  colnames(data) <- c("run_label", "p", "prop_de", "sfcorr", "tp", "fp", "tn", "fn")
+# options:
+# (1) counts
+# (2) logratios
+measure <- "counts"
+# options:
+# (1) 0   -- no filtering of lowly abundant features
+# (1) 1   -- omission of calls on features with mean abundance < 1
+min_abundance <- 0
+# output files are:
+# (1) results_RNAseq.tsv        -- counts
+# (2) results_ALR_nofilter.tsv  -- logratios w/ spike-in
+# (3) results_ALR_filter.tsv    -- vanishingly low abundance features removed
+output_file <- "results_RNAseq.tsv"
+
+if(plot_ROC) {
+  data <- read.table(file.path("output", output_file), header = F)
+  colnames(data) <- c("run_label", "p", "prop_de", "sfcorr", "measure", "min_abundance",
+                      "tp", "fp", "tn", "fn", "feature_evaluated")
+  # subset to a condition of interest
+  data <- data[data$measure == measure & data$min_abundance == min_abundance,]
   data$tpr <- data$tp / (data$tp + data$fn)
   data$fpr <- data$fp / (data$fp + data$tn)
+  data$prop_de <- round(data$prop_de, 2)
   data$prop_de <- as.factor(data$prop_de)
   data$sfcorr <- as.factor(data$sfcorr)
 
-  no_genes <- c(100, 500, 20000)
+  no_genes <- c(100, 1000)
+
+  # filter out 0/0 that occasionally crops up in filtered ALR w/ low number of features
+  # these are tp = 0, fn = 0
+  data <- data[!(is.nan(data$tpr)),]
 
   for(ng in no_genes) {
     subdata <- data[data$p == ng,]
@@ -34,30 +56,30 @@ if(plot_ROCE) {
       labs(color = "size factor\ncorrelation")
 
     p <- grid.arrange(p1, p2, nrow = 1)
-    ggsave(paste0("RNAseq-like_p",ng,".png"), p, dpi = 150, units = "in", height = 4, width = 11)
+    ggsave(paste0("RNAseq_p",ng,"_",measure,"_min",min_abundance,".png"), p, dpi = 150, units = "in", height = 4, width = 11)
   }
 }
 
+# sanity check calls about differences
 if(plot_DE) {
-  p <- 500
-  data <- simulate_RNAseq(p = p, n = 200, proportion_de = 0.2, size_factor_correlation = 0)
-  for(i in sample(data$de_genes)[1]) {
-    png("DE_sample.png", height = 400, width = 800)
-    par(mfrow = c(1,2))
-    plot(data$abundances[,i], ylab = "original abundances")
-    plot(data$observed_counts[,i], ylab = "observed abundances")
-    dev.off()
-    cat("P-value abundance:", round(call_DE(data, i, TRUE), 3), "\n")
-    cat("P-value observed counts:", round(call_DE(data, i, FALSE), 3), "\n")
+  p <- 20000
+  data <- simulate_RNAseq(p = p, n = 250, proportion_de = (2/3), size_factor_correlation = 0)
+  pvals.original <- c()
+  pvals.resampled <- c()
+  # the below takes about 1 min to run
+  for(i in 1:(p/10)) {
+    pvals.original <- c(pvals.original, call_DA(data, i, TRUE))
+    pvals.resampled <- c(pvals.resampled, call_DA(data, i, FALSE))
   }
-  for(i in sample(setdiff(1:p, data$de_genes))[1]) {
-    png("nonDE_sample.png", height = 400, width = 800)
-    par(mfrow = c(1,2))
-    plot(data$abundances[,i], ylab = "original abundances")
-    plot(data$observed_counts[,i], ylab = "observed abundances")
-    dev.off()
-    cat("P-value abundance:", round(call_DE(data, i, TRUE), 3), "\n")
-    cat("P-value observed counts:", round(call_DE(data, i, FALSE), 3), "\n")
-  }
+  # let's look at a false positive
+  fp <- which((pvals.original > 0.05/p) & (pvals.resampled <= 0.05/p))
+  fp_single <- sample(fp)[1]
+  png("nonDE_sample.png", height = 400, width = 800)
+  par(mfrow = c(1,2))
+  plot(data$abundances[,fp_single], ylab = "original abundances")
+  plot(data$observed_counts[,fp_single], ylab = "observed abundances")
+  dev.off()
+  cat("P-value abundance:", pvals.original[fp_single], "\n")
+  cat("P-value observed counts:", pvals.resampled[fp_single], "\n")
 }
 
