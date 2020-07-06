@@ -29,7 +29,7 @@ sweep_RNAseq(p,
              run_label = run_label,
              de_sweep = c((1/10), (1/4), (2/3)),
              corr_sweep = c(0, 0.9),
-             output_file = "results_RNAseq.tsv",
+             output_file = paste0("results_",run_label,".tsv"),
              use_ALR = use_ALR,
              filter_abundance = filter_abundance,
              rarefy = rarefy)

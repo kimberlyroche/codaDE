@@ -334,8 +334,8 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
     pval.abundances <- call_DA(data, i, call_abundances = TRUE)
     pval.observed_counts <- call_DA(data, i, call_abundances = FALSE)
     if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-      calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
-      calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+      calls.abundances <- c(calls.abundances, pval.abundances <= alpha/p)
+      calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/p)
     }
   }
   FN <- sum(calls.abundances == TRUE & calls.observed_counts == FALSE)
@@ -355,7 +355,7 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
                     FP,"\t",
                     TN,"\t",
                     FN)
-  record_result(out_str, file.path("output","results.tsv"))
+  record_result(out_str, file.path("output",output_file))
 }
 
 #' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
@@ -414,8 +414,8 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
         pval.abundances <- call_DA_CODA(logratios.abundances, i, data$groups)
         pval.observed_counts <- call_DA_CODA(logratios.observed_counts, i, data$groups)
         if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-          calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
-          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+          calls.abundances <- c(calls.abundances, pval.abundances <= alpha/p)
+          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/p)
         }
       }
     }
@@ -425,8 +425,8 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
         pval.abundances <- call_DA(data, i, call_abundances = TRUE, rarefy = rarefy_total)
         pval.observed_counts <- call_DA(data, i, call_abundances = FALSE, rarefy = rarefy_total)
         if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-          calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
-          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+          calls.abundances <- c(calls.abundances, pval.abundances <= alpha/p)
+          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/p)
         }
       }
     }
@@ -437,7 +437,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
   TN <- sum(calls.abundances == FALSE & calls.observed_counts == FALSE)
   TP <- sum(calls.abundances == TRUE & calls.observed_counts == TRUE)
   quantity_evaluated <- "counts"
-  if(use_lr) {
+  if(use_ALR) {
     quantity_evaluated <- "logratios"
   }
   out_str <- paste0(run_label,"\t",
@@ -478,7 +478,7 @@ sweep_RNAseq <- function(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, b
     for(sf_corr in corr_sweep) {
       cat("Evaluating size factor correlation =",round(sf_corr, 2),"and DA proportion =",round(de_prop, 2),"\n")
       run_RNAseq_evaluation_instance(p, n, proportion_de = de_prop, run_label = run_label, size_factor_correlation = sf_corr,
-                                     output_file = "results.txt", alpha = 0.05, use_ALR = use_ALR,
+                                     output_file = output_file, alpha = 0.05, use_ALR = use_ALR,
                                      filter_abundance = filter_abundance, rarefy = rarefy)
     }
   }
