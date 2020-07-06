@@ -2,13 +2,21 @@
 % Please edit documentation in R/simulate.R
 \name{sweep_RNAseq}
 \alias{sweep_RNAseq}
-\title{Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
-differential expression calls and write these to an output file}
+\title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
+differential abundance calls and write these to an output file}
 \usage{
-sweep_RNAseq(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by =
-  0.1), corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-  output_file = "results.txt", alpha = 0.05, use_ALR = FALSE,
-  rarefy = FALSE)
+sweep_RNAseq(
+  p,
+  n,
+  run_label,
+  de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  output_file = "results.txt",
+  alpha = 0.05,
+  use_ALR = FALSE,
+  filter_abundance = 0,
+  rarefy = FALSE
+)
 }
 \arguments{
 \item{p}{number of genes}
@@ -17,21 +25,24 @@ sweep_RNAseq(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by =
 
 \item{run_label}{human-readable string identifier for this simulation run}
 
-\item{de_sweep}{vector of proportions of differentially expressed genes to simulate}
+\item{de_sweep}{vector of proportions of differentially abundant genes to simulate}
 
 \item{corr_sweep}{vector of correlations of size factors (true vs. observed abundances) to simulate}
 
 \item{output_file}{output file to append to}
 
-\item{alpha}{significant level below which to call a feature differentially expressed}
+\item{alpha}{significant level below which to call a feature differentially abundant}
 
-\item{use_ALR}{if TRUE, evaluates differential expression using a spike-in and the additive logratio}
+\item{use_ALR}{if TRUE, evaluates differential abundance using a spike-in and the additive logratio}
+
+\item{filter_abundance}{the minimum average abundance to require of features we'll evaluate for differential abundance
+(e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
 
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }
 \description{
-Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
-differential expression calls and write these to an output file
+Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
+differential abundance calls and write these to an output file
 }
 \details{
 Writes out error and simulation run statistics to a file.

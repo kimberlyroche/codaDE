@@ -12,7 +12,7 @@ simcor <- function(x, ymean = 0, ysd = 1, correlation = 0) {
 #'
 #' @param p number of genes
 #' @param n number of samples per group
-#' @param proportion_de proportion of differentially expressed genes
+#' @param proportion_de proportion of differentially abundant genes
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param spike_in simulate a control spike in with low dispersion
 #' @return named list of true abundances, observed abundances, and group assignments
@@ -50,7 +50,8 @@ simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_
     offset <- 2 + (j-1)*2 + 1
     mu.ij <- exp(theta[offset] + groups*theta[offset+1])
     if(spike_in & (j == length(beta.0))) {
-      rnbinom((n*2), mu = mu.ij, size = 10) # less dispersion
+      # rnbinom((n*2), mu = mu.ij, size = 10) # less dispersion
+      exp(mu.ij) # noiseless spike-in
     } else {
       rnbinom((n*2), mu = mu.ij, size = theta[1])
     }
@@ -83,7 +84,7 @@ simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_
 #' @param p number of genes
 #' @param n number of samples per group
 #' @param proportions set of proportions from which to sample true abundances
-#' @param perturbed_features number of features to differentially express
+#' @param perturbed_features number of features to differentially simulate
 #' @param fold_change fold change to induce in perturbed features
 #' @param mean_size_factor average total abundance to simulate
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
@@ -160,16 +161,16 @@ simulate_data <- function(p, n, proportions, perturbed_features, fold_change = N
               relative_entropy = relative_entropy))
 }
 
-#' Fit negative binomial model to null and full models and evaluate differential expression for a focal gene
+#' Fit negative binomial model to null and full models and evaluate differential abundance for a focal gene
 #'
 #' @param data simulated data set
-#' @param feature_idx index of gene to test for differential expression
-#' @param call_abundances if TRUE, call DE on abundances; if FALSE, on observed counts
+#' @param feature_idx index of gene to test for differential abundance
+#' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
 #' @param rarefy_depth if non-zero, specifies the depth at which to resample the counts
 #' @return p-value from NB GLM fit with MASS::glm.nb
 #' @import MASS
 #' @export
-call_DE <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0) {
+call_DA <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0) {
   if(call_abundances) {
     gene_data <- data.frame(counts = data$abundances[,feature_idx], groups = data$groups)
   } else {
@@ -208,7 +209,7 @@ call_DE <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0)
 #' Get additive logratios from the data set
 #'
 #' @param data simulated data set
-#' @param call_abundances if TRUE, call DE on abundances; if FALSE, on observed counts
+#' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
 #' @return logratios
 #' @import driver
 #' @export
@@ -224,16 +225,16 @@ get_logratios <- function(data, call_abundances = TRUE) {
   return(logratios)
 }
 
-#' Fit normal model to logratios and evaluate differential expression for a focal gene
+#' Fit normal model to logratios and evaluate differential abundance for a focal gene
 #' NOTE: probably need something better than a normal here; it's not a great fit :(
 #'       predict from fitted model for a few of these and see if this is the case
 #'
 #' @param logratios data in ALR format
-#' @param feature_idx index of gene to test for differential expression
+#' @param feature_idx index of gene to test for differential abundance
 #' @param groups treatment group assignments across samples
 #' @return p-value from lm
 #' @export
-call_DE_CODA <- function(logratios, feature_idx, groups) {
+call_DA_CODA <- function(logratios, feature_idx, groups) {
   # adjust the indexing
   gene_data <- data.frame(logratios = logratios[,feature_idx], groups = groups)
   fit <- lm(logratios ~ groups, data = gene_data)
@@ -241,14 +242,14 @@ call_DE_CODA <- function(logratios, feature_idx, groups) {
   return(pval)
 }
 
-#' Fit NBID model to null and full models and evaluate differential expression for a focal gene
+#' Fit NBID model to null and full models and evaluate differential abundance for a focal gene
 #'
 #' @param data simulated data set
-#' @param feature_idx index of gene to test for differential expression
-#' @param call_abundances if TRUE, call DE on abundances; if FALSE, on observed counts
-#' @return p-value from likelihood ratio test of differential expression
+#' @param feature_idx index of gene to test for differential abundance
+#' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
+#' @return p-value from likelihood ratio test of differential abundance
 #' @export
-call_DE_original <- function(data, feature_idx, call_abundances = TRUE) {
+call_DA_counts <- function(data, feature_idx, call_abundances = TRUE) {
   if(call_abundances) {
     base_params <- list(x = data$abundances[,feature_idx], groups = data$groups, size_factor = data$size_factors.abundances)
   } else {
@@ -286,17 +287,17 @@ record_result <- function(out_str, out_file) {
 }
 
 #' Generate simulated data with randomly perturbed features, evaluate false negatives and positives in
-#' differential expression calls and write these to an output file
+#' differential abundance calls and write these to an output file
 #'
 #' @param p number of genes
 #' @param fold_change fold change to induce in perturbed features
-#' @param proportion_perturbed_features proportion of features to differentially express
+#' @param proportion_perturbed_features proportion of features to differentially simulate
 #' @param run_label human-readable string identifier for this simulation run
 #' @param mean_size_factor average sequencing depth (total counts per sample)
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param bimodal if TRUE, simulates a composition with a high and low abundance cohorts
 #' @param output_file output file to append to
-#' @param alpha significant level below which to call a feature differentially expressed
+#' @param alpha significant level below which to call a feature differentially abundant
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @import LaplacesDemon
@@ -326,12 +327,12 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
     }
   }
 
-  # calculate and compare differential expression calls
+  # calculate and compare differential abundance calls
   calls.abundances <- c()
   calls.observed_counts <- c()
   for(i in 1:p) {
-    pval.abundances <- call_DE(data, i, call_abundances = TRUE)
-    pval.observed_counts <- call_DE(data, i, call_abundances = FALSE)
+    pval.abundances <- call_DA(data, i, call_abundances = TRUE)
+    pval.observed_counts <- call_DA(data, i, call_abundances = FALSE)
     if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
       calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
       calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
@@ -357,23 +358,25 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
   record_result(out_str, file.path("output","results.tsv"))
 }
 
-#' Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
-#' differential expression calls and write these to an output file
+#' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
+#' differential abundance calls and write these to an output file
 #'
 #' @param p number of genes
 #' @param n number of samples per group
-#' @param proportion_de proportion of differentially expressed genes
+#' @param proportion_de proportion of differentially abundant genes
 #' @param run_label human-readable string identifier for this simulation run
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param output_file output file to append to
-#' @param alpha significant level below which to call a feature differentially expressed
-#' @param use_ALR if TRUE, evaluates differential expression using a spike-in and the additive logratio
+#' @param alpha significant level below which to call a feature differentially abundant
+#' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
+#' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
+#' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
 run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_factor_correlation = 0,
-                                           output_file = "results.txt", alpha = 0.05, use_ALR = FALSE, rarefy = FALSE) {
+                                           output_file = "results.txt", alpha = 0.05, use_ALR = FALSE, filter_abundance = 1, rarefy = FALSE) {
   all_taxa_observed <- FALSE
   while(!all_taxa_observed) {
     cat("Simulating data...\n")
@@ -396,29 +399,35 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
     rarefy_total <- 0
   }
 
-  # calculate and compare differential expression calls
-  cat("Evaluating differential expression...\n")
+  # calculate and compare differential abundance calls
+  cat("Evaluating differential abundance...\n")
   calls.abundances <- c()
   calls.observed_counts <- c()
-
+  
+  evaluate_features <- apply(data$observed_counts, 2, function(x) mean(x)/nrow(data$observed_counts) > filter_abundance)
+  
   if(use_ALR) {
     logratios.abundances <- get_logratios(data, call_abundances = TRUE)
     logratios.observed_counts <- get_logratios(data, call_abundances = FALSE)
     for(i in 1:p) {
-      pval.abundances <- call_DE_CODA(logratios.abundances, i, data$groups)
-      pval.observed_counts <- call_DE_CODA(logratios.observed_counts, i, data$groups)
-      if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-        calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
-        calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+      if(evaluate_features[i]) {
+        pval.abundances <- call_DA_CODA(logratios.abundances, i, data$groups)
+        pval.observed_counts <- call_DA_CODA(logratios.observed_counts, i, data$groups)
+        if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+          calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
+          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+        }
       }
     }
   } else {
     for(i in 1:p) {
-      pval.abundances <- call_DE(data, i, call_abundances = TRUE, rarefy = rarefy_total)
-      pval.observed_counts <- call_DE(data, i, call_abundances = FALSE, rarefy = rarefy_total)
-      if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-        calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
-        calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+      if(evaluate_features[i]) {
+        pval.abundances <- call_DA(data, i, call_abundances = TRUE, rarefy = rarefy_total)
+        pval.observed_counts <- call_DA(data, i, call_abundances = FALSE, rarefy = rarefy_total)
+        if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+          calls.abundances <- c(calls.abundances, pval.abundances <= alpha)
+          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha)
+        }
       }
     }
   }
@@ -427,39 +436,50 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
   FP <- sum(calls.abundances == FALSE & calls.observed_counts == TRUE)
   TN <- sum(calls.abundances == FALSE & calls.observed_counts == FALSE)
   TP <- sum(calls.abundances == TRUE & calls.observed_counts == TRUE)
+  quantity_evaluated <- "counts"
+  if(use_lr) {
+    quantity_evaluated <- "logratios"
+  }
   out_str <- paste0(run_label,"\t",
                     p,"\t",
                     proportion_de,"\t",
                     size_factor_correlation,"\t",
+                    quantity_evaluated,"\t",
+                    filter_abundance,"\t",
                     TP,"\t",
                     FP,"\t",
                     TN,"\t",
-                    FN)
-  record_result(out_str, file.path("output","results_RNAseq.tsv"))
+                    FN,"\t",
+                    sum(evaluate_features),"\t")
+  record_result(out_str, file.path("output",output_file))
 }
 
-#' Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
-#' differential expression calls and write these to an output file
+#' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
+#' differential abundance calls and write these to an output file
 #'
 #' @param p number of genes
 #' @param n number of samples per group
 #' @param run_label human-readable string identifier for this simulation run
-#' @param de_sweep vector of proportions of differentially expressed genes to simulate
+#' @param de_sweep vector of proportions of differentially abundant genes to simulate
 #' @param corr_sweep vector of correlations of size factors (true vs. observed abundances) to simulate
 #' @param output_file output file to append to
-#' @param alpha significant level below which to call a feature differentially expressed
-#' @param use_ALR if TRUE, evaluates differential expression using a spike-in and the additive logratio
+#' @param alpha significant level below which to call a feature differentially abundant
+#' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
+#' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
+#' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
 sweep_RNAseq <- function(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-                         corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt", alpha = 0.05, use_ALR = FALSE, rarefy = FALSE) {
+                         corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt",
+                         alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, rarefy = FALSE) {
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
-      cat("Evaluating size factor correlation =",round(sf_corr, 2),"and DE proportion =",round(de_prop, 2),"\n")
+      cat("Evaluating size factor correlation =",round(sf_corr, 2),"and DA proportion =",round(de_prop, 2),"\n")
       run_RNAseq_evaluation_instance(p, n, proportion_de = de_prop, run_label = run_label, size_factor_correlation = sf_corr,
-                                     output_file = "results.txt", alpha = 0.05, use_ALR = use_ALR, rarefy = rarefy)
+                                     output_file = "results.txt", alpha = 0.05, use_ALR = use_ALR,
+                                     filter_abundance = filter_abundance, rarefy = rarefy)
     }
   }
 }

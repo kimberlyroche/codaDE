@@ -3,18 +3,26 @@
 \name{run_evaluation_instance}
 \alias{run_evaluation_instance}
 \title{Generate simulated data with randomly perturbed features, evaluate false negatives and positives in
-differential expression calls and write these to an output file}
+differential abundance calls and write these to an output file}
 \usage{
-run_evaluation_instance(p, fold_change, proportion_perturbed_features,
-  run_label, mean_size_factor = 5000, size_factor_correlation = 0,
-  bimodal = FALSE, output_file = "results.txt", alpha = 0.05)
+run_evaluation_instance(
+  p,
+  fold_change,
+  proportion_perturbed_features,
+  run_label,
+  mean_size_factor = 5000,
+  size_factor_correlation = 0,
+  bimodal = FALSE,
+  output_file = "results.txt",
+  alpha = 0.05
+)
 }
 \arguments{
 \item{p}{number of genes}
 
 \item{fold_change}{fold change to induce in perturbed features}
 
-\item{proportion_perturbed_features}{proportion of features to differentially express}
+\item{proportion_perturbed_features}{proportion of features to differentially simulate}
 
 \item{run_label}{human-readable string identifier for this simulation run}
 
@@ -26,11 +34,11 @@ run_evaluation_instance(p, fold_change, proportion_perturbed_features,
 
 \item{output_file}{output file to append to}
 
-\item{alpha}{significant level below which to call a feature differentially expressed}
+\item{alpha}{significant level below which to call a feature differentially abundant}
 }
 \description{
 Generate simulated data with randomly perturbed features, evaluate false negatives and positives in
-differential expression calls and write these to an output file
+differential abundance calls and write these to an output file
 }
 \details{
 Writes out error and simulation run statistics to a file.

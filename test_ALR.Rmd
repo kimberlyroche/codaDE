@@ -1,0 +1,221 @@
+---
+title: "Evaluating ALR DE"
+author: "Kim Roche"
+date: "7/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Aim
+
+In evaluating simulated (compositional) RNAseq data, we've seen that grossly speaking having *relatively few differentially expressed genes* or having *reliable information about the original total sample abundances* is protective against error in differential expression (DE) calls.
+
+The expectation would be that simulating a spike-in (with less variation than the other synthetic "genes"; noise will only come through via resampling in this simulation) and evaluating DE on counts relative to this spike-in should reduce error.
+
+## Simulate and visualize data
+
+```{r sim}
+library(codaDE)
+p <- 500
+n <- 100
+data <- simulate_RNAseq(p = p, n = n, proportion_de = 0.5, size_factor_correlation = 0.0, spike_in = TRUE)
+
+# visualize counts for a differentially expressed gene
+plot(data$abundances[,data$de_genes[1]], ylab = "orig. abundances")
+plot(data$observed_counts[,data$de_genes[1]], ylab = "observed counts")
+```
+
+Convert these to logratios and visualize them. In general we notice that this representation -- which is one noisy feature relative to another -- obscures a lot of the difference between control and treatment!
+
+```{r sim_alr_viz}
+
+logratios.abundances <- get_logratios(data, call_abundances = TRUE)
+logratios.observed_counts <- get_logratios(data, call_abundances = FALSE)
+
+# visualize noise to a DE gene added by ALR representation
+plot(logratios.abundances[,data$de_genes[1]], ylab = "ALR orig. abundances")
+plot(logratios.observed_counts[,data$de_genes[1]], ylab = "ALR observed counts")
+```
+
+## Evaluating DE
+
+Build a function to evaluate differential expression on counts or logratios, allowing us to set a threshold for minimum mean abundance we'll use later.
+
+This function returns a list of: true positives, true negatives, false positives, false negatives, and the number of genes evaluated (those above the minimum abundance threshold).
+
+```{r de_func}
+evaluate_DE <- function(data, abundance_threshold = 1, use_lr = TRUE) {
+  tp <- c()
+  tn <- c()
+  fn <- c(); fn_p1 <- c(); fn_p2 <- c()
+  fp <- c(); fp_p1 <- c(); fp_p2 <- c()
+  evaluate_gene <- apply(data$observed_counts, 2, function(x) mean(x)/nrow(data$observed_counts) > abundance_threshold)
+  for(feature_idx in 1:p) {
+    if(evaluate_gene[feature_idx]) {
+      if(use_lr) {
+        gene_data <- data.frame(logratios = logratios.abundances[,feature_idx], groups = data$groups)
+        fit <- lm(logratios ~ groups, data = gene_data)
+        pval1 <- coef(summary(fit))[2,4]
+        gene_data <- data.frame(logratios = logratios.observed_counts[,feature_idx], groups = data$groups)
+        fit <- lm(logratios ~ groups, data = gene_data)
+        pval2 <- coef(summary(fit))[2,4]
+      } else {
+        pval1 <- call_DE(data, feature_idx, call_abundances = TRUE)
+        pval2 <- call_DE(data, feature_idx, call_abundances = FALSE)
+      }
+      if(pval1 < 0.05) {
+        if(pval2 < 0.05) {
+          tp <- c(tp, feature_idx)
+        } else {
+          fn <- c(fn, feature_idx)
+          fn_p1 <- c(fn_p1, pval1)
+          fn_p2 <- c(fn_p2, pval2)
+        }
+      } else {
+        if(pval2 < 0.05) {
+          fp <- c(fp, feature_idx)
+          fp_p1 <- c(fp_p1, pval1)
+          fp_p2 <- c(fp_p2, pval2)
+        } else {
+          tn <- c(tn, feature_idx)
+        }
+      }
+    }
+  }
+  return(list(tp = tp, tn = tn, fp = fp, fn = fn,
+              fp_p1 = fp_p1, fp_p2 = fp_p2, fn_p1 = fn_p1, fn_p2 = fn_p2,
+              genes_evaluated = sum(evaluate_gene)))
+}
+
+print_result_stats <- function(results) {
+  cat(paste0("TP: ",length(results$tp),"/",results$genes_evaluated," (",round(length(results$tp)/results$genes_evaluated, 2),")\n"))
+  cat(paste0("TN: ",length(results$tn),"/",results$genes_evaluated," (",round(length(results$tn)/results$genes_evaluated, 2),")\n"))
+  cat(paste0("FP: ",length(results$fp),"/",results$genes_evaluated," (",round(length(results$fp)/results$genes_evaluated, 2),")\n"))
+  cat(paste0("FN: ",length(results$fn),"/",results$genes_evaluated," (",round(length(results$fn)/results$genes_evaluated, 2),")\n"))
+}
+```
+
+## Performance with and without filtering
+
+If we only include genes that have greater-then-negligible abundance, our error rates are very small with an ALR representation (relative to the spike-in).
+
+```{r alr_de}
+results_alr.1 <- evaluate_DE(data, abundance_threshold = 0, use_lr = TRUE)
+print_result_stats(results_alr.1)
+cat("\n")
+results_alr.2 <- evaluate_DE(data, abundance_threshold = 1, use_lr = TRUE)
+print_result_stats(results_alr.2)
+```
+
+There are not big changes in the **count** version of DE if we filter. Error is high all around.
+
+```{r count_de}
+results1 <- evaluate_DE(data, abundance_threshold = 0, use_lr = FALSE)
+print_result_stats(results1)
+cat("\n")
+results2 <- evaluate_DE(data, abundance_threshold = 1, use_lr = FALSE)
+print_result_stats(results2)
+```
+
+## Understanding error in the ALR scenario
+
+We'll make some visualization functions first.
+
+```{r alr_error_fn}
+plot_rg <- function(orig_mat, observed_mat, rg) {
+  plot(orig_mat[,rg], ylab = "orig. abundances")
+  plot(observed_mat[,rg], ylab = "observed counts")
+}
+```
+
+### Visualizing ALR false negatives (misses)
+
+In all cases of missed DE calls, it looks like a very lowly abundant gene (with particularly *decreased* expression in treatment) has the DE effect "washed out" by the new noisy representation.
+
+This is a problem of sensitivity.
+
+```{r alr_fn_viz}
+# visualize a random FN
+rgs <- sample(results_alr.1$fn)[1]
+for(rg in rgs) {
+  fn_idx <- which(results_alr.1$fn == rg)
+  cat(paste0("P1 vs P2: ",round(results_alr.1$fn_p1[fn_idx], 3)," vs ",round(results_alr.1$fn_p2[fn_idx], 3),"\n"))
+  plot_rg(logratios.abundances, logratios.observed_counts, rg)
+}
+```
+
+### Visualizing ALR false positives (erroneous hits)
+
+These are stranger. In all cases and vanishingly abundant gene with no DE in the original system appears to be increasing in abundance (relative to the spike-in). The logratio (focal gene vs. spike-in) is increasing. This happens because:
+
+1) The gross effect of differential expression is an increase is total counts in the original system. (I suppose because of a floor at zero; you can only decrease in abundance so much but you can effectively increase without bound.)
+
+2) Since neither is changing in absolute amount, the focal gene and the spike-in decrease (proportionally) by the same factor.
+
+3) However, when realized in the resampling as counts, there is a higher barrier for the focal feature (with its tiny proportion) to "jump" between counts. Proportional change in a tiny fraction doesn't amount to much as a count. So the vanishingly abundant focal gene appears to have changed (proportionally) less than the spike-in.
+
+4) This mean the numerator of the ALR (focal gene) stays about the same, while generally the denominator (spike-in) decreases, increasing the overall ratio.
+
+This appears as increased expression.
+
+The best workaround is probably just to exclude very-lowly-abundant features and make the (reasonable) claim that we just don't have resolution on them. We can probably work out an empirical cutoff based on FPs.
+
+**Note:** This is mitigated by a correlation between resampled and original total counts ("size factors") because this effect seems to happen with resampling when there is "expansion" or "contraction" that isn't symmetric between smaller and larger relative abundances (proportions).
+
+
+```{r alr_fp_viz}
+# visualize a random FP
+rgs <- sample(results_alr.1$fp)[1]
+for(rg in rgs) {
+  fp_idx <- which(results_alr.1$fp == rg)
+  cat(paste0("P1 vs P2: ",round(results_alr.1$fp_p1[fp_idx], 3)," vs ",round(results_alr.1$fp_p2[fp_idx], 3),"\n"))
+  plot_rg(logratios.abundances, logratios.observed_counts, rg)
+}
+```
+
+### Exploratory: What do DE calls on counts look like?
+
+Visualize true positives:
+
+```{r count_tp_viz}
+rgs <- sample(results1$tp)[1]
+for(rg in rgs) {
+  plot_rg(data$abundances, data$observed_counts, rg)
+}
+```
+
+Versus false negatives:
+
+```{r count_fn_viz}
+rgs <- sample(results1$fn)[1]
+for(rg in rgs) {
+  fn_idx <- which(results1$fn == rg)
+  cat(paste0("P1 vs P2: ",round(results1$fn_p1[fn_idx], 3)," vs ",round(results1$fn_p2[fn_idx], 3),"\n"))
+  plot_rg(data$abundances, data$observed_counts, rg)
+}
+```
+
+It looks like this is just an issue noise induced by resampling. Maybe you could argue that estimating separate control and treatment dispersions would mitigate this.
+
+Visualize false positives:
+
+```{r count_fp_viz}
+rgs <- sample(results1$fp)[1]
+for(rg in rgs) {
+  fp_idx <- which(results1$fp == rg)
+  cat(paste0("P1 vs P2: ",round(results1$fp_p1[fp_idx], 3)," vs ",round(results1$fp_p2[fp_idx], 3),"\n"))
+  plot_rg(data$abundances, data$observed_counts, rg)
+}
+```
+
+Again most of these would not be flagged by eye. So we might be able to argue here that $\alpha = 0.05$ is just a sucky threshold.
+
+
+
+
+
+
+

@@ -4,15 +4,20 @@
 \alias{simulate_RNAseq}
 \title{Simulate RNA-seq (like) data}
 \usage{
-simulate_RNAseq(p = 5000, n = 500, proportion_de = 0.5,
-  size_factor_correlation = 0, spike_in = FALSE)
+simulate_RNAseq(
+  p = 5000,
+  n = 500,
+  proportion_de = 0.5,
+  size_factor_correlation = 0,
+  spike_in = FALSE
+)
 }
 \arguments{
 \item{p}{number of genes}
 
 \item{n}{number of samples per group}
 
-\item{proportion_de}{proportion of differentially expressed genes}
+\item{proportion_de}{proportion of differentially abundant genes}
 
 \item{size_factor_correlation}{correlation of observed abundances to original total abundances}
 

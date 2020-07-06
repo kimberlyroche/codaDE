@@ -2,19 +2,28 @@
 % Please edit documentation in R/simulate.R
 \name{run_RNAseq_evaluation_instance}
 \alias{run_RNAseq_evaluation_instance}
-\title{Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
-differential expression calls and write these to an output file}
+\title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
+differential abundance calls and write these to an output file}
 \usage{
-run_RNAseq_evaluation_instance(p, n, proportion_de, run_label,
-  size_factor_correlation = 0, output_file = "results.txt",
-  alpha = 0.05, use_ALR = FALSE, rarefy = FALSE)
+run_RNAseq_evaluation_instance(
+  p,
+  n,
+  proportion_de,
+  run_label,
+  size_factor_correlation = 0,
+  output_file = "results.txt",
+  alpha = 0.05,
+  use_ALR = FALSE,
+  filter_abundance = 1,
+  rarefy = FALSE
+)
 }
 \arguments{
 \item{p}{number of genes}
 
 \item{n}{number of samples per group}
 
-\item{proportion_de}{proportion of differentially expressed genes}
+\item{proportion_de}{proportion of differentially abundant genes}
 
 \item{run_label}{human-readable string identifier for this simulation run}
 
@@ -22,15 +31,18 @@ run_RNAseq_evaluation_instance(p, n, proportion_de, run_label,
 
 \item{output_file}{output file to append to}
 
-\item{alpha}{significant level below which to call a feature differentially expressed}
+\item{alpha}{significant level below which to call a feature differentially abundant}
 
-\item{use_ALR}{if TRUE, evaluates differential expression using a spike-in and the additive logratio}
+\item{use_ALR}{if TRUE, evaluates differential abundance using a spike-in and the additive logratio}
+
+\item{filter_abundance}{the minimum average abundance to require of features we'll evaluate for differential abundance
+(e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
 
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }
 \description{
-Generate simulated data with RNA-seq like features and > 3 fold differential expression, evaluate false negatives and positives in
-differential expression calls and write these to an output file
+Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
+differential abundance calls and write these to an output file
 }
 \details{
 Writes out error and simulation run statistics to a file.

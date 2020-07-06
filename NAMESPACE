@@ -2,9 +2,9 @@
 
 S3method(predict,NBID)
 export(calc_LRT.NBID)
-export(call_DE)
-export(call_DE_CODA)
-export(call_DE_original)
+export(call_DA)
+export(call_DA_CODA)
+export(call_DA_counts)
 export(get_logratios)
 export(gradient.NBID)
 export(gradient_NBID)
