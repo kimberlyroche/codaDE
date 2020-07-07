@@ -3,8 +3,8 @@ use warnings;
 use POSIX;
 
 my @features = qw(20000);
-my @evaluate_alr = qw(TRUE);
-my @filter_abundance = qw(0);
+my @evaluate_alr = qw(FALSE);
+my @filter_abundance = qw(1);
 
 my $filename = "job.slurm";
 my $f = 0;
@@ -33,7 +33,7 @@ for my $i (0 .. $#features) {
       print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
       # FALSE refers to rarefication
-      print $fh 'srun Rscript run.R '.$f.' 250 ALR_nofilter '.$ea.' '.$fa.' FALSE'."\n\n";
+      print $fh 'srun Rscript run.R '.$f.' 250 RNAseq_filter '.$ea.' '.$fa.' FALSE'."\n\n";
 
       close $fh;
 
