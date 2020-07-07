@@ -2,8 +2,8 @@ library(ggplot2)
 library(gridExtra)
 library(codaDE)
 
-plot_ROC <- FALSE
-plot_DE <- TRUE
+plot_ROC <- TRUE
+plot_DE <- FALSE
 
 # options:
 # (1) counts
@@ -12,12 +12,24 @@ measure <- "counts"
 # options:
 # (1) 0   -- no filtering of lowly abundant features
 # (1) 1   -- omission of calls on features with mean abundance < 1
-min_abundance <- 0
+min_abundance <- 1
+
+output_file <- "results_"
+if(measure == "counts") {
+  output_file <- paste0(output_file, "RNAseq_")
+} else {
+  output_file <- paste0(output_file, "ALR_")
+}
+if(min_abundance == 0) {
+  output_file <- paste0(output_file, "nofilter.tsv")
+} else {
+  output_file <- paste0(output_file, "filter.tsv")
+}
 # output files are:
-# (1) results_RNAseq.tsv        -- counts
-# (2) results_ALR_nofilter.tsv  -- logratios w/ spike-in
-# (3) results_ALR_filter.tsv    -- vanishingly low abundance features removed
-output_file <- "results_RNAseq.tsv"
+# (1) results_RNAseq_nofilter.tsv   -- counts
+# (1) results_RNAseq_filter.tsv     -- counts omitting tiny counts
+# (2) results_ALR_nofilter.tsv      -- logratios
+# (3) results_ALR_filter.tsv        -- logratios omitting tiny counts
 
 if(plot_ROC) {
   data <- read.table(file.path("output", output_file), header = F)
@@ -31,7 +43,7 @@ if(plot_ROC) {
   data$prop_de <- as.factor(data$prop_de)
   data$sfcorr <- as.factor(data$sfcorr)
 
-  no_genes <- c(100, 1000)
+  no_genes <- c(20000)
 
   # filter out 0/0 that occasionally crops up in filtered ALR w/ low number of features
   # these are tp = 0, fn = 0
