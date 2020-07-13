@@ -8,24 +8,22 @@ simcor <- function(x, ymean = 0, ysd = 1, correlation = 0) {
   yresult
 }
 
-#' Simulate RNA-seq (like) data
+#' Simulate sequence count data
 #'
-#' @param p number of genes
+#' @param baseline_log_abundances a distribution (length p) of baseline log abundances from which to simulate
 #' @param n number of samples per group
 #' @param proportion_de proportion of differentially abundant genes
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param spike_in simulate a control spike in with low dispersion
 #' @return named list of true abundances, observed abundances, and group assignments
 #' @export
-simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_correlation = 0, spike_in = FALSE) {
-  data_dir <- "GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct"
-  GTEx_stats <- readRDS(file.path(data_dir, "empirical_sample.rds"))
+simulate_sequence_counts <- function(baseline_log_abundances, n = 500, proportion_de = 0.5, size_factor_correlation = 0, spike_in = FALSE) {
+  beta.0 <- baseline_log_abundances
+  p <- length(beta.0)
   groups <- c(rep(0, n), rep(1, n))
   theta <- rep(0.25, 2) # fix the dispersions between groups for simplicity now
-  beta.0 <- sample(log(GTEx_stats$mean_abundance_profiles + 0.5), size = p, replace = TRUE)
   if(spike_in) {
     spike_in_beta <- median(beta.0)
-    cat("Spike in has abundance:",spike_in_beta,"\n")
     beta.0 <- c(beta.0, spike_in_beta)
   }
   de_elements <- sort(sample(1:p)[1:round(proportion_de*p)])
@@ -43,7 +41,7 @@ simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_
     }
   })
   theta <- c(theta, c(rbind(beta.0, beta.1)))
-
+  
   # the commented-out code below just shuffles the original abundances
   # size_factors.abundances <- sample(rep(GTEx_stats$total_read_profiles, ceiling(length(GTEx_stats$total_read_profiles)/(n*2))))[1:(n*2)]
   abundances <- sapply(1:length(beta.0), function(j) {
@@ -57,11 +55,11 @@ simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_
     }
   })
   # samples x genes
-
+  
   # transform these to proportions
   sampled_proportions <- apply(abundances, 1, function(x) x/sum(x))
   # genes x samples
-
+  
   realized_total_counts <- rowSums(abundances)
   size_factors.observed_counts <- round(simcor(realized_total_counts, mean(realized_total_counts), sd(realized_total_counts),
                                                size_factor_correlation))
@@ -75,8 +73,48 @@ simulate_RNAseq <- function(p = 5000, n = 500, proportion_de = 0.5, size_factor_
     rmultinom(1, size = size_factors.observed_counts[i], prob = sampled_proportions[,i])
   })
   # genes x samples
-
+  
   return(list(abundances = abundances, observed_counts = t(observed_counts), groups = groups, theta = theta, de_genes = de_elements))
+}
+
+#' Simulate UMI count single-cell RNA-seq data
+#'
+#' @param p number of genes
+#' @param n number of samples per group
+#' @param proportion_de proportion of differentially abundant genes
+#' @param size_factor_correlation correlation of observed abundances to original total abundances
+#' @param spike_in simulate a control spike in with low dispersion
+#' @param dataset_name options are "Muraro2016", "Haber2017", "Halpern2017"; see details
+#' @details Available data sets to infer baseline abundances from are:
+#' Muraro et al. (2016) -- pancreatic alpha and beta islet cells resolved to gene level with CEL-seq2
+#' Haber et al. (2017) -- murine intestinal epithelium cells resolved to gene level with GemCode (early 10x Chromium)
+#' Halpern et al. (2017) -- (murine?) liver cells resolved to gene level with MARS-seq
+#' @return named list of true abundances, observed abundances, and group assignments
+#' @export
+simulate_singlecell_RNAseq <- function(p = 20000, n = 500, proportion_de = 0.5, size_factor_correlation = 0, spike_in = FALSE,
+                                       dataset_name = "Muraro2016") {
+  data_dir <- "UMI_counts"
+  UMI_stats <- readRDS(file.path(data_dir, paste0(dataset_name, ".rds")))
+  beta.0 <- sample(log(UMI_stats$stats$mean_abundance_profiles + 0.5), size = p, replace = TRUE)
+  return(simulate_sequence_counts(beta.0, n = n, proportion_de = proportion_de,
+                                  size_factor_correlation = size_factor_correlation, spike_in = spike_in))
+}
+
+#' Simulate bulk RNA-seq data
+#'
+#' @param p number of genes
+#' @param n number of samples per group
+#' @param proportion_de proportion of differentially abundant genes
+#' @param size_factor_correlation correlation of observed abundances to original total abundances
+#' @param spike_in simulate a control spike in with low dispersion
+#' @return named list of true abundances, observed abundances, and group assignments
+#' @export
+simulate_bulk_RNAseq <- function(p = 20000, n = 500, proportion_de = 0.5, size_factor_correlation = 0, spike_in = FALSE) {
+  data_dir <- "GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct"
+  GTEx_stats <- readRDS(file.path(data_dir, "empirical_sample.rds"))
+  beta.0 <- sample(log(GTEx_stats$mean_abundance_profiles + 0.5), size = p, replace = TRUE)
+  return(simulate_sequence_counts(beta.0, n = n, proportion_de = proportion_de,
+                                  size_factor_correlation = size_factor_correlation, spike_in = spike_in))
 }
 
 #' Simulate counts for control vs. treatment groups
@@ -242,7 +280,7 @@ call_DA_CODA <- function(logratios, feature_idx, groups) {
   return(pval)
 }
 
-#' Fit NBID model to null and full models and evaluate differential abundance for a focal gene
+#' Fit NBID model to null and full models and evaluate differential abundance for a focal gene; OLD
 #'
 #' @param data simulated data set
 #' @param feature_idx index of gene to test for differential abundance
@@ -366,6 +404,8 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
 #' @param proportion_de proportion of differentially abundant genes
 #' @param run_label human-readable string identifier for this simulation run
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
+#' @param sc_dataset_name if not NULL, specifies single-cell data set to use for estimating baseline abundances (see simulate_singlecell_RNAseq
+#' for details); otherwise, simulate bulk RNA-seq
 #' @param output_file output file to append to
 #' @param alpha significant level below which to call a feature differentially abundant
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
@@ -375,12 +415,18 @@ run_evaluation_instance <- function(p, fold_change, proportion_perturbed_feature
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
-run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_factor_correlation = 0,
+run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_factor_correlation = 0, sc_dataset_name = NULL,
                                            output_file = "results.txt", alpha = 0.05, use_ALR = FALSE, filter_abundance = 1, rarefy = FALSE) {
   all_taxa_observed <- FALSE
   while(!all_taxa_observed) {
     cat("Simulating data...\n")
-    data <- simulate_RNAseq(p = p, n = n, proportion_de = proportion_de, size_factor_correlation = size_factor_correlation, spike_in = use_ALR)
+    if(is.null(sc_dataset_name)) {
+      data <- simulate_bulk_RNAseq(p = p, n = n, proportion_de = proportion_de, size_factor_correlation = size_factor_correlation,
+                                   spike_in = use_ALR)
+    } else {
+      data <- simulate_singlecell_RNAseq(p = p, n = n, proportion_de = proportion_de, size_factor_correlation = size_factor_correlation,
+                                         spike_in = use_ALR, dataset_name = sc_dataset_name)
+    }
     g0.ab <- data$abundances[data$groups == 0,] # samples x genes
     g1.ab <- data$abundances[data$groups == 1,] # samples x genes
     g0.oc <- data$observed_counts[data$groups == 0,] # samples x genes
@@ -404,7 +450,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
   calls.abundances <- c()
   calls.observed_counts <- c()
   
-  evaluate_features <- apply(data$observed_counts, 2, function(x) mean(x)/nrow(data$observed_counts) > filter_abundance)
+  evaluate_features <- apply(data$observed_counts, 2, function(x) mean(x) > filter_abundance)
   
   if(use_ALR) {
     logratios.abundances <- get_logratios(data, call_abundances = TRUE)
@@ -421,6 +467,9 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
     }
   } else {
     for(i in 1:p) {
+      if(i %% 1000 == 0) {
+        cat("Evaluating DA on feature:",i,"\n")
+      }
       if(evaluate_features[i]) {
         pval.abundances <- call_DA(data, i, call_abundances = TRUE, rarefy = rarefy_total)
         pval.observed_counts <- call_DA(data, i, call_abundances = FALSE, rarefy = rarefy_total)
@@ -460,6 +509,8 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
 #' @param p number of genes
 #' @param n number of samples per group
 #' @param run_label human-readable string identifier for this simulation run
+#' @param sc_dataset_name label of single-cell data set to use for estimating baseline abundances (see simulate_singlecell_RNAseq
+#' for details); if NULL, simulates bulk RNA-seq data
 #' @param de_sweep vector of proportions of differentially abundant genes to simulate
 #' @param corr_sweep vector of correlations of size factors (true vs. observed abundances) to simulate
 #' @param output_file output file to append to
@@ -471,14 +522,14 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_de, run_label, size_
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
-sweep_RNAseq <- function(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+sweep_RNAseq <- function(p, n, run_label, sc_dataset_name = NULL, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
                          corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt",
                          alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, rarefy = FALSE) {
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
       cat("Evaluating size factor correlation =",round(sf_corr, 2),"and DA proportion =",round(de_prop, 2),"\n")
       run_RNAseq_evaluation_instance(p, n, proportion_de = de_prop, run_label = run_label, size_factor_correlation = sf_corr,
-                                     output_file = output_file, alpha = 0.05, use_ALR = use_ALR,
+                                     sc_dataset_name = sc_dataset_name, output_file = output_file, alpha = 0.05, use_ALR = use_ALR,
                                      filter_abundance = filter_abundance, rarefy = rarefy)
     }
   }

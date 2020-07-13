@@ -5,10 +5,19 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
 differential abundance calls and write these to an output file}
 \usage{
-sweep_RNAseq(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by =
-  0.1), corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-  output_file = "results.txt", alpha = 0.05, use_ALR = FALSE,
-  filter_abundance = 0, rarefy = FALSE)
+sweep_RNAseq(
+  p,
+  n,
+  run_label,
+  sc_dataset_name = NULL,
+  de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  output_file = "results.txt",
+  alpha = 0.05,
+  use_ALR = FALSE,
+  filter_abundance = 0,
+  rarefy = FALSE
+)
 }
 \arguments{
 \item{p}{number of genes}
@@ -16,6 +25,9 @@ sweep_RNAseq(p, n, run_label, de_sweep = seq(from = 0.1, to = 0.9, by =
 \item{n}{number of samples per group}
 
 \item{run_label}{human-readable string identifier for this simulation run}
+
+\item{sc_dataset_name}{label of single-cell data set to use for estimating baseline abundances (see simulate_singlecell_RNAseq
+for details); if NULL, simulates bulk RNA-seq data}
 
 \item{de_sweep}{vector of proportions of differentially abundant genes to simulate}
 

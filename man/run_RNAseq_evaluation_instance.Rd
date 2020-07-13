@@ -5,10 +5,19 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
 differential abundance calls and write these to an output file}
 \usage{
-run_RNAseq_evaluation_instance(p, n, proportion_de, run_label,
-  size_factor_correlation = 0, output_file = "results.txt",
-  alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
-  rarefy = FALSE)
+run_RNAseq_evaluation_instance(
+  p,
+  n,
+  proportion_de,
+  run_label,
+  size_factor_correlation = 0,
+  sc_dataset_name = NULL,
+  output_file = "results.txt",
+  alpha = 0.05,
+  use_ALR = FALSE,
+  filter_abundance = 1,
+  rarefy = FALSE
+)
 }
 \arguments{
 \item{p}{number of genes}
@@ -20,6 +29,9 @@ run_RNAseq_evaluation_instance(p, n, proportion_de, run_label,
 \item{run_label}{human-readable string identifier for this simulation run}
 
 \item{size_factor_correlation}{correlation of observed abundances to original total abundances}
+
+\item{sc_dataset_name}{if not NULL, specifies single-cell data set to use for estimating baseline abundances (see simulate_singlecell_RNAseq
+for details); otherwise, simulate bulk RNA-seq}
 
 \item{output_file}{output file to append to}
 

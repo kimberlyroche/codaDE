@@ -2,7 +2,7 @@
 % Please edit documentation in R/simulate.R
 \name{call_DA_counts}
 \alias{call_DA_counts}
-\title{Fit NBID model to null and full models and evaluate differential abundance for a focal gene}
+\title{Fit NBID model to null and full models and evaluate differential abundance for a focal gene; OLD}
 \usage{
 call_DA_counts(data, feature_idx, call_abundances = TRUE)
 }
@@ -17,5 +17,5 @@ call_DA_counts(data, feature_idx, call_abundances = TRUE)
 p-value from likelihood ratio test of differential abundance
 }
 \description{
-Fit NBID model to null and full models and evaluate differential abundance for a focal gene
+Fit NBID model to null and full models and evaluate differential abundance for a focal gene; OLD
 }
