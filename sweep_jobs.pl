@@ -2,9 +2,21 @@ use strict;
 use warnings;
 use POSIX;
 
+# bulk RNA-seq
+#my @features = qw(1000 20000 50000);
 my @features = qw(20000);
-my @evaluate_alr = qw(FALSE);
+my @evaluate_alr = qw(TRUE);
 my @filter_abundance = qw(1);
+my $sc_dataset_name = "bulk";
+#my $label = "bulkRNAseq";
+my $label = "bulkRNAseq_ALR";
+
+# single-cell RNA-seq
+#my @features = qw(50000);
+#my @evaluate_alr = qw(FALSE);
+#my @filter_abundance = qw(1);
+#my $sc_dataset_name = "Haber2017";
+#my $label = "singlecell_Haber";
 
 my $filename = "job.slurm";
 my $f = 0;
@@ -33,11 +45,11 @@ for my $i (0 .. $#features) {
       print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
       # FALSE refers to rarefication
-      print $fh 'srun Rscript run.R '.$f.' 250 RNAseq_filter '.$ea.' '.$fa.' FALSE'."\n\n";
+      print $fh 'srun Rscript run.R '.$f.' 250 '.$label.' '.$sc_dataset_name.' '.$ea.' '.$fa.' FALSE'."\n\n";
 
       close $fh;
 
-      my $call_str = "sbatch --array=1-20 $filename";
+      my $call_str = "sbatch --array=1-50 $filename";
       print("Calling: ".$call_str."\n");
       `$call_str`;
 
