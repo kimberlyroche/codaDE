@@ -7,10 +7,10 @@
 simulate_singlecell_RNAseq(
   p = 20000,
   n = 500,
-  proportion_de = 0.5,
+  k = 1,
+  proportion_da = 0.1,
   size_factor_correlation = 0,
-  spike_in = FALSE,
-  dataset_name = "Muraro2016"
+  spike_in = FALSE
 )
 }
 \arguments{
@@ -18,23 +18,17 @@ simulate_singlecell_RNAseq(
 
 \item{n}{number of samples per group}
 
-\item{proportion_de}{proportion of differentially abundant genes}
+\item{k}{number of distinct cell types}
+
+\item{proportion_da}{proportion of differentially abundant genes}
 
 \item{size_factor_correlation}{correlation of observed abundances to original total abundances}
 
 \item{spike_in}{simulate a control spike in with low dispersion}
-
-\item{dataset_name}{options are "Muraro2016", "Haber2017", "Halpern2017"; see details}
 }
 \value{
 named list of true abundances, observed abundances, and group assignments
 }
 \description{
 Simulate UMI count single-cell RNA-seq data
-}
-\details{
-Available data sets to infer baseline abundances from are:
-Muraro et al. (2016) -- pancreatic alpha and beta islet cells resolved to gene level with CEL-seq2
-Haber et al. (2017) -- murine intestinal epithelium cells resolved to gene level with GemCode (early 10x Chromium)
-Halpern et al. (2017) -- (murine?) liver cells resolved to gene level with MARS-seq
 }

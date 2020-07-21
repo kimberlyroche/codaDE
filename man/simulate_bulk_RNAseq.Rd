@@ -2,12 +2,12 @@
 % Please edit documentation in R/simulate.R
 \name{simulate_bulk_RNAseq}
 \alias{simulate_bulk_RNAseq}
-\title{Simulate bulk RNA-seq data}
+\title{Simulate bulk RNA-seq-like data}
 \usage{
 simulate_bulk_RNAseq(
   p = 20000,
   n = 500,
-  proportion_de = 0.5,
+  proportion_da = 0.1,
   size_factor_correlation = 0,
   spike_in = FALSE
 )
@@ -15,17 +15,17 @@ simulate_bulk_RNAseq(
 \arguments{
 \item{p}{number of genes}
 
-\item{n}{number of samples per group}
+\item{n}{number of samples per group (e.g. control vs. treatment)}
 
-\item{proportion_de}{proportion of differentially abundant genes}
+\item{proportion_da}{proportion of differentially abundant genes}
 
-\item{size_factor_correlation}{correlation of observed abundances to original total abundances}
+\item{size_factor_correlation}{correlation of observed abundances to original absolute abundances}
 
-\item{spike_in}{simulate a control spike in with low dispersion}
+\item{spike_in}{flag indicating whether or not to simulate a spike-in (control) with very low dispersion}
 }
 \value{
 named list of true abundances, observed abundances, and group assignments
 }
 \description{
-Simulate bulk RNA-seq data
+Simulate bulk RNA-seq-like data
 }
