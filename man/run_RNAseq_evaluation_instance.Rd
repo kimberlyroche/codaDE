@@ -2,16 +2,16 @@
 % Please edit documentation in R/simulate.R
 \name{run_RNAseq_evaluation_instance}
 \alias{run_RNAseq_evaluation_instance}
-\title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
+\title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 differential abundance calls and write these to an output file}
 \usage{
 run_RNAseq_evaluation_instance(
   p,
   n,
-  proportion_de,
+  proportion_da,
   run_label,
+  k = NULL,
   size_factor_correlation = 0,
-  sc_dataset_name = NULL,
   output_file = "results.txt",
   alpha = 0.05,
   use_ALR = FALSE,
@@ -24,14 +24,13 @@ run_RNAseq_evaluation_instance(
 
 \item{n}{number of samples per group}
 
-\item{proportion_de}{proportion of differentially abundant genes}
+\item{proportion_da}{proportion of differentially abundant genes}
 
 \item{run_label}{human-readable string identifier for this simulation run}
 
-\item{size_factor_correlation}{correlation of observed abundances to original total abundances}
+\item{k}{number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated}
 
-\item{sc_dataset_name}{if not NULL, specifies single-cell data set to use for estimating baseline abundances (see simulate_singlecell_RNAseq
-for details); otherwise, simulate bulk RNA-seq}
+\item{size_factor_correlation}{correlation of observed abundances to original total abundances}
 
 \item{output_file}{output file to append to}
 
@@ -45,7 +44,7 @@ for details); otherwise, simulate bulk RNA-seq}
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }
 \description{
-Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
+Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 differential abundance calls and write these to an output file
 }
 \details{
