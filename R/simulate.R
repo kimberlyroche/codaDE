@@ -296,8 +296,8 @@ record_result <- function(out_str, out_file) {
 run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = NULL, size_factor_correlation = 0,
                                            output_file = "results.txt", alpha = 0.05, use_ALR = FALSE,
                                            filter_abundance = 1, rarefy = FALSE) {
-  all_taxa_observed <- FALSE
-  while(!all_taxa_observed) {
+  # all_taxa_observed <- FALSE
+  # while(!all_taxa_observed) {
     cat("Simulating data...\n")
     if(is.null(k)) {
       data <- simulate_bulk_RNAseq(p = p, n = n, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
@@ -306,17 +306,17 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = N
       data <- simulate_singlecell_RNAseq(p = p, n = n, k = k, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
                                          spike_in = use_ALR)
     }
-    g0.ab <- data$abundances[data$groups == 0,] # samples x genes
-    g1.ab <- data$abundances[data$groups == 1,] # samples x genes
-    g0.oc <- data$observed_counts[data$groups == 0,] # samples x genes
-    g1.oc <- data$observed_counts[data$groups == 1,] # samples x genes
-    if(sum(rowSums(g0.ab) == 0) == 0 & sum(colSums(g0.ab) == 0) == 0 &
-       sum(rowSums(g1.ab) == 0) == 0 & sum(colSums(g1.ab) == 0) == 0 &
-       sum(rowSums(g0.oc) == 0) == 0 & sum(colSums(g0.oc) == 0) == 0 &
-       sum(rowSums(g1.oc) == 0) == 0 & sum(colSums(g1.oc) == 0) == 0) {
-      all_taxa_observed <- TRUE
-    }
-  }
+  #   g0.ab <- data$abundances[data$groups == 0,] # samples x genes
+  #   g1.ab <- data$abundances[data$groups == 1,] # samples x genes
+  #   g0.oc <- data$observed_counts[data$groups == 0,] # samples x genes
+  #   g1.oc <- data$observed_counts[data$groups == 1,] # samples x genes
+  #   if(sum(rowSums(g0.ab) == 0) == 0 & sum(colSums(g0.ab) == 0) == 0 &
+  #      sum(rowSums(g1.ab) == 0) == 0 & sum(colSums(g1.ab) == 0) == 0 &
+  #      sum(rowSums(g0.oc) == 0) == 0 & sum(colSums(g0.oc) == 0) == 0 &
+  #      sum(rowSums(g1.oc) == 0) == 0 & sum(colSums(g1.oc) == 0) == 0) {
+  #     all_taxa_observed <- TRUE
+  #   }
+  # }
   
   if(rarefy) {
     rarefy_total <- min(apply(data$observed_counts, 1, sum))
