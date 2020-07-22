@@ -5,19 +5,10 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 differential abundance calls and write these to an output file}
 \usage{
-run_RNAseq_evaluation_instance(
-  p,
-  n,
-  proportion_da,
-  run_label,
-  k = NULL,
-  size_factor_correlation = 0,
-  output_file = "results.txt",
-  alpha = 0.05,
-  use_ALR = FALSE,
-  filter_abundance = 1,
-  rarefy = FALSE
-)
+run_RNAseq_evaluation_instance(p, n, proportion_da, run_label, k = NULL,
+  size_factor_correlation = 0, output_file = "results.txt",
+  alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
+  rarefy = FALSE)
 }
 \arguments{
 \item{p}{number of genes}

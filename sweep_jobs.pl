@@ -2,9 +2,18 @@ use strict;
 use warnings;
 use POSIX;
 
-my @features = qw(20000);
+# bulk RNA-seq
+#my @features = qw(20000);
+#my @evaluate_alr = qw(TRUE);
+#my @filter_abundance = qw(1);
+#my $label = "bulkRNAseq";
+#my $label = "bulkRNAseq_ALR";
+
+# single-cell RNA-seq
+my @features = qw(10000);
 my @evaluate_alr = qw(FALSE);
 my @filter_abundance = qw(1);
+my $label = "singlecellRNAseq";
 
 my $filename = "job.slurm";
 my $f = 0;
@@ -17,7 +26,7 @@ for my $i (0 .. $#features) {
       $f = $features[$i];
       $ea = $evaluate_alr[$j];
       $fa = $filter_abundance[$k];
-      $walltime = ceil(0.004*$f);
+      $walltime = ceil(0.001*$f);
 
       open(my $fh, '>', $filename);
       print $fh '#!/bin/bash'."\n";
@@ -27,13 +36,13 @@ for my $i (0 .. $#features) {
       print $fh '#SBATCH --time='.$walltime.':00:00'."\n";
       print $fh '#'."\n\n";
   
-      print $fh 'module add R/3.5.1-gcb01'."\n";
-      print $fh 'module add gcc/6.2.0-fasrc01'."\n\n";
+      print $fh 'module add R/3.6.1-gcb03'."\n";
+      print $fh 'module add gcc/7.1.0-fasrc01'."\n\n";
 
       print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
       # FALSE refers to rarefication
-      print $fh 'srun Rscript run.R '.$f.' 250 RNAseq_filter '.$ea.' '.$fa.' FALSE'."\n\n";
+      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --run_label='.$label."\n\n";
 
       close $fh;
 
