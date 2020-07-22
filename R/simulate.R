@@ -107,7 +107,7 @@ simulate_bulk_RNAseq <- function(p = 20000, n = 500, proportion_da = 0.1, size_f
   return(list(abundances = counts$abundances,
               observed_counts = counts$observed_counts,
               groups = groups,
-              theta = theta,
+              theta = parameters$theta,
               da_genes = parameters$da_genes))
 }
 
@@ -136,10 +136,10 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
     for(kk in 1:k) {
       mean_log_expr_celltypes <- c(mean_log_expr_celltypes, rep(rnorm(1, parameters$theta[offset], 2), counts_components[kk]))
     }
-    counts <- rnbinom(n*2, mu = exp(mean_log_expr_celltypes + groups*parameters$theta[offset+1]), size = theta[1])
+    counts <- rnbinom(n*2, mu = exp(mean_log_expr_celltypes + groups*parameters$theta[offset+1]), size = parameters$theta[1])
     if(spike_in & (j == p)) {
       # for now, simulate the same noiseless spike-in
-      counts <- c(counts, exp(theta[offset] + groups*theta[offset+1]))
+      counts <- c(counts, exp(parameters$theta[offset] + groups*parameters$theta[offset+1]))
     }
     counts
   })
@@ -167,7 +167,7 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
   return(list(abundances = abundances,
               observed_counts = observed_counts,
               groups = groups,
-              theta = theta,
+              theta = parameters$theta,
               da_genes = parameters$da_genes))
 }
 
