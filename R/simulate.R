@@ -107,7 +107,7 @@ simulate_bulk_RNAseq <- function(p = 20000, n = 500, proportion_da = 0.1, size_f
   return(list(abundances = counts$abundances,
               observed_counts = counts$observed_counts,
               groups = groups,
-              theta = theta,
+              theta = parameters$theta,
               da_genes = parameters$da_genes))
 }
 
@@ -120,6 +120,8 @@ simulate_bulk_RNAseq <- function(p = 20000, n = 500, proportion_da = 0.1, size_f
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param spike_in simulate a control spike in with low dispersion
 #' @return named list of true abundances, observed abundances, and group assignments
+#' @details Samples the mean gene abundances from Halpern et al. (2017) as a references. This gives a data set
+#' with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
 #' @import LaplacesDemon
 #' @export
 simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE) {
@@ -127,7 +129,9 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
   counts_components <- round(proportions_components[1:(k-1)]*n)
   counts_components <- c(counts_components, n - sum(counts_components))
   # if differentially expressed, a gene will be differentially expressed in all cell types (for now)
-  beta.0 <- rnorm(p, log(30), 1)
+  # beta.0 <- rnorm(p, log(5), 3)
+  Halpern2017_data <- readRDS("UMI_counts/Halpern2017.rds")$stats
+  beta.0 <- sample(log(unname(Halpern2017_data$mean_abundance_profiles) + 0.5), size = p, replace = TRUE)
   groups <- c(rep(0, n), rep(1, n))
   parameters <- build_theta(beta.0, proportion_da, spike_in)
   abundances <- sapply(1:p, function(j) {
@@ -136,13 +140,15 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
     for(kk in 1:k) {
       mean_log_expr_celltypes <- c(mean_log_expr_celltypes, rep(rnorm(1, parameters$theta[offset], 2), counts_components[kk]))
     }
-    counts <- rnbinom(n*2, mu = exp(mean_log_expr_celltypes + groups*parameters$theta[offset+1]), size = theta[1])
+    counts <- rnbinom(n*2, mu = exp(mean_log_expr_celltypes + groups*parameters$theta[offset+1]), size = parameters$theta[1])
     if(spike_in & (j == p)) {
       # for now, simulate the same noiseless spike-in
-      counts <- c(counts, exp(theta[offset] + groups*theta[offset+1]))
+      counts <- c(counts, exp(parameters$theta[offset] + groups*parameters$theta[offset+1]))
     }
     counts
   })
+  
+  #cat(paste0("Percent zeros in data set: ",round(sum(abundances == 0)/(nrow(abundances)*ncol(abundances)), 2)*100,"\n"))
   
   realized_total_counts <- rowSums(abundances)
   size_factors.observed_counts <- round(simcor(realized_total_counts, mean(realized_total_counts), sd(realized_total_counts),
@@ -163,11 +169,14 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
     rmultinom(1, size = size_factors.observed_counts[i], prob = resample_probs)
   })
   observed_counts <- t(observed_counts)
+  
+  #cat(paste0("Percent zeros in data set: ",round(sum(observed_counts == 0)/(nrow(observed_counts)*ncol(observed_counts)), 2)*100,"\n"))
+  
   # the observed_counts matrix has dimensions n*2 samples x p genes
   return(list(abundances = abundances,
               observed_counts = observed_counts,
               groups = groups,
-              theta = theta,
+              theta = parameters$theta,
               da_genes = parameters$da_genes))
 }
 

@@ -20,7 +20,7 @@ min_abundance <- 1
 data_type <- "bulkRNAseq"
 no_genes <- c(100, 1000, 20000, 50000)
 
-data_type <- "singlecell_Haber"
+data_type <- "singlecellRNAseq"
 no_genes <- c(50000)
 
 output_file <- paste0("results_", data_type, ".tsv")
