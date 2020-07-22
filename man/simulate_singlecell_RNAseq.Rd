@@ -32,3 +32,7 @@ named list of true abundances, observed abundances, and group assignments
 \description{
 Simulate UMI count single-cell RNA-seq data
 }
+\details{
+Samples the mean gene abundances from Halpern et al. (2017) as a references. This gives a data set
+with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
+}
