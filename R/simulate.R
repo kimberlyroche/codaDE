@@ -221,7 +221,7 @@ call_DA <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0)
       data_type <- "observed counts"
     }
     cat(paste0("Fit failed on ",data_type," #",feature_idx,"\n"))
-    return(gene_data)
+    return(NA)
   }
 }
 
@@ -296,27 +296,43 @@ record_result <- function(out_str, out_file) {
 run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = NULL, size_factor_correlation = 0,
                                            output_file = "results.txt", alpha = 0.05, use_ALR = FALSE,
                                            filter_abundance = 1, rarefy = FALSE) {
-  # all_taxa_observed <- FALSE
-  # while(!all_taxa_observed) {
-    cat("Simulating data...\n")
-    if(is.null(k)) {
-      data <- simulate_bulk_RNAseq(p = p, n = n, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
-                                   spike_in = use_ALR)
-    } else {
-      data <- simulate_singlecell_RNAseq(p = p, n = n, k = k, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
-                                         spike_in = use_ALR)
-    }
-  #   g0.ab <- data$abundances[data$groups == 0,] # samples x genes
-  #   g1.ab <- data$abundances[data$groups == 1,] # samples x genes
-  #   g0.oc <- data$observed_counts[data$groups == 0,] # samples x genes
-  #   g1.oc <- data$observed_counts[data$groups == 1,] # samples x genes
-  #   if(sum(rowSums(g0.ab) == 0) == 0 & sum(colSums(g0.ab) == 0) == 0 &
-  #      sum(rowSums(g1.ab) == 0) == 0 & sum(colSums(g1.ab) == 0) == 0 &
-  #      sum(rowSums(g0.oc) == 0) == 0 & sum(colSums(g0.oc) == 0) == 0 &
-  #      sum(rowSums(g1.oc) == 0) == 0 & sum(colSums(g1.oc) == 0) == 0) {
-  #     all_taxa_observed <- TRUE
-  #   }
-  # }
+  cat("Simulating data...\n")
+  if(is.null(k)) {
+    data <- simulate_bulk_RNAseq(p = p, n = n, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
+                                 spike_in = use_ALR)
+  } else {
+    data <- simulate_singlecell_RNAseq(p = p, n = n, k = k, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
+                                       spike_in = use_ALR)
+  }
+  # we've got to make sure there's non-zero variation in all genes in each condition
+  # usually this fails to be true if one gene is 100% unobserved in one condition and minimally present in the other
+  # as a small workaround, if we find any genes will fully no expression in a given condition, we'll drop in a
+  #   single 1-count
+  # this shouldn't change results and will allow us to fit the GLM across all genes
+
+  # which genes are fully missing in the original counts for group 0?
+  drop_in <- which(colSums(data$abundances[data$groups == 0,]) == 0)
+  for(d in drop_in) {
+    data$abundances[sample(which(data$groups == 0))[1],d] <- 1
+  }
+
+  # which genes are fully missing in the original counts for group 0?
+  drop_in <- which(colSums(data$abundances[data$groups == 1,]) == 0)
+  for(d in drop_in) {
+    data$abundances[sample(which(data$groups == 1))[1],d] <- 1
+  }
+
+  # which genes are fully missing in the original counts for group 0?
+  drop_in <- which(colSums(data$observed_counts[data$groups == 0,]) == 0)
+  for(d in drop_in) {
+    data$observed_counts[sample(which(data$groups == 0))[1],d] <- 1
+  }
+
+  # which genes are fully missing in the original counts for group 0?
+  drop_in <- which(colSums(data$observed_counts[data$groups == 0,]) == 0)
+  for(d in drop_in) {
+    data$observed_counts[sample(which(data$groups == 0))[1],d] <- 1
+  }
   
   if(rarefy) {
     rarefy_total <- min(apply(data$observed_counts, 1, sum))

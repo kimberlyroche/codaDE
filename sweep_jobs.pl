@@ -42,7 +42,7 @@ for my $i (0 .. $#features) {
       print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
       # FALSE refers to rarefication
-      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --run_label='.$label."\n\n";
+      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --run_label='.$label.' --filter_abundance='.$fa."\n\n";
 
       close $fh;
 
