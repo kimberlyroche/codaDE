@@ -4,12 +4,16 @@
 \alias{resample_counts}
 \title{Simulate sequence counts according to a negative binomial}
 \usage{
-resample_counts(theta, groups)
+resample_counts(theta, groups, size_factor_correlation, spike_in = FALSE)
 }
 \arguments{
 \item{theta}{vector of (2) group dispersion parameters and (2) per-gene log covariates is theta}
 
 \item{groups}{condition (e.g. control vs. treatment) labels}
+
+\item{size_factor_correlation}{correlation of observed abundances to original absolute abundances}
+
+\item{spike_in}{flag indicating whether or not to simulate a spike-in (control) with very low dispersion}
 }
 \value{
 named list of true abundances and observed abundances

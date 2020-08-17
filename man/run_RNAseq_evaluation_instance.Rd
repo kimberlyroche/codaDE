@@ -16,6 +16,7 @@ run_RNAseq_evaluation_instance(
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 1,
+  call_DA_by_NB = TRUE,
   rarefy = FALSE
 )
 }
@@ -40,6 +41,9 @@ run_RNAseq_evaluation_instance(
 
 \item{filter_abundance}{the minimum average abundance to require of features we'll evaluate for differential abundance
 (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
+
+\item{call_DA_by_NB}{if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
+permutation test}
 
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }
