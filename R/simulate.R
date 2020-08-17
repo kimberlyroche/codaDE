@@ -476,6 +476,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = N
                     proportion_da,"\t",
                     size_factor_correlation,"\t",
                     quantity_evaluated,"\t",
+                    call_DA_by_NB,"\t",
                     filter_abundance,"\t",
                     TP,"\t",
                     FP,"\t",

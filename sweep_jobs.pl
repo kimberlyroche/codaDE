@@ -3,17 +3,18 @@ use warnings;
 use POSIX;
 
 # bulk RNA-seq
-#my @features = qw(20000);
-#my @evaluate_alr = qw(TRUE);
-#my @filter_abundance = qw(1);
-#my $label = "bulkRNAseq";
-#my $label = "bulkRNAseq_ALR";
+# my @features = qw(20000);
+# my @evaluate_alr = qw(TRUE);
+# my @filter_abundance = qw(1);
+# my $label = "bulkRNAseq";
+# my $label = "bulkRNAseq_ALR";
 
 # single-cell RNA-seq
-my @features = qw(10000);
+my @features = qw(5000 10000 20000);
 my @evaluate_alr = qw(FALSE);
-my @filter_abundance = qw(1);
+my @filter_abundance = qw(0);
 my $label = "singlecellRNAseq";
+my $NB_for_DE = "TRUE"; # TRUE: NB, FALSE: log-LM + permutation
 
 my $filename = "job.slurm";
 my $f = 0;
@@ -42,7 +43,7 @@ for my $i (0 .. $#features) {
       print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
       # FALSE refers to rarefication
-      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --run_label='.$label.' --filter_abundance='.$fa."\n\n";
+      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --run_label='.$label.' --NB_for_DE='.$NB_for_DE.' --filter_abundance='.$fa."\n\n";
 
       close $fh;
 

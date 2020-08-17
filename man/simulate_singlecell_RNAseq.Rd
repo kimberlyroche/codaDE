@@ -4,14 +4,8 @@
 \alias{simulate_singlecell_RNAseq}
 \title{Simulate UMI count single-cell RNA-seq data}
 \usage{
-simulate_singlecell_RNAseq(
-  p = 20000,
-  n = 500,
-  k = 1,
-  proportion_da = 0.1,
-  size_factor_correlation = 0,
-  spike_in = FALSE
-)
+simulate_singlecell_RNAseq(p = 20000, n = 500, k = 1,
+  proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE)
 }
 \arguments{
 \item{p}{number of genes}
