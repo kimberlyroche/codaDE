@@ -12,18 +12,21 @@ simcor <- function(x, ymean = 0, ysd = 1, correlation = 0) {
 #'
 #' @param theta vector of (2) group dispersion parameters and (2) per-gene log covariates is theta
 #' @param groups condition (e.g. control vs. treatment) labels
+#' @param size_factor_correlation correlation of observed abundances to original absolute abundances
+#' @param spike_in flag indicating whether or not to simulate a spike-in (control) with very low dispersion
 #' @return named list of true abundances and observed abundances
 #' @export
-resample_counts <- function(theta, groups) {
+resample_counts <- function(theta, groups, size_factor_correlation, spike_in = FALSE) {
   p <- (length(theta) - 2)/2
+  n_total <- length(groups)
   abundances <- sapply(1:p, function(j) {
     offset <- 2 + (j-1)*2 + 1
     mu.ij <- exp(theta[offset] + groups*theta[offset+1])
     if(spike_in & (j == p)) {
-      # rnbinom((n*2), mu = mu.ij, size = 10) # less dispersion
+      # rnbinom(n_total, mu = mu.ij, size = 10) # less dispersion
       exp(mu.ij) # noiseless spike-in
     } else {
-      rnbinom((n*2), mu = mu.ij, size = theta[1])
+      rnbinom(n_total, mu = mu.ij, size = theta[1])
     }
   })
   # the abundances matrix has dimensions n*2 samples x p genes
@@ -38,7 +41,7 @@ resample_counts <- function(theta, groups) {
   # this increases correlation but barely
   size_factors.observed_counts <- abs(size_factors.observed_counts)
   
-  observed_counts <- sapply(1:(n*2), function(i) {
+  observed_counts <- sapply(1:n_total, function(i) {
     if(is.na(size_factors.observed_counts[i])) {
       print(i)
     }
@@ -103,7 +106,7 @@ simulate_bulk_RNAseq <- function(p = 20000, n = 500, proportion_da = 0.1, size_f
   beta.0 <- sample(log(GTEx_stats$mean_abundance_profiles + 0.5), size = p, replace = TRUE)
   groups <- c(rep(0, n), rep(1, n))
   parameters <- build_theta(beta.0, proportion_da, spike_in)
-  counts <- resample_counts(parameters$theta, groups)
+  counts <- resample_counts(parameters$theta, groups, size_factor_correlation, spike_in)
   return(list(abundances = counts$abundances,
               observed_counts = counts$observed_counts,
               groups = groups,
@@ -345,13 +348,15 @@ record_result <- function(out_str, out_file) {
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
+#' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
+#' permutation test
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
 run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = NULL, size_factor_correlation = 0,
                                            output_file = "results.txt", alpha = 0.05, use_ALR = FALSE,
-                                           filter_abundance = 1, rarefy = FALSE) {
+                                           filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE) {
   cat("Simulating data...\n")
   if(is.null(k)) {
     data <- simulate_bulk_RNAseq(p = p, n = n, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
@@ -404,6 +409,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = N
   evaluate_features <- apply(data$observed_counts, 2, function(x) mean(x) > filter_abundance)
   
   if(use_ALR) {
+    # this setup is currently only possible with NB DA calling
     logratios.abundances <- get_logratios(data, call_abundances = TRUE)
     logratios.observed_counts <- get_logratios(data, call_abundances = FALSE)
     for(i in 1:p) {
@@ -417,13 +423,23 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = N
       }
     }
   } else {
+    if(!call_DA_by_NB) {
+      # build our null distribution
+      H0.abundances <- generate_null_distribution(data, use_abundances = TRUE, n_permutations = 10)
+      H0.observed_counts <- generate_null_distribution(data, use_abundances = FALSE, n_permutations = 10)
+    }
     for(i in 1:p) {
       if(i %% 1000 == 0) {
         cat("Evaluating DA on feature:",i,"\n")
       }
       if(evaluate_features[i]) {
-        pval.abundances <- call_DA(data, i, call_abundances = TRUE, rarefy = rarefy_total)
-        pval.observed_counts <- call_DA(data, i, call_abundances = FALSE, rarefy = rarefy_total)
+        if(call_DA_by_NB) {
+          pval.abundances <- call_DA(data, i, call_abundances = TRUE, rarefy = rarefy_total)
+          pval.observed_counts <- call_DA(data, i, call_abundances = FALSE, rarefy = rarefy_total)
+        } else {
+          pval.abundances <- call_DA_LM(data, i, call_abundances = TRUE, null_distribution = H0.abundances)
+          pval.observed_counts <- call_DA_LM(data, i, call_abundances = FALSE, null_distribution = H0.observed_counts)
+        }
         if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
           calls.abundances <- c(calls.abundances, pval.abundances <= alpha/p)
           calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/p)
@@ -468,13 +484,15 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = N
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
+#' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
+#' permutation test
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
 sweep_simulations <- function(p, n, run_label, k = NULL, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
                          corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt",
-                         alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, rarefy = FALSE) {
+                         alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, call_DA_by_NB = TRUE, rarefy = FALSE) {
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
       out_str <- paste0("simulated evaluating size factor correlation = ",round(sf_corr, 2)," and DA proportion = ",round(de_prop, 2),"\n")
@@ -486,7 +504,7 @@ sweep_simulations <- function(p, n, run_label, k = NULL, de_sweep = seq(from = 0
       run_RNAseq_evaluation_instance(p, n, proportion_da = de_prop, run_label = run_label, k = k,
                                      size_factor_correlation = sf_corr, output_file = output_file,
                                      alpha = 0.05, use_ALR = use_ALR, filter_abundance = filter_abundance,
-                                     rarefy = rarefy)
+                                     call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
     }
   }
 }
