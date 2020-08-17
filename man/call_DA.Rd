@@ -16,7 +16,7 @@ call_DA(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0)
 \item{rarefy_depth}{if non-zero, specifies the depth at which to resample the counts}
 }
 \value{
-p-value from NB GLM fit with MASS::glm.nb
+p-value from NB GLM fit with MASS::glm.nb associated with group coefficient
 }
 \description{
 Fit negative binomial model to null and full models and evaluate differential abundance for a focal gene

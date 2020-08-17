@@ -186,7 +186,7 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
 #' @param feature_idx index of gene to test for differential abundance
 #' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
 #' @param rarefy_depth if non-zero, specifies the depth at which to resample the counts
-#' @return p-value from NB GLM fit with MASS::glm.nb
+#' @return p-value from NB GLM fit with MASS::glm.nb associated with group coefficient
 #' @import MASS
 #' @export
 call_DA <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0) {
@@ -223,6 +223,62 @@ call_DA <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0)
     cat(paste0("Fit failed on ",data_type," #",feature_idx,"\n"))
     return(NA)
   }
+}
+
+#' Fit log linear model to null and full models and evaluate differential abundance for a focal gene
+#' This requires a null distribution to have been constructed previously
+#' 
+#' @param data simulated data set
+#' @param use_abundances if TRUE, use abundances to calculate null distro; if FALSE, use observed counts
+#' @param n_permutations number of times to permute the full data set
+#' @return p-value associated with group coefficient
+#' @export
+generate_null_distribution <- function(data, use_abundances = TRUE, n_permutations = 10) {
+  null_distribution <- c()
+  for(p in 1:n_permutations) {
+    n_samples <- length(data$groups)
+    groups <- rbinom(n_samples, size = 1, prob = rep(0.5, n_samples))
+    obs_rsq_vector <- sapply(1:ncol(data$abundances), function(z) {
+      call_DA_LM_sub(data, z, call_abundances = use_abundances)
+    })
+    null_distribution <- c(null_distribution, obs_rsq_vector)
+  }
+  null_distribution <- null_distribution[order(null_distribution)]
+  return(null_distribution)
+}
+
+#' Fit log linear model to null and full models and evaluate differential abundance for a focal gene
+#' 
+#' @param data simulated data set
+#' @param feature_idx index of gene to test for differential abundance
+#' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
+#' @return p-value associated with group coefficient
+#' @export
+call_DA_LM_sub <- function(data, feature_idx, call_abundances = TRUE) {
+  if(call_abundances) {
+    gene_data <- data.frame(log_counts = log(data$abundances[,feature_idx] + 0.5), groups = data$groups)
+  } else {
+    gene_data <- data.frame(log_counts = log(data$observed_counts[,feature_idx] + 0.5), groups = data$groups)
+  }
+  fit <- lm(log_counts ~ groups, data = gene_data)
+  obs_rsq <- summary(fit)$adj.r.squared
+  return(obs_rsq)
+}
+
+#' Fit log linear model to null and full models and evaluate differential abundance for a focal gene;
+#' this requires a null distribution to have been constructed previously such that p-values can be
+#' simulated
+#' 
+#' @param data simulated data set
+#' @param feature_idx index of gene to test for differential abundance
+#' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
+#' @param null_distribution simulated null distribution of R-squared values
+#' @return p-value associated with group coefficient
+#' @export
+call_DA_LM <- function(data, feature_idx, call_abundances = TRUE, null_distribution) {
+  obs_rsq <- call_DA_LM_sub(data, feature_idx, call_abundances)
+  pval <- sum(null_distribution > obs_rsq)/length(null_distribution)
+  return(pval)
 }
 
 #' Get additive logratios from the data set
