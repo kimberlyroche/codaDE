@@ -2,11 +2,9 @@
 % Please edit documentation in R/simulate.R
 \name{call_DA_LM}
 \alias{call_DA_LM}
-\title{Fit log linear model to null and full models and evaluate differential abundance for a focal gene;
-this requires a null distribution to have been constructed previously such that p-values can be
-simulated}
+\title{Fit log linear model to null and full models and evaluate differential abundance for a focal gene}
 \usage{
-call_DA_LM(data, feature_idx, call_abundances = TRUE, null_distribution)
+call_DA_LM(data, feature_idx, call_abundances = TRUE)
 }
 \arguments{
 \item{data}{simulated data set}
@@ -14,14 +12,10 @@ call_DA_LM(data, feature_idx, call_abundances = TRUE, null_distribution)
 \item{feature_idx}{index of gene to test for differential abundance}
 
 \item{call_abundances}{if TRUE, call DA on abundances; if FALSE, on observed counts}
-
-\item{null_distribution}{simulated null distribution of R-squared values}
 }
 \value{
 p-value associated with group coefficient
 }
 \description{
-Fit log linear model to null and full models and evaluate differential abundance for a focal gene;
-this requires a null distribution to have been constructed previously such that p-values can be
-simulated
+Fit log linear model to null and full models and evaluate differential abundance for a focal gene
 }
