@@ -173,7 +173,14 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
   })
   observed_counts <- t(observed_counts)
   
-  #cat(paste0("Percent zeros in data set: ",round(sum(observed_counts == 0)/(nrow(observed_counts)*ncol(observed_counts)), 2)*100,"\n"))
+  # cat(paste0("Percent zeros in data set: ",round(sum(observed_counts == 0)/(nrow(observed_counts)*ncol(observed_counts)), 2)*100,"\n"))
+  
+  # if we wanted to calculate entropy for a whole data set, here's how we might go about it
+    
+  # log_means <- log(colMeans(observed_counts[,parameters$da_genes]) + 1)
+  # breaks <- seq(from = min(log_means), to = max(log_means), length.out = 10)
+  # chunked_data <- cut(log_means, breaks, 1:9)
+  # ent_val <- entropy(table(chunked_data))
   
   # the observed_counts matrix has dimensions n*2 samples x p genes
   return(list(abundances = abundances,

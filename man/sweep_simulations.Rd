@@ -5,10 +5,20 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
 differential abundance calls and write these to an output file}
 \usage{
-sweep_simulations(p, n, run_label, k = NULL, de_sweep = seq(from = 0.1,
-  to = 0.9, by = 0.1), corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-  output_file = "results.txt", alpha = 0.05, use_ALR = FALSE,
-  filter_abundance = 0, call_DA_by_NB = TRUE, rarefy = FALSE)
+sweep_simulations(
+  p,
+  n,
+  run_label,
+  k = NULL,
+  de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  output_file = "results.txt",
+  alpha = 0.05,
+  use_ALR = FALSE,
+  filter_abundance = 0,
+  call_DA_by_NB = TRUE,
+  rarefy = FALSE
+)
 }
 \arguments{
 \item{p}{number of genes}
