@@ -10,7 +10,7 @@ use POSIX;
 # my $label = "bulkRNAseq_ALR";
 
 # single-cell RNA-seq
-my @features = qw(5000 10000 20000);
+my @features = qw(100 200 500);
 my @evaluate_alr = qw(FALSE);
 my @filter_abundance = qw(0);
 my $label = "singlecellRNAseq";
