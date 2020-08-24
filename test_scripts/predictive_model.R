@@ -24,8 +24,10 @@ data$fnr <- data$fn / (data$tp + data$fn)
 # (3) Plot the data. Does anything have an obvious linear or log-linear relationship with 
 #     the outcome?
 
-eval_data <- data[data$DE_NB == FALSE,]
+eval_data <- data[data$DE_NB == TRUE &
+                  data$prop_de > 0,]
 
+# outcome isn't really linear in any of the predictors
 p1 <- ggplot(eval_data) +
        geom_point(aes(x = p, y = fpr))
 p2 <- ggplot(eval_data) +
@@ -62,7 +64,7 @@ plot_df$which <- as.factor(plot_df$which)
 p <- ggplot(plot_df) +
      geom_point(aes(x = true_values, y = predicted_values)) +
      facet_wrap(vars(which), nrow = 1, scales = "free")
-ggsave("betareg_model.png", p, units = "in", dpi = 150, height = 5, width = 8)
+ggsave("betareg_model.png", p, units = "in", dpi = 150, height = 5, width = 10)
 
 # Hopefully adding gene number improves this a lot!
 
@@ -71,6 +73,7 @@ ggsave("betareg_model.png", p, units = "in", dpi = 150, height = 5, width = 8)
 
 # x should be N x D
 # y should be N x 1
+
 x <- cbind(eval_data$p, eval_data$prop_de, eval_data$sfcorr)
 y <- eval_data$fpr
 
@@ -92,6 +95,7 @@ plot_df$which <- as.factor(plot_df$which)
 p <- ggplot(plot_df) +
      geom_point(aes(x = true_values, y = predicted_values)) +
      facet_wrap(vars(which), nrow = 1, scales = "free")
-ggsave("GPreg_model.png", p, units = "in", dpi = 150, height = 5, width = 8)
+ggsave("GPreg_model.png", p, units = "in", dpi = 150, height = 5, width = 10)
+
 
 

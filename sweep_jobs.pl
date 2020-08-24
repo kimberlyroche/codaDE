@@ -10,7 +10,7 @@ use POSIX;
 # my $label = "bulkRNAseq_ALR";
 
 # single-cell RNA-seq
-my @features = qw(100 200 500);
+my @features = qw(10000 20000);
 my @evaluate_alr = qw(FALSE);
 my @filter_abundance = qw(0);
 my $label = "singlecellRNAseq";
@@ -27,7 +27,7 @@ for my $i (0 .. $#features) {
       $f = $features[$i];
       $ea = $evaluate_alr[$j];
       $fa = $filter_abundance[$k];
-      $walltime = ceil(0.001*$f);
+      $walltime = ceil(0.002*$f);
 
       open(my $fh, '>', $filename);
       print $fh '#!/bin/bash'."\n";

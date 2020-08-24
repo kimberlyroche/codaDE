@@ -12,7 +12,7 @@ library(codaDE)
 
 p <- 20000
 
-for(i in 1:20) {
+for(j in 1:20) {
 
   data <- simulate_singlecell_RNAseq(p = p, n = 250, k = 1, proportion_da = (2/3),
                                      size_factor_correlation = 0, spike_in = FALSE)
@@ -39,6 +39,6 @@ for(i in 1:20) {
 
   saveRDS(list(data = data, FN = FN, FP = FP, TN = TN, TP = TP,
           calls.abundances = calls.abundances, calls.observed_counts = calls.observed_counts),
-          file = paste0("sim_dataset_",i,".rds"))
+          file = paste0("sim_dataset_",j,".rds"))
 
 }
