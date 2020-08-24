@@ -19,7 +19,7 @@ min_abundance <- 0
 # (2) FALSE -- use log-LM + permutations for DE calling
 NB_DE <- FALSE
 
-output_file <- "results_singlecellRNAseq.tsv"
+output_file <- "results_singlecellRNAseq_smallbatch.tsv"
 
 if(plot_ROC) {
   data <- read.table(file.path("output", output_file), header = F)
