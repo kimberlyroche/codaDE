@@ -491,8 +491,8 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
   
   # calculate the log mean expression for the DA group under "treatment"; the median of the signed different
   #     will be a predictor too
-  med_affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, data$da_genes] + 0.5))
-  net_dir_da <- median(med_affected_expr_dat - med_baseline_expr_da)
+  affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, data$da_genes] + 0.5))
+  net_dir_da <- median(affected_expr_dat - baseline_expr_da)
 
   # sparsity level (percent zeros)
   sparsity <- sum(data$observed_counts == 0)/(nrow(data$observed_counts)*ncol(data$observed_counts))
