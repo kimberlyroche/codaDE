@@ -478,10 +478,26 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = N
   if(use_ALR) {
     quantity_evaluated <- "logratios"
   }
+  
+  # calculate a couple of quantities that might help us model error in low-feature-number, high DE cases
+  # (1) calculate the log mean expression for the DA group at baseline and include a measure of how different
+  #     this is from overall log mean expression at baseline -- i.e. is our selection of DE genes biased?
+  baseline_expr_all <- colMeans(log(data$abundances[data$groups == 0,] + 0.5))
+  baseline_expr_da <- colMeans(log(data$abundances[data$groups == 0, data$da_genes] + 0.5))
+  ordered_baseline <- baseline_expr_all[order(baseline_expr_all)]
+  median_expr_da_quantile <- sum(ordered_baseline < median(baseline_expr_da))/length(ordered_baseline)
+  
+  # (2) calculate the log mean expression for the DA group under "treatment"; the median of the signed different
+  #     will be a predictor too
+  med_affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, data$da_genes] + 0.5))
+  net_dir_da <- med_affected_expr_dat - med_baseline_expr_da
+
   out_str <- paste0(run_label,"\t",
                     p,"\t",
                     proportion_da,"\t",
                     size_factor_correlation,"\t",
+                    round(median_expr_da_quantile, 5),"\t",
+                    round(median(net_dir_da), 5),"\t",
                     quantity_evaluated,"\t",
                     call_DA_by_NB,"\t",
                     filter_abundance,"\t",
