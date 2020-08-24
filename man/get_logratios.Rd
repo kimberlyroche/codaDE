@@ -65,6 +65,10 @@ get_logratios(data, call_abundances = TRUE)
 \item{data}{simulated data set}
 
 \item{call_abundances}{if TRUE, call DA on abundances; if FALSE, on observed counts}
+
+\item{data}{simulated data set}
+
+\item{call_abundances}{if TRUE, call DA on abundances; if FALSE, on observed counts}
 }
 \value{
 logratios
