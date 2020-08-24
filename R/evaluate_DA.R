@@ -1,194 +1,3 @@
-# utility function to simulate a vector with some desired correlation to a reference vector
-# source: https://stackoverflow.com/questions/47775389/how-to-simulate-a-vector-that-is-correlated-in-a-different-way-to-two-other-ex
-simcor <- function(x, ymean = 0, ysd = 1, correlation = 0) {
-  n <- length(x)
-  y <- rnorm(n)
-  z <- correlation * scale(x)[,1] + sqrt(1 - correlation^2) * scale(resid(lm(y ~ x)))[,1]
-  yresult <- ymean + ysd * z
-  yresult
-}
-
-#' Simulate sequence counts according to a negative binomial
-#'
-#' @param theta vector of (2) group dispersion parameters and (2) per-gene log covariates is theta
-#' @param groups condition (e.g. control vs. treatment) labels
-#' @param size_factor_correlation correlation of observed abundances to original absolute abundances
-#' @param spike_in flag indicating whether or not to simulate a spike-in (control) with very low dispersion
-#' @return named list of true abundances and observed abundances
-#' @export
-resample_counts <- function(theta, groups, size_factor_correlation, spike_in = FALSE) {
-  p <- (length(theta) - 2)/2
-  n_total <- length(groups)
-  abundances <- sapply(1:p, function(j) {
-    offset <- 2 + (j-1)*2 + 1
-    mu.ij <- exp(theta[offset] + groups*theta[offset+1])
-    if(spike_in & (j == p)) {
-      # rnbinom(n_total, mu = mu.ij, size = 10) # less dispersion
-      exp(mu.ij) # noiseless spike-in
-    } else {
-      rnbinom(n_total, mu = mu.ij, size = theta[1])
-    }
-  })
-  # the abundances matrix has dimensions n*2 samples x p genes
-  
-  # transform these to proportions
-  sampled_proportions <- apply(abundances, 1, function(x) x/sum(x))
-  realized_total_counts <- rowSums(abundances)
-  size_factors.observed_counts <- round(simcor(realized_total_counts, mean(realized_total_counts), sd(realized_total_counts),
-                                               size_factor_correlation))
-  # since we're sampling from a normal around the observed counts occasionally we'll get a suggested
-  # total count that is negative; reflect this
-  # this increases correlation but barely
-  size_factors.observed_counts <- abs(size_factors.observed_counts)
-  
-  observed_counts <- sapply(1:n_total, function(i) {
-    if(is.na(size_factors.observed_counts[i])) {
-      print(i)
-    }
-    rmultinom(1, size = size_factors.observed_counts[i], prob = sampled_proportions[,i])
-  })
-  observed_counts <- t(observed_counts)
-  # the observed_counts matrix has dimensions n*2 samples x p genes
-  
-  return(list(abundances = abundances, observed_counts = observed_counts))
-}
-
-#' Simulate differential abundance parameters
-#'
-#' @param beta.0 vector of log baseline (mean) expression for all genes
-#' @param proportion_da proportion of differentially abundant genes
-#' @param spike_in flag indicating whether or not to simulate a spike-in (control) with very low dispersion
-#' @return complete vector of dispersion and log coefficient parameters
-#' @export
-build_theta <- function(beta.0, proportion_da, spike_in) {
-  p <- length(beta.0)
-  theta <- rep(0.25, 2) # fix the dispersions between groups for simplicity now but we should consider
-  # varying this as well
-  if(spike_in) {
-    # simulate a spike-in at the median log abundance and tack it on
-    spike_in_beta <- median(beta.0)
-    beta.0 <- c(beta.0, spike_in_beta)
-  }
-  # select a random set of features to perturb
-  da_genes <- sort(sample(1:p)[1:round(proportion_da*p)])
-  # simulate a random large fold change (between +/- 3 and 5) for these, otherwise give the group effect (beta.1)
-  # as zero
-  beta.1 <- sapply(1:p, function(idx) {
-    if(idx %in% da_genes) {
-      fc <- sample(c(3:5))[1]
-      fc_sign <- 1
-      if(rbinom(1, size = 1, prob = 0.5)) {
-        fc_sign <- -1
-      }
-      fc_sign*log(fc)
-    } else {
-      0
-    }
-  })
-  # the set of (2) group dispersion parameters and (2) per-gene log covariates is theta
-  theta <- c(theta, c(rbind(beta.0, beta.1)))
-  return(list(theta = theta, da_genes = da_genes))
-}
-
-#' Simulate bulk RNA-seq-like data
-#'
-#' @param p number of genes
-#' @param n number of samples per group (e.g. control vs. treatment)
-#' @param proportion_da proportion of differentially abundant genes
-#' @param size_factor_correlation correlation of observed abundances to original absolute abundances
-#' @param spike_in flag indicating whether or not to simulate a spike-in (control) with very low dispersion
-#' @return named list of true abundances, observed abundances, and group assignments
-#' @export
-simulate_bulk_RNAseq <- function(p = 20000, n = 500, proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE) {
-  data_dir <- "GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct"
-  GTEx_stats <- readRDS(file.path(data_dir, "empirical_sample.rds"))
-  # sample a set of baseline log abundances for p genes
-  beta.0 <- sample(log(GTEx_stats$mean_abundance_profiles + 0.5), size = p, replace = TRUE)
-  groups <- c(rep(0, n), rep(1, n))
-  parameters <- build_theta(beta.0, proportion_da, spike_in)
-  counts <- resample_counts(parameters$theta, groups, size_factor_correlation, spike_in)
-  return(list(abundances = counts$abundances,
-              observed_counts = counts$observed_counts,
-              groups = groups,
-              theta = parameters$theta,
-              da_genes = parameters$da_genes))
-}
-
-#' Simulate UMI count single-cell RNA-seq data
-#'
-#' @param p number of genes
-#' @param n number of samples per group
-#' @param k number of distinct cell types
-#' @param proportion_da proportion of differentially abundant genes
-#' @param size_factor_correlation correlation of observed abundances to original total abundances
-#' @param spike_in simulate a control spike in with low dispersion
-#' @return named list of true abundances, observed abundances, and group assignments
-#' @details Samples the mean gene abundances from Halpern et al. (2017) as a references. This gives a data set
-#' with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
-#' @import LaplacesDemon
-#' @export
-simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE) {
-  proportions_components <- rdirichlet(1, alpha = rep(1/k, k)*5)
-  counts_components <- round(proportions_components[1:(k-1)]*n)
-  counts_components <- c(counts_components, n - sum(counts_components))
-  # if differentially expressed, a gene will be differentially expressed in all cell types (for now)
-  # beta.0 <- rnorm(p, log(5), 3)
-  Halpern2017_data <- readRDS("UMI_counts/Halpern2017.rds")$stats
-  beta.0 <- sample(log(unname(Halpern2017_data$mean_abundance_profiles) + 0.5), size = p, replace = TRUE)
-  groups <- c(rep(0, n), rep(1, n))
-  parameters <- build_theta(beta.0, proportion_da, spike_in)
-  abundances <- sapply(1:p, function(j) {
-    offset <- 2 + (j-1)*2 + 1
-    mean_log_expr_celltypes <- c()
-    for(kk in 1:k) {
-      mean_log_expr_celltypes <- c(mean_log_expr_celltypes, rep(rnorm(1, parameters$theta[offset], 2), counts_components[kk]))
-    }
-    counts <- rnbinom(n*2, mu = exp(mean_log_expr_celltypes + groups*parameters$theta[offset+1]), size = parameters$theta[1])
-    if(spike_in & (j == p)) {
-      # for now, simulate the same noiseless spike-in
-      counts <- c(counts, exp(parameters$theta[offset] + groups*parameters$theta[offset+1]))
-    }
-    counts
-  })
-  
-  #cat(paste0("Percent zeros in data set: ",round(sum(abundances == 0)/(nrow(abundances)*ncol(abundances)), 2)*100,"\n"))
-  
-  realized_total_counts <- rowSums(abundances)
-  size_factors.observed_counts <- round(simcor(realized_total_counts, mean(realized_total_counts), sd(realized_total_counts),
-                                               size_factor_correlation))
-  # since we're sampling from a normal around the observed counts occasionally we'll get a suggested
-  # total count that is negative; reflect this
-  # this increases correlation but barely
-  size_factors.observed_counts <- abs(size_factors.observed_counts)
-  
-  # transform to proportions
-  sampled_proportions <- apply(abundances, 1, function(x) x/sum(x))
-  observed_counts <- sapply(1:(n*2), function(i) {
-    resample_probs <- sampled_proportions[,i]
-    # censor very low concentration stuff to simulate drop-outs
-    # I'm trying to simulate some minimum detectable concentration
-    # this threshold is pretty arbitrary; we need to tune this to resemble real data
-    resample_probs[resample_probs < 1e-8] <- 0
-    rmultinom(1, size = size_factors.observed_counts[i], prob = resample_probs)
-  })
-  observed_counts <- t(observed_counts)
-  
-  # cat(paste0("Percent zeros in data set: ",round(sum(observed_counts == 0)/(nrow(observed_counts)*ncol(observed_counts)), 2)*100,"\n"))
-  
-  # if we wanted to calculate entropy for a whole data set, here's how we might go about it
-    
-  # log_means <- log(colMeans(observed_counts[,parameters$da_genes]) + 1)
-  # breaks <- seq(from = min(log_means), to = max(log_means), length.out = 10)
-  # chunked_data <- cut(log_means, breaks, 1:9)
-  # ent_val <- entropy(table(chunked_data))
-  
-  # the observed_counts matrix has dimensions n*2 samples x p genes
-  return(list(abundances = abundances,
-              observed_counts = observed_counts,
-              groups = groups,
-              theta = parameters$theta,
-              da_genes = parameters$da_genes))
-}
 
 #' Fit negative binomial model to null and full models and evaluate differential abundance for a focal gene
 #'
@@ -367,6 +176,7 @@ record_result <- function(out_str, out_file) {
 #' @param p number of genes
 #' @param n number of samples per group
 #' @param proportion_da proportion of differentially abundant genes
+#' @param run_label human-readable string identifier for this simulation run
 #' @param k number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param output_file output file to append to
@@ -379,10 +189,8 @@ record_result <- function(out_str, out_file) {
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
-#' @import entropy
-#' @import uuid
 #' @export
-run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_factor_correlation = 0,
+run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = NULL, size_factor_correlation = 0,
                                            output_file = "results.txt", alpha = 0.05, use_ALR = FALSE,
                                            filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE) {
   cat("Simulating data...\n")
@@ -398,25 +206,25 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
   # as a small workaround, if we find any genes will fully no expression in a given condition, we'll drop in a
   #   single 1-count
   # this shouldn't change results and will allow us to fit the GLM across all genes
-
+  
   # which genes are fully missing in the original counts for group 0?
   drop_in <- which(colSums(data$abundances[data$groups == 0,]) == 0)
   for(d in drop_in) {
     data$abundances[sample(which(data$groups == 0))[1],d] <- 1
   }
-
+  
   # which genes are fully missing in the original counts for group 0?
   drop_in <- which(colSums(data$abundances[data$groups == 1,]) == 0)
   for(d in drop_in) {
     data$abundances[sample(which(data$groups == 1))[1],d] <- 1
   }
-
+  
   # which genes are fully missing in the original counts for group 0?
   drop_in <- which(colSums(data$observed_counts[data$groups == 0,]) == 0)
   for(d in drop_in) {
     data$observed_counts[sample(which(data$groups == 0))[1],d] <- 1
   }
-
+  
   # which genes are fully missing in the original counts for group 0?
   drop_in <- which(colSums(data$observed_counts[data$groups == 0,]) == 0)
   for(d in drop_in) {
@@ -428,7 +236,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
   } else {
     rarefy_total <- 0
   }
-
+  
   # calculate and compare differential abundance calls
   cat("Evaluating differential abundance...\n")
   calls.abundances <- c()
@@ -470,7 +278,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
       }
     }
   }
-
+  
   FN <- sum(calls.abundances == TRUE & calls.observed_counts == FALSE)
   FP <- sum(calls.abundances == FALSE & calls.observed_counts == TRUE)
   TN <- sum(calls.abundances == FALSE & calls.observed_counts == FALSE)
@@ -481,47 +289,33 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
   }
   
   # calculate a couple of quantities that might help us model error in low-feature-number, high DE cases
-
-  # calculate the log mean expression for the DA group at baseline and include a measure of how different
+  # (1) calculate the log mean expression for the DA group at baseline and include a measure of how different
   #     this is from overall log mean expression at baseline -- i.e. is our selection of DE genes biased?
   baseline_expr_all <- colMeans(log(data$abundances[data$groups == 0,] + 0.5))
   baseline_expr_da <- colMeans(log(data$abundances[data$groups == 0, data$da_genes] + 0.5))
   ordered_baseline <- baseline_expr_all[order(baseline_expr_all)]
   median_expr_da_quantile <- sum(ordered_baseline < median(baseline_expr_da))/length(ordered_baseline)
   
-  # calculate the log mean expression for the DA group under "treatment"; the median of the signed different
+  # (2) calculate the log mean expression for the DA group under "treatment"; the median of the signed different
   #     will be a predictor too
   med_affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, data$da_genes] + 0.5))
-  net_dir_da <- median(med_affected_expr_dat - med_baseline_expr_da)
-
-  # sparsity level (percent zeros)
-  sparsity <- sum(data$observed_counts == 0)/(nrow(data$observed_counts)*ncol(data$observed_counts))
+  net_dir_da <- med_affected_expr_dat - med_baseline_expr_da
   
-  # uniformity of composition at baseline
-  binned_log_expression <- as.numeric(table(cut(baseline_expr_all, breaks = seq(from = min(baseline_expr_all), to = max(baseline_expr_all), length.out = 10))))
-  max_entropy <- entropy(rep(round(sum(binned_log_expression) / length(binned_log_expression)), length(binned_log_expression)))
-  sim_entropy <- entropy(binned_log_expression) / max_entropy
-
-  save_obj <- list(data = data, result = NULL)
-  save_obj$result$p <- p
-  save_obj$result$proportion_da <- proportion_da
-  save_obj$result$size_factor_correlation <- size_factor_correlation
-  save_obj$result$median_expr_da_quantile <- median_expr_da_quantile
-  save_obj$result$net_dir_da <- net_dir_da
-  save_obj$result$sparsity <- sparsity
-  save_obj$result$sim_entropy <- sim_entropy
-  save_obj$result$tp <- TP
-  save_obj$result$fp <- FP
-  save_obj$result$tn <- TN
-  save_obj$result$fn <- FN
-  save_obj$result$tpr <- TP / (TP + FN)
-  save_obj$result$fpr <- FP / (FP + TN)
-  save_obj$result$quantity_evaluated <- quantity_evaluated
-  save_obj$result$call_DA_by_NB <- call_DA_by_NB
-  save_obj$result$filter_abundance <- filter_abundance
-  save_obj$result$no_features_evaluated <- sum(evaluate_features)
-  
-  saveRDS(save_obj, file.path("simulated_data", paste0(UUIDgenerate(), ".rds")))
+  out_str <- paste0(run_label,"\t",
+                    p,"\t",
+                    proportion_da,"\t",
+                    size_factor_correlation,"\t",
+                    round(median_expr_da_quantile, 5),"\t",
+                    round(median(net_dir_da), 5),"\t",
+                    quantity_evaluated,"\t",
+                    call_DA_by_NB,"\t",
+                    filter_abundance,"\t",
+                    TP,"\t",
+                    FP,"\t",
+                    TN,"\t",
+                    FN,"\t",
+                    sum(evaluate_features),"\t")
+  record_result(out_str, file.path("output",output_file))
 }
 
 #' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
@@ -529,6 +323,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
 #'
 #' @param p number of genes
 #' @param n number of samples per group
+#' @param run_label human-readable string identifier for this simulation run
 #' @param k number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated
 #' @param de_sweep vector of proportions of differentially abundant genes to simulate
 #' @param corr_sweep vector of correlations of size factors (true vs. observed abundances) to simulate
@@ -543,9 +338,9 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
-sweep_simulations <- function(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-                         corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt",
-                         alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, call_DA_by_NB = TRUE, rarefy = FALSE) {
+sweep_simulations <- function(p, n, run_label, k = NULL, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+                              corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt",
+                              alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, call_DA_by_NB = TRUE, rarefy = FALSE) {
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
       out_str <- paste0("simulated evaluating size factor correlation = ",round(sf_corr, 2)," and DA proportion = ",round(de_prop, 2),"\n")
@@ -554,19 +349,10 @@ sweep_simulations <- function(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.
       } else {
         cat("Single-cell RNA-seq",out_str)
       }
-      run_RNAseq_evaluation_instance(p, n, proportion_da = de_prop, k = k,
+      run_RNAseq_evaluation_instance(p, n, proportion_da = de_prop, run_label = run_label, k = k,
                                      size_factor_correlation = sf_corr, output_file = output_file,
                                      alpha = 0.05, use_ALR = use_ALR, filter_abundance = filter_abundance,
                                      call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
     }
   }
 }
-
-
-
-
-
-
-
-
-
