@@ -10,11 +10,11 @@
 
 library(codaDE)
 
-p <- 20000
+p <- 200
 
 for(j in 1:20) {
 
-  data <- simulate_singlecell_RNAseq(p = p, n = 250, k = 1, proportion_da = (2/3),
+  data <- simulate_singlecell_RNAseq(p = p, n = 250, k = 1, proportion_da = 0.8,
                                      size_factor_correlation = 0, spike_in = FALSE)
 
   calls.abundances <- c()

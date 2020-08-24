@@ -12,6 +12,10 @@ record_result(out_str, out_file)
 \item{out_str}{string to write to file}
 
 \item{out_file}{log file path and name}
+
+\item{out_str}{string to write to file}
+
+\item{out_file}{log file path and name}
 }
 \description{
 Write simulation result to a file

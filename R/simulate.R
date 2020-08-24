@@ -484,15 +484,20 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
 
   # calculate the log mean expression for the DA group at baseline and include a measure of how different
   #     this is from overall log mean expression at baseline -- i.e. is our selection of DE genes biased?
-  baseline_expr_all <- colMeans(log(data$abundances[data$groups == 0,] + 0.5))
-  baseline_expr_da <- colMeans(log(data$abundances[data$groups == 0, data$da_genes] + 0.5))
-  ordered_baseline <- baseline_expr_all[order(baseline_expr_all)]
-  median_expr_da_quantile <- sum(ordered_baseline < median(baseline_expr_da))/length(ordered_baseline)
+  if(proportion_da > 0) {
+    baseline_expr_all <- colMeans(log(data$abundances[data$groups == 0,] + 0.5))
+    baseline_expr_da <- colMeans(log(data$abundances[data$groups == 0, data$da_genes] + 0.5))
+    ordered_baseline <- baseline_expr_all[order(baseline_expr_all)]
+    median_expr_da_quantile <- sum(ordered_baseline < median(baseline_expr_da))/length(ordered_baseline)
   
-  # calculate the log mean expression for the DA group under "treatment"; the median of the signed different
-  #     will be a predictor too
-  affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, data$da_genes] + 0.5))
-  net_dir_da <- median(affected_expr_dat - baseline_expr_da)
+    # calculate the log mean expression for the DA group under "treatment"; the median of the signed different
+    #     will be a predictor too
+    affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, data$da_genes] + 0.5))
+    net_dir_da <- median(affected_expr_dat - baseline_expr_da)
+  } else {
+    median_expr_da_quantile <- NULL
+    net_dir_da <- NULL
+  }
 
   # sparsity level (percent zeros)
   sparsity <- sum(data$observed_counts == 0)/(nrow(data$observed_counts)*ncol(data$observed_counts))

@@ -4,13 +4,8 @@
 \alias{simulate_bulk_RNAseq}
 \title{Simulate bulk RNA-seq-like data}
 \usage{
-simulate_bulk_RNAseq(
-  p = 20000,
-  n = 500,
-  proportion_da = 0.1,
-  size_factor_correlation = 0,
-  spike_in = FALSE
-)
+simulate_bulk_RNAseq(p = 20000, n = 500, proportion_da = 0.1,
+  size_factor_correlation = 0, spike_in = FALSE)
 }
 \arguments{
 \item{p}{number of genes}
