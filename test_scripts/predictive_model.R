@@ -24,8 +24,10 @@ data$fnr <- data$fn / (data$tp + data$fn)
 # (3) Plot the data. Does anything have an obvious linear or log-linear relationship with 
 #     the outcome?
 
-eval_data <- data[data$DE_NB == FALSE,]
+eval_data <- data[data$DE_NB == TRUE &
+                  data$prop_de > 0,]
 
+# outcome isn't really linear in any of the predictors
 p1 <- ggplot(eval_data) +
        geom_point(aes(x = p, y = fpr))
 p2 <- ggplot(eval_data) +
@@ -44,6 +46,9 @@ ggsave("predictor_correlation.png", p)
 # (4) Fit and evaluate a Beta regression model.
 # Note: We need to add a tiny value because betareg only allows outcomes (0,1).
 
+eval_data <- eval_data[eval_data$prop_de > 0,]
+eval_data <- eval_data[eval_data$prop_de < 1,]
+
 addend <- 0.00001
 eval_data$fpr <- eval_data$fpr + addend
 eval_data$fnr <- eval_data$fnr + addend
@@ -54,7 +59,8 @@ predicted_fpr <- predict(fit_fpr, eval_data)
 fit_fnr <- betareg(fnr ~ p + prop_de + sfcorr, data = eval_data, link = "log")
 predicted_fnr <- predict(fit_fnr, eval_data)
 
-plot_df <- data.frame(predicted_values = predicted_fpr, true_values = eval_data$fpr, which = "fpr")
+plot_df <- data.frame(predicted_values = predicted_fpr, true_values = eval_data$fpr,
+which = "fpr")
 plot_df <- rbind(plot_df,
                  data.frame(predicted_values = predicted_fnr, true_values = eval_data$fnr, which = "fnr"))
 plot_df$which <- as.factor(plot_df$which)
@@ -62,7 +68,7 @@ plot_df$which <- as.factor(plot_df$which)
 p <- ggplot(plot_df) +
      geom_point(aes(x = true_values, y = predicted_values)) +
      facet_wrap(vars(which), nrow = 1, scales = "free")
-ggsave("betareg_model.png", p, units = "in", dpi = 150, height = 5, width = 8)
+ggsave("betareg_model.png", p, units = "in", dpi = 150, height = 5, width = 10)
 
 # Hopefully adding gene number improves this a lot!
 
@@ -92,6 +98,6 @@ plot_df$which <- as.factor(plot_df$which)
 p <- ggplot(plot_df) +
      geom_point(aes(x = true_values, y = predicted_values)) +
      facet_wrap(vars(which), nrow = 1, scales = "free")
-ggsave("GPreg_model.png", p, units = "in", dpi = 150, height = 5, width = 8)
+ggsave("GPreg_model.png", p, units = "in", dpi = 150, height = 5, width = 10)
 
 
