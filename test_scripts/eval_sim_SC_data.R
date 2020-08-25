@@ -1,3 +1,5 @@
+library(ggplot2)
+
 simdata <- list()
 for(i in 1:20) {
   simdata[[i]] <- readRDS(paste0("sim_dataset_",i,".rds"))
@@ -26,94 +28,78 @@ sim2 <- simdata[[order(fpr_vector)[2]]]$data # "good"
 sim3 <- simdata[[order(fpr_vector)[19]]]$data # "bad"
 sim4 <- simdata[[order(fpr_vector)[20]]]$data # "bad"
 
-# (1) do the differentially expressed genes have a different mean log abundance?
+# My hunch about what's happening is we've got really different distributions (i.e. lots of very low
+# abundance stuff vs. more moderate abundance stuff) and/or the distribution of genes simulated as
+# differentially expressed is very different between groups, causing more "movement" in one case vs.
+# the other.
 
-da_mean_log_ab1 <- colMeans(log(sim1$observed_counts[1:250,sim1$da_genes] + 0.5))
-da_mean_log_ab2 <- colMeans(log(sim2$observed_counts[1:250,sim2$da_genes] + 0.5))
-da_mean_log_ab3 <- colMeans(log(sim3$observed_counts[1:250,sim3$da_genes] + 0.5))
-da_mean_log_ab4 <- colMeans(log(sim4$observed_counts[1:250,sim4$da_genes] + 0.5))
-png("diagnostic_1a.png")
-plot(density(da_mean_log_ab1))
-lines(density(da_mean_log_ab2), col = "black", lty = 2)
-lines(density(da_mean_log_ab3), col = "red")
-lines(density(da_mean_log_ab4), col = "red", lty = 2)
-dev.off()
+plot_diagnostic <- function(label, filename, components) {
+  plot_df <- data.frame(values = c(), type = c())
+  for(cc in 1:length(components)) {
+    plot_df <- rbind(plot_df, data.frame(values = c(components[[cc]]), type = cc))
+  }
+  plot_df$type <- as.factor(plot_df$type)
 
-n_genes <- ncol(sim1$abundances)
+  p <- ggplot(plot_df) +
+    geom_density(aes(x = values, color = type)) +
+    ggtitle(label)
+  ggsave(paste0(filename, ".png"), p, units = "in", dpi = 150, height = 6, width = 6)
+}
 
-nonda_mean_log_ab1 <- colMeans(log(sim1$observed_counts[1:250,setdiff(1:n_genes, sim1$da_genes)] + 0.5))
-nonda_mean_log_ab2 <- colMeans(log(sim2$observed_counts[1:250,setdiff(1:n_genes, sim2$da_genes)] + 0.5))
-nonda_mean_log_ab3 <- colMeans(log(sim3$observed_counts[1:250,setdiff(1:n_genes, sim3$da_genes)] + 0.5))
-nonda_mean_log_ab4 <- colMeans(log(sim4$observed_counts[1:250,setdiff(1:n_genes, sim4$da_genes)] + 0.5))
-png("diagnostic_1b.png")
-plot(density(nonda_mean_log_ab1))
-lines(density(nonda_mean_log_ab2), col = "black", lty = 2)
-lines(density(nonda_mean_log_ab3), col = "red")
-lines(density(nonda_mean_log_ab4), col = "red", lty = 2)
-dev.off()
+# (1) Are the baseline distributions different? (NO)
+log_abundance_1 <- log(sim1$abundance[sim1$groups == 0,] + 0.5)
+log_abundance_2 <- log(sim2$abundance[sim2$groups == 0,] + 0.5)
+log_abundance_3 <- log(sim3$abundance[sim3$groups == 0,] + 0.5)
+log_abundance_4 <- log(sim4$abundance[sim4$groups == 0,] + 0.5)
 
-# (2) is the baseline distribution different (i.e. in terms of uniformity)?
+plot_diagnostic("baseline log distributions",
+                "diagnostic_1",
+                list(c(log_abundance_1),
+                     c(log_abundance_2),
+                     c(log_abundance_3),
+                     c(log_abundance_4)))
 
-mean_log_ab1 <- colMeans(log(sim1$observed_counts[1:250,] + 0.5))
-mean_log_ab2 <- colMeans(log(sim2$observed_counts[1:250,] + 0.5))
-mean_log_ab3 <- colMeans(log(sim3$observed_counts[1:250,] + 0.5))
-mean_log_ab4 <- colMeans(log(sim4$observed_counts[1:250,] + 0.5))
-png("diagnostic_2.png")
-plot(density(mean_log_ab1))
-lines(density(mean_log_ab2), col = "black", lty = 2)
-lines(density(mean_log_ab3), col = "red")
-lines(density(mean_log_ab4), col = "red", lty = 2)
-dev.off()
+# (2) Are distributions of (randomly selected) differential expressed genes different at baseline? (NO)
 
-# (3) is the direction of differential expression skewed positive or negative?
+log_abundance_1 <- log(sim1$abundance[sim1$groups == 0,sim1$da_genes] + 0.5)
+log_abundance_2 <- log(sim2$abundance[sim2$groups == 0,sim2$da_genes] + 0.5)
+log_abundance_3 <- log(sim3$abundance[sim3$groups == 0,sim3$da_genes] + 0.5)
+log_abundance_4 <- log(sim4$abundance[sim4$groups == 0,sim4$da_genes] + 0.5)
 
-log_da_counts1a <- colMeans(log(sim1$observed_counts[1:250,sim1$da_genes] + 0.5))
-log_da_counts1b <- colMeans(log(sim1$observed_counts[251:500,sim1$da_genes] + 0.5))
-direction1 <- log_da_counts1a - log_da_counts1b
+plot_diagnostic("baseline log distributions (DE genes only)",
+                "diagnostic_2",
+                list(c(log_abundance_1),
+                     c(log_abundance_2),
+                     c(log_abundance_3),
+                     c(log_abundance_4)))
 
-log_da_counts2a <- colMeans(log(sim2$observed_counts[1:250,sim2$da_genes] + 0.5))
-log_da_counts2b <- colMeans(log(sim2$observed_counts[251:500,sim2$da_genes] + 0.5))
-direction2 <- log_da_counts2a - log_da_counts2b
+# (3) Are the distributions of differentially expressed genes different in "treatment" condition? (NO)
 
-log_da_counts3a <- colMeans(log(sim3$observed_counts[1:250,sim3$da_genes] + 0.5))
-log_da_counts3b <- colMeans(log(sim3$observed_counts[251:500,sim3$da_genes] + 0.5))
-direction3 <- log_da_counts3a - log_da_counts3b
+log_abundance_1 <- log(sim1$abundance[sim1$groups == 1,sim1$da_genes] + 0.5)
+log_abundance_2 <- log(sim2$abundance[sim2$groups == 1,sim2$da_genes] + 0.5)
+log_abundance_3 <- log(sim3$abundance[sim3$groups == 1,sim3$da_genes] + 0.5)
+log_abundance_4 <- log(sim4$abundance[sim4$groups == 1,sim4$da_genes] + 0.5)
 
-log_da_counts4a <- colMeans(log(sim4$observed_counts[1:250,sim4$da_genes] + 0.5))
-log_da_counts4b <- colMeans(log(sim4$observed_counts[251:500,sim4$da_genes] + 0.5))
-direction4 <- log_da_counts4a - log_da_counts4b
+plot_diagnostic("treatment log distributions (DE genes only)",
+                "diagnostic_3",
+                list(c(log_abundance_1),
+                     c(log_abundance_2),
+                     c(log_abundance_3),
+                     c(log_abundance_4)))
 
-png("diagnostic_3.png")
-plot(density(direction1))
-lines(density(direction2), col = "black", lty = 2)
-lines(density(direction3), col = "red")
-lines(density(direction4), col = "red", lty = 2)
-dev.off()
 
-# (4) is there a net difference in total abundance?
+# (4) Is the direction of differential expression different? (MAYBE?)
 
-total_ab1a <- rowSums(sim1$abundances[1:250,])
-total_ab1b <- rowSums(sim1$abundances[251:500,])
-difference1 <- total_ab1b - total_ab1a
+log_diff_1 <- log(sim1$abundance[sim1$groups == 1,sim1$da_genes] + 0.5) - log(sim1$abundance[sim1$groups == 0,sim1$da_genes] + 0.5)
+log_diff_2 <- log(sim2$abundance[sim2$groups == 1,sim2$da_genes] + 0.5) - log(sim2$abundance[sim2$groups == 0,sim2$da_genes] + 0.5)
+log_diff_3 <- log(sim3$abundance[sim3$groups == 1,sim3$da_genes] + 0.5) - log(sim3$abundance[sim3$groups == 0,sim3$da_genes] + 0.5)
+log_diff_4 <- log(sim4$abundance[sim4$groups == 1,sim4$da_genes] + 0.5) - log(sim4$abundance[sim4$groups == 0,sim4$da_genes] + 0.5)
 
-total_ab2a <- rowSums(sim2$abundances[1:250,])
-total_ab2b <- rowSums(sim2$abundances[251:500,])
-difference2 <- total_ab2b - total_ab2a
-
-total_ab3a <- rowSums(sim3$abundances[1:250,])
-total_ab3b <- rowSums(sim3$abundances[251:500,])
-difference3 <- total_ab3b - total_ab3a
-
-total_ab4a <- rowSums(sim4$abundances[1:250,])
-total_ab4b <- rowSums(sim4$abundances[251:500,])
-difference4 <- total_ab4b - total_ab4a
-
-png("diagnostic_4.png")
-plot(density(difference1))
-lines(density(difference2), col = "black", lty = 2)
-lines(density(difference3), col = "red")
-lines(density(difference4), col = "red", lty = 2)
-dev.off()
-
+plot_diagnostic("log differential (DE genes only)",
+                "diagnostic_4",
+                list(c(log_diff_1),
+                     c(log_diff_2),
+                     c(log_diff_3),
+                     c(log_diff_4)))
 
 
