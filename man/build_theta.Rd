@@ -2,7 +2,7 @@
 % Please edit documentation in R/simulate.R
 \name{build_theta}
 \alias{build_theta}
-\title{Simulate differential abundance parameters}
+\title{Simulate differential abundance parameters (NOT IN USE)}
 \usage{
 build_theta(beta.0, proportion_da, spike_in)
 }
@@ -17,5 +17,5 @@ build_theta(beta.0, proportion_da, spike_in)
 complete vector of dispersion and log coefficient parameters
 }
 \description{
-Simulate differential abundance parameters
+Simulate differential abundance parameters (NOT IN USE)
 }

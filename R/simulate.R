@@ -53,7 +53,7 @@ resample_counts <- function(theta, groups, size_factor_correlation, spike_in = F
   return(list(abundances = abundances, observed_counts = observed_counts))
 }
 
-#' Simulate differential abundance parameters
+#' Simulate differential abundance parameters (NOT IN USE)
 #'
 #' @param beta.0 vector of log baseline (mean) expression for all genes
 #' @param proportion_da proportion of differentially abundant genes
@@ -132,26 +132,66 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
   counts_components <- round(proportions_components[1:(k-1)]*n)
   counts_components <- c(counts_components, n - sum(counts_components))
   # if differentially expressed, a gene will be differentially expressed in all cell types (for now)
-  # beta.0 <- rnorm(p, log(5), 3)
-  Halpern2017_data <- readRDS("UMI_counts/Halpern2017.rds")$stats
-  beta.0 <- sample(log(unname(Halpern2017_data$mean_abundance_profiles) + 0.5), size = p, replace = TRUE)
+  Halpern2017_data <- readRDS("data/summary_Halpern2017_base.rds")
+  sampled_relative_abundances <- sample(Halpern2017_data$mean_relative_abundances, size = p, replace = TRUE)
+  # re-close
+  sampled_relative_abundances <- sampled_relative_abundances / sum(sampled_relative_abundances)
+  # convert these to baseline abundances
+  baseline_abundances <- sampled_relative_abundances * 20000
+  # this grossly looks like real data
+  #   plot(density(log(round(baseline_abundances) + 0.5)))
+  # assign control vs. treatment groups
   groups <- c(rep(0, n), rep(1, n))
-  parameters <- build_theta(beta.0, proportion_da, spike_in)
+  
+  # randomly selection some proportion of genes to be differentially abundant between conditions
+  n_da <- round(p * proportion_da)
+  da_genes <- as.logical(rbinom(p, size = 1, prob = proportion_da))
+  # pick a random change for each differential gene
+  da_factor <- rep(1, p)
+  fold_changes <- c(3, 4, 5)
+  da_factor[da_genes] <- sample(c(1/fold_changes, fold_changes), size = sum(da_genes), replace = TRUE)
+  
+  # sample true counts (format: samples [rows] x genes [columns])
   abundances <- sapply(1:p, function(j) {
-    offset <- 2 + (j-1)*2 + 1
-    mean_log_expr_celltypes <- c()
-    for(kk in 1:k) {
-      mean_log_expr_celltypes <- c(mean_log_expr_celltypes, rep(rnorm(1, parameters$theta[offset], 2), counts_components[kk]))
-    }
-    counts <- rnbinom(n*2, mu = exp(mean_log_expr_celltypes + groups*parameters$theta[offset+1]), size = parameters$theta[1])
-    if(spike_in & (j == p)) {
-      # for now, simulate the same noiseless spike-in
-      counts <- c(counts, exp(parameters$theta[offset] + groups*parameters$theta[offset+1]))
-    }
+    # simulate different baselines for different cell types (TBD; see below)
+    counts <- rnbinom(n*2, mu = c(rep(baseline_abundances[j], n), rep(baseline_abundances[j]*da_factor[j], n)), size = 1)
+    # spike-in also TBD
     counts
   })
+  # this grossly looks like real data in terms of log count distribution
+  #   plot(density(log(round(abundances) + 0.5)))
+  # and again if we look at the profiles of individual genes
+  #   counts <- as.matrix(readRDS("data/counts_Halpern2017_base.rds")$counts) # genes (rows) x samples (columns)
+  #   emp_log_mean <- rowMeans(log(counts + 0.5))
+  #   highly_expressed_idx <- unname(which(emp_log_mean > 3))
+  #   lowly_expressed_idx <- unname(which(emp_log_mean < 1))
+  #   high_sample_vec <- unname(counts[sample(highly_expressed_idx)[1],])
+  #   low_sample_vec <- unname(counts[sample(lowly_expressed_idx)[1],])
+  #   par(mfrow = c(2,2))
+  #   plot(1:length(high_sample_vec), high_sample_vec)
+  #   plot(rnbinom(1000, mu = mean(high_sample_vec), size = 1))
+  #   plot(1:length(high_sample_vec), low_sample_vec)
+  #   plot(rnbinom(1000, mu = mean(low_sample_vec), size = 1))
   
-  #cat(paste0("Percent zeros in data set: ",round(sum(abundances == 0)/(nrow(abundances)*ncol(abundances)), 2)*100,"\n"))
+  # and if we pick a randomly differentially abundant gene this should be somewhat visible
+  #   idx <- sample(which(da_genes == TRUE))[1]
+  #   da_factor[idx]
+  #   plot(abundances[,idx])
+  
+  # parameters <- build_theta(beta.0, proportion_da, spike_in)
+  # abundances <- sapply(1:p, function(j) {
+  #   offset <- 2 + (j-1)*2 + 1
+  #   mean_log_expr_celltypes <- c()
+  #   for(kk in 1:k) {
+  #     mean_log_expr_celltypes <- c(mean_log_expr_celltypes, rep(rnorm(1, parameters$theta[offset], 2), counts_components[kk]))
+  #   }
+  #   counts <- rnbinom(n*2, mu = exp(mean_log_expr_celltypes + groups*parameters$theta[offset+1]), size = parameters$theta[1])
+  #   if(spike_in & (j == p)) {
+  #     # for now, simulate the same noiseless spike-in
+  #     counts <- c(counts, exp(parameters$theta[offset] + groups*parameters$theta[offset+1]))
+  #   }
+  #   counts
+  # })
   
   realized_total_counts <- rowSums(abundances)
   size_factors.observed_counts <- round(simcor(realized_total_counts, mean(realized_total_counts), sd(realized_total_counts),
@@ -183,11 +223,15 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
   # ent_val <- entropy(table(chunked_data))
   
   # the observed_counts matrix has dimensions n*2 samples x p genes
+  # return(list(abundances = abundances,
+  #             observed_counts = observed_counts,
+  #             groups = groups,
+  #             theta = parameters$theta,
+  #             da_genes = parameters$da_genes))
   return(list(abundances = abundances,
               observed_counts = observed_counts,
               groups = groups,
-              theta = parameters$theta,
-              da_genes = parameters$da_genes))
+              da_genes = which(da_genes == TRUE)))
 }
 
 #' Fit negative binomial model to null and full models and evaluate differential abundance for a focal gene

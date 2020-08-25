@@ -7,8 +7,12 @@ library(kernlab)
 
 # (1) Parse the simulated data.
 
-output_file <- file.path("results.txt")
-data <- read.table(output_file, header = T)
+output_file <- "results_singlecellRNAseq.tsv"
+
+data <- read.table(file.path("output", output_file), header = F)
+colnames(data) <- c("run_label", "p", "prop_de", "sfcorr", "measure", "NB_DE",
+                    "min_abundance", "tp", "fp", "tn", "fn", "feature_evaluated")
+
 # Note: The latest run includes an insertion into the 6th column of a logical flag that indicates
 #       whether or not the NB LRT was used for DE (as opposed to the log-LM + permutations).
 #       These labels will have to be updated if using those results.
@@ -24,41 +28,40 @@ addend <- 0.00001
 eval_data$fpr <- eval_data$fp / (eval_data$fp + eval_data$tn) + addend
 eval_data$fnr <- eval_data$fn / (eval_data$fn + eval_data$tp) + addend
 
-fit_fpr <- betareg(fpr ~ p + prop_de + sf_corr + expr_de + dir_de + sparsity + entropy,
+fit_fpr <- betareg(fpr ~ p + prop_de + sfcorr,
                    data = eval_data, link = "log")
 predicted_fpr <- predict(fit_fpr, eval_data)
 
-fit_fnr <- betareg(fnr ~ p + prop_de + sf_corr + expr_de + dir_de + sparsity + entropy,
+fit_fnr <- betareg(fnr ~ p + prop_de + sfcorr,
                    data = eval_data, link = "log")
 predicted_fnr <- predict(fit_fnr, eval_data)
 
+bad_cases <- eval_data$p <= 200 & eval_data$prop_de > 0.3
+labels <- as.factor(bad_cases)
 plot_df <- data.frame(predicted_values = predicted_fpr,
                       true_values = eval_data$fpr,
                       p = as.factor(eval_data$p),
                       prop_de = as.factor(eval_data$prop_de),
-                      sf_corr = as.factor(eval_data$sf_corr),
-                      expr_de = eval_data$expr_de,
-                      dir_de = eval_data$dir_de,
-                      sparsity = eval_data$sparsity,
-                      entropy = eval_data$entropy,
+                      sfcorr = as.factor(eval_data$sfcorr),
+                      labels = as.factor(labels),
                       which = "fpr")
 plot_df <- rbind(plot_df,
                  data.frame(predicted_values = predicted_fnr,
                  true_values = eval_data$fnr,
                  p = as.factor(eval_data$p),
                  prop_de = as.factor(eval_data$prop_de),
-                 sf_corr = as.factor(eval_data$sf_corr),
-                 expr_de = eval_data$expr_de,
-                 dir_de = eval_data$dir_de,
-                 sparsity = eval_data$sparsity,
-                 entropy = eval_data$entropy,
+                 sfcorr = as.factor(eval_data$sfcorr),
+                 labels = as.factor(labels),
                  which = "fnr"))
 plot_df$which <- as.factor(plot_df$which)
 
-p <- ggplot(plot_df) +
-     geom_point(aes(x = true_values, y = predicted_values, color = p)) +
-     facet_wrap(vars(which), nrow = 1, scales = "free")
-ggsave("betareg_model.png", p, units = "in", dpi = 150, height = 5, width = 10)
+data1 <- plot_df[plot_df$which == "fpr" & plot_df$labels == FALSE,]
+data2 <- plot_df[plot_df$which == "fpr" & plot_df$labels == TRUE,]
+p <- ggplot() +
+     geom_point(aes(x = true_values, y = predicted_values), color = "black", data = data1) +
+     geom_point(aes(x = true_values, y = predicted_values), color = "red", data = data2)
+     # facet_wrap(vars(which), nrow = 1, scales = "free")
+ggsave("betareg_model.png", p, units = "in", dpi = 150, height = 5, width = 6)
 
 # (3) Fit and evaluate a GP regression model.
 # Note: Fit can be adjusted via var = ... and kpar = list(sigma = ...).
