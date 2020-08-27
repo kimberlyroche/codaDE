@@ -10,9 +10,12 @@ use POSIX;
 # my $label = "bulkRNAseq_ALR";
 
 # single-cell RNA-seq
-# I've been using p = 100, 200, 500, 1000, 2000, 5000, 10000, 20000
-# my @features = qw(100 200 500 1000 2000 5000);
-my @features = qw(10000 20000);
+#   I had been using p = 100, 200, 500, 1000, 2000, 5000, 10000, 20000
+#   but I don't think sizes below 10K are realistic (FILTERED data sets
+#   below that number make sense)
+# FUTURE THING: I should really consider how read depth influences error
+#   here, it's random
+my @features = qw(10000 15000 20000 25000 30000);
 my @evaluate_alr = qw(FALSE);
 my @filter_abundance = qw(0);
 my $NB_for_DE = "TRUE"; # TRUE: NB, FALSE: log-LM + permutation
@@ -28,7 +31,7 @@ for my $i (0 .. $#features) {
       $f = $features[$i];
       $ea = $evaluate_alr[$j];
       $fa = $filter_abundance[$k];
-      $walltime = ceil(0.002*$f);
+      $walltime = ceil(0.001*$f);
 
       open(my $fh, '>', $filename);
       print $fh '#!/bin/bash'."\n";
