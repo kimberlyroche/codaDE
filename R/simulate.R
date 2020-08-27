@@ -408,12 +408,7 @@ record_result <- function(out_str, out_file) {
 #' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 #' differential abundance calls and write these to an output file
 #'
-#' @param p number of genes
-#' @param n number of samples per group
-#' @param proportion_da proportion of differentially abundant genes
-#' @param k number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated
-#' @param size_factor_correlation correlation of observed abundances to original total abundances
-#' @param output_file output file to append to
+#' @param data simulated data set
 #' @param alpha significant level below which to call a feature differentially abundant
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
@@ -423,61 +418,18 @@ record_result <- function(out_str, out_file) {
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
-#' @import entropy
-#' @import uuid
 #' @export
-run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_factor_correlation = 0,
-                                           output_file = "results.txt", alpha = 0.05, use_ALR = FALSE,
-                                           filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE) {
-  cat("Simulating data...\n")
-  if(is.null(k)) {
-    data <- simulate_bulk_RNAseq(p = p, n = n, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
-                                 spike_in = use_ALR)
-  } else {
-    data <- simulate_singlecell_RNAseq(p = p, n = n, k = k, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
-                                       spike_in = use_ALR)
-  }
-  # we've got to make sure there's non-zero variation in all genes in each condition
-  # usually this fails to be true if one gene is 100% unobserved in one condition and minimally present in the other
-  # as a small workaround, if we find any genes will fully no expression in a given condition, we'll drop in a
-  #   single 1-count
-  # this shouldn't change results and will allow us to fit the GLM across all genes
-
-  # which genes are fully missing in the original counts for group 0?
-  drop_in <- which(colSums(data$abundances[data$groups == 0,]) == 0)
-  for(d in drop_in) {
-    data$abundances[sample(which(data$groups == 0))[1],d] <- 1
-  }
-
-  # which genes are fully missing in the original counts for group 0?
-  drop_in <- which(colSums(data$abundances[data$groups == 1,]) == 0)
-  for(d in drop_in) {
-    data$abundances[sample(which(data$groups == 1))[1],d] <- 1
-  }
-
-  # which genes are fully missing in the original counts for group 0?
-  drop_in <- which(colSums(data$observed_counts[data$groups == 0,]) == 0)
-  for(d in drop_in) {
-    data$observed_counts[sample(which(data$groups == 0))[1],d] <- 1
-  }
-
-  # which genes are fully missing in the original counts for group 0?
-  drop_in <- which(colSums(data$observed_counts[data$groups == 0,]) == 0)
-  for(d in drop_in) {
-    data$observed_counts[sample(which(data$groups == 0))[1],d] <- 1
-  }
-  
-  if(rarefy) {
-    rarefy_total <- min(apply(data$observed_counts, 1, sum))
-  } else {
-    rarefy_total <- 0
-  }
-
+evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE) {
   # calculate and compare differential abundance calls
   cat("Evaluating differential abundance...\n")
   calls.abundances <- c()
   calls.observed_counts <- c()
-  
+
+  if(rarefy) {
+    rarefy_total <- min(apply(data$observed_counts, 1, sum))
+  } else {
+    rarefy_total <- 0
+  }  
   evaluate_features <- apply(data$observed_counts, 2, function(x) mean(x) > filter_abundance)
   
   if(use_ALR) {
@@ -569,8 +521,156 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
   save_obj$result$call_DA_by_NB <- call_DA_by_NB
   save_obj$result$filter_abundance <- filter_abundance
   save_obj$result$no_features_evaluated <- sum(evaluate_features)
+
+  return(save_obj)
+}
+
+#' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
+#' differential abundance calls and write these to an output file
+#'
+#' @param p number of genes
+#' @param n number of samples per group
+#' @param proportion_da proportion of differentially abundant genes
+#' @param k number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated
+#' @param size_factor_correlation correlation of observed abundances to original total abundances
+#' @param alpha significant level below which to call a feature differentially abundant
+#' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
+#' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
+#' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
+#' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
+#' permutation test
+#' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
+#' @details Writes out error and simulation run statistics to a file.
+#' @return NULL
+#' @import entropy
+#' @import uuid
+#' @export
+run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_factor_correlation = 0,
+                                           alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
+                                           call_DA_by_NB = TRUE, rarefy = FALSE) {
+  cat("Simulating data...\n")
+  if(is.null(k)) {
+    data <- simulate_bulk_RNAseq(p = p, n = n, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
+                                 spike_in = use_ALR)
+  } else {
+    data <- simulate_singlecell_RNAseq(p = p, n = n, k = k, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
+                                       spike_in = use_ALR)
+  }
+  # we've got to make sure there's non-zero variation in all genes in each condition
+  # usually this fails to be true if one gene is 100% unobserved in one condition and minimally present in the other
+  # as a small workaround, if we find any genes will fully no expression in a given condition, we'll drop in a
+  #   single 1-count
+  # this shouldn't change results and will allow us to fit the GLM across all genes
+
+  # which genes are fully missing in the original counts for group 0?
+  drop_in <- which(colSums(data$abundances[data$groups == 0,]) == 0)
+  for(d in drop_in) {
+    data$abundances[sample(which(data$groups == 0))[1],d] <- 1
+  }
+
+  # which genes are fully missing in the original counts for group 0?
+  drop_in <- which(colSums(data$abundances[data$groups == 1,]) == 0)
+  for(d in drop_in) {
+    data$abundances[sample(which(data$groups == 1))[1],d] <- 1
+  }
+
+  # which genes are fully missing in the original counts for group 0?
+  drop_in <- which(colSums(data$observed_counts[data$groups == 0,]) == 0)
+  for(d in drop_in) {
+    data$observed_counts[sample(which(data$groups == 0))[1],d] <- 1
+  }
+
+  # which genes are fully missing in the original counts for group 0?
+  drop_in <- which(colSums(data$observed_counts[data$groups == 0,]) == 0)
+  for(d in drop_in) {
+    data$observed_counts[sample(which(data$groups == 0))[1],d] <- 1
+  }
   
+  save_obj <- evaluate_DA(data, alpha = alpha, use_ALR = use_ALR, filter_abundance = file_abundance, call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
+
   saveRDS(save_obj, file.path("simulated_data", paste0(UUIDgenerate(), ".rds")))
+}
+
+#' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
+#' differential abundance calls and write these to an output file
+#'
+#' @param p number of genes
+#' @param n number of samples per group
+#' @param proportion_da proportion of differentially abundant genes
+#' @param k number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated
+#' @param size_factor_correlation correlation of observed abundances to original total abundances
+#' @param alpha significant level below which to call a feature differentially abundant
+#' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
+#' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
+#' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
+#' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
+#' permutation test
+#' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
+#' @details Writes out error and simulation run statistics to a file.
+#' @return NULL
+#' @import filelock
+#' @export
+evaluate_existing_RNAseq_instance <- function(p, proportion_da, size_factor_correlation,
+                                              alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
+                                              call_DA_by_NB = TRUE, rarefy = FALSE) {
+  # lock metadata
+  # use metadata to file the data sets that match the criteria we want in a random file
+  # record this file as in use
+  # unlock metadata
+
+  metadata_file <- file.path("simulated_data", "metadata.tsv")
+  lock_file <- paste0(metadata_file, ".lck")
+  lck <- lock(lock_file, timeout = Inf)
+  metadata <- read.table(metadata_file, header = T, stringsAsFactors = FALSE)
+  file_idx <- which(metadata$p == p &
+                    metadata$proportion_da == proportion_da &
+                    metadata$size_factor_correlation == size_factor_correlation &
+                    metadata$filter_threshold != filter_abundance &
+                    metadata$in_use == FALSE)
+  if(length(file_idx) == 0) {
+    unlock(lck)
+    return(NULL)
+  }
+  
+  # select a candidate file
+  selected_idx <- sample(file_idx)[1]
+  candidate_short_filename <- metadata[selected_idx,]$filename
+  
+  # mark all instances of this guy as in-use
+  metadata[metadata$filename == metadata[selected_idx,]$filename,]$in_use <- TRUE
+  write.table(metadata, file = metadata_file, quote = FALSE, sep = '\t', row.names = FALSE)
+  unlock(lck)
+  
+  # run the differential abundance test
+  data_filename <- file.path("simulated_data", candidate_short_filename)
+  data <- readRDS(data_filename)
+  
+  save_obj <- evaluate_DA(data$data, alpha = alpha, use_ALR = use_ALR, filter_abundance = 10, call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
+  save_obj <- save_obj$result # discard the part we've already recorded
+  
+  if("result" %in% names(data)) {
+    # fix the structure
+    data$results <- list(data$result)
+    data$result <- NULL
+  }
+  data$results[[length(data$results) + 1]] <- save_obj
+  saveRDS(data, file = data_filename)
+  # add to save object
+  
+  # update the metadata: open the current version and update this filename
+  lck <- lock(lock_file, timeout = Inf)
+  metadata <- read.table(metadata_file, header = T, stringsAsFactors = FALSE)
+  metadata[metadata$filename == candidate_short_filename,]$in_use <- FALSE
+  # update the metadata: add the new entry
+  metadata <- rbind(metadata,
+                    data.frame(filename = candidate_short_filename,
+                               p = p,
+                               proportion_da = proportion_da,
+                               size_factor_correlation = size_factor_correlation,
+                               filter_threshold = filter_abundance,
+                               in_use = FALSE))
+  write.table(metadata, file = metadata_file, quote = FALSE, sep = '\t', row.names = FALSE)
+  unlock(lck)
 }
 
 #' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
