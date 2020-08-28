@@ -14,12 +14,6 @@ call_DA_LM(data, feature_idx, call_abundances = TRUE)
 \item{feature_idx}{index of gene to test for differential abundance}
 
 \item{call_abundances}{if TRUE, call DA on abundances; if FALSE, on observed counts}
-
-\item{data}{simulated data set}
-
-\item{feature_idx}{index of gene to test for differential abundance}
-
-\item{call_abundances}{if TRUE, call DA on abundances; if FALSE, on observed counts}
 }
 \value{
 p-value associated with group coefficient
