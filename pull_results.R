@@ -1,4 +1,4 @@
-# run on 8K simulation files, this takes about 2-3 hrs.
+k# run on 8K simulation files, this takes about 2-3 hrs.
 # it's the loading of each individual data set that's rough (TBD)
 
 output_file <- file.path("simulated_data/metadata.tsv")

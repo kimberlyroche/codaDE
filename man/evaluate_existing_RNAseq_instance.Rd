@@ -5,21 +5,16 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 differential abundance calls and write these to an output file}
 \usage{
-evaluate_existing_RNAseq_instance(
-  p,
-  proportion_da,
-  size_factor_correlation,
-  alpha = 0.05,
-  use_ALR = FALSE,
-  filter_abundance = 1,
-  call_DA_by_NB = TRUE,
-  rarefy = FALSE
-)
+evaluate_existing_RNAseq_instance(p, proportion_da, k,
+  size_factor_correlation, alpha = 0.05, use_ALR = FALSE,
+  filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE)
 }
 \arguments{
 \item{p}{number of genes}
 
 \item{proportion_da}{proportion of differentially abundant genes}
+
+\item{k}{number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated}
 
 \item{size_factor_correlation}{correlation of observed abundances to original total abundances}
 
@@ -36,8 +31,6 @@ permutation test}
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 
 \item{n}{number of samples per group}
-
-\item{k}{number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated}
 }
 \description{
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in

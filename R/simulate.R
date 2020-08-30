@@ -375,6 +375,8 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
     rarefy_total <- 0
   }  
   evaluate_features <- apply(data$observed_counts, 2, function(x) mean(x) > filter_abundance)
+
+  p <- ncol(data$abundances)
   
   if(use_ALR) {
     # this setup is currently only possible with NB DA calling
@@ -555,7 +557,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
 #' @return NULL
 #' @import filelock
 #' @export
-evaluate_existing_RNAseq_instance <- function(p, proportion_da, size_factor_correlation,
+evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_correlation,
                                               alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
                                               call_DA_by_NB = TRUE, rarefy = FALSE) {
   # lock metadata
@@ -567,11 +569,15 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, size_factor_corr
   lock_file <- paste0(metadata_file, ".lck")
   lck <- lock(lock_file, timeout = Inf)
   metadata <- read.table(metadata_file, header = T, stringsAsFactors = FALSE)
+
   # filter to files that meet the criteria
   usable_idx <- which(metadata$p == p &
              metadata$proportion_da == proportion_da &
              metadata$size_factor_correlation == size_factor_correlation &
+             metadata$k == k &
              metadata$in_use == FALSE)
+  cat("Found",length(usable_idx),"usable files\n")
+
   # exclude files that have had this analysis run before
   usable_md <- metadata[usable_idx,]
   usable_files <- usable_md[!(usable_md$filename %in% usable_md[usable_md$filter_threshold == filter_abundance,]$filename),]$filename
@@ -592,7 +598,7 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, size_factor_corr
     data_filename <- file.path("simulated_data", candidate_short_filename)
     data <- readRDS(data_filename)
     
-    save_obj <- evaluate_DA(data$data, alpha = alpha, use_ALR = use_ALR, filter_abundance = 10, call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
+    save_obj <- evaluate_DA(data$data, alpha = alpha, use_ALR = use_ALR, filter_abundance = filter_abundance, call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
     # save_obj <- save_obj$result # discard the part we've already recorded
     
     # if("result" %in% names(data)) {
@@ -614,6 +620,7 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, size_factor_corr
                                  p = p,
                                  proportion_da = proportion_da,
                                  size_factor_correlation = size_factor_correlation,
+                                 k = k,
                                  filter_threshold = filter_abundance,
                                  in_use = FALSE))
     write.table(metadata, file = metadata_file, quote = FALSE, sep = '\t', row.names = FALSE)
@@ -652,7 +659,7 @@ sweep_simulations <- function(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.
         cat("Single-cell RNA-seq",out_str)
       }
       if(use_existing_simulations) {
-        evaluate_existing_RNAseq_instance(p, proportion_da = de_prop, size_factor_correlation = sf_corr,
+        evaluate_existing_RNAseq_instance(p, proportion_da = de_prop, k = k, size_factor_correlation = sf_corr,
                                                       alpha = 0.05, use_ALR = use_ALR, filter_abundance = filter_abundance,
                                                       call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
       } else {

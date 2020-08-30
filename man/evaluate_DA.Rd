@@ -18,14 +18,8 @@ record_result <- function(out_str, out_file) {
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 differential abundance calls and write these to an output file}
 \usage{
-evaluate_DA(
-  data,
-  alpha = 0.05,
-  use_ALR = FALSE,
-  filter_abundance = 1,
-  call_DA_by_NB = TRUE,
-  rarefy = FALSE
-)
+evaluate_DA(data, alpha = 0.05, use_ALR = FALSE,
+  filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE)
 }
 \arguments{
 \item{data}{simulated data set}
