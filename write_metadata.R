@@ -1,4 +1,4 @@
-rewrite <- FALSE
+rewrite <- TRUE
 metadata_file <- file.path("simulated_data", "metadata.tsv")
 simdata_files <- list.files(path = "simulated_data", pattern = "*.rds")
 

@@ -24,7 +24,9 @@ option_list = list(
   make_option(c("--rarefy"), type = "logical", default = FALSE, 
               help = "flag indicating whether or not to rarefy samples", metavar = "logical"),
   make_option(c("--existing"), type = "logical", default = FALSE, 
-              help = "use existing simulation", metavar = "logical")
+              help = "use existing simulation", metavar = "logical"),
+  make_option(c("--save_slot"), type = "numeric", default = NULL, 
+              help = "index in results to save evaluation run into", metavar = "numeric")
 ); 
 
 opt_parser = OptionParser(option_list=option_list);
@@ -51,4 +53,5 @@ sweep_simulations(p = opt$p,
                   filter_abundance = opt$filter_abundance,
                   call_DA_by_NB = opt$NB_for_DE,
                   rarefy = opt$rarefy,
-                  use_existing_simulations = opt$existing)
+                  use_existing_simulations = opt$existing,
+                  save_slot = opt$save_slot)

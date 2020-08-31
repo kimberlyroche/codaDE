@@ -7,7 +7,8 @@ differential abundance calls and write these to an output file}
 \usage{
 evaluate_existing_RNAseq_instance(p, proportion_da, k,
   size_factor_correlation, alpha = 0.05, use_ALR = FALSE,
-  filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE)
+  filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE,
+  save_slot = NULL)
 }
 \arguments{
 \item{p}{number of genes}
@@ -29,6 +30,8 @@ evaluate_existing_RNAseq_instance(p, proportion_da, k,
 permutation test}
 
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
+
+\item{save_slot}{if not NULL, this specifies the results index in the saved object to write (or overwrite)}
 
 \item{n}{number of samples per group}
 }

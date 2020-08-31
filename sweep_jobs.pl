@@ -17,7 +17,7 @@ use POSIX;
 #   here, it's random
 my @features = qw(10000 15000 20000 25000 30000);
 my @evaluate_alr = qw(FALSE);
-my @filter_abundance = qw(10);
+my @filter_abundance = qw(3);
 my $NB_for_DE = "TRUE"; # TRUE: NB, FALSE: log-LM + permutation
 
 my $filename = "job.slurm";
@@ -47,7 +47,7 @@ for my $i (0 .. $#features) {
       print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
       # FALSE refers to rarefication
-      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --NB_for_DE='.$NB_for_DE.' --filter_abundance='.$fa.' --existing=TRUE'."\n\n";
+      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --NB_for_DE='.$NB_for_DE.' --filter_abundance='.$fa.' --existing=TRUE --save_slot=2'."\n\n";
 
       close $fh;
 

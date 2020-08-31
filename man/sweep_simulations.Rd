@@ -9,13 +9,13 @@ sweep_simulations(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.9,
   by = 0.1), corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
   alpha = 0.05, use_ALR = FALSE, filter_abundance = 0,
   call_DA_by_NB = TRUE, rarefy = FALSE,
-  use_existing_simulations = FALSE)
+  use_existing_simulations = FALSE, save_slot = NULL)
 
 sweep_simulations(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.9,
   by = 0.1), corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
   alpha = 0.05, use_ALR = FALSE, filter_abundance = 0,
   call_DA_by_NB = TRUE, rarefy = FALSE,
-  use_existing_simulations = FALSE)
+  use_existing_simulations = FALSE, save_slot = NULL)
 }
 \arguments{
 \item{p}{number of genes}
@@ -41,6 +41,8 @@ permutation test}
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 
 \item{use_existing_simulations}{if TRUE looks for existing simulations (specified in a metadata file) rather than simulating new data sets}
+
+\item{save_slot}{if not NULL, this specifies the results index in the saved object to write (or overwrite)}
 
 \item{run_label}{human-readable string identifier for this simulation run}
 

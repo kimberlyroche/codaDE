@@ -387,8 +387,8 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
         pval.abundances <- call_DA_CODA(logratios.abundances, i, data$groups)
         pval.observed_counts <- call_DA_CODA(logratios.observed_counts, i, data$groups)
         if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-          calls.abundances <- c(calls.abundances, pval.abundances <= alpha/p)
-          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/p)
+          calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
+          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/length(evaluate_features))
         }
       }
     }
@@ -406,8 +406,8 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
           pval.observed_counts <- call_DA_LM(data, i, call_abundances = FALSE)
         }
         if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-          calls.abundances <- c(calls.abundances, pval.abundances <= alpha/p)
-          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/p)
+          calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
+          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/length(evaluate_features))
         }
       }
     }
@@ -553,13 +553,14 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
 #' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
 #' permutation test
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
+#' @param save_slot if not NULL, this specifies the results index in the saved object to write (or overwrite)
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @import filelock
 #' @export
 evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_correlation,
                                               alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
-                                              call_DA_by_NB = TRUE, rarefy = FALSE) {
+                                              call_DA_by_NB = TRUE, rarefy = FALSE, save_slot = NULL) {
   # lock metadata
   # use metadata to file the data sets that match the criteria we want in a random file
   # record this file as in use
@@ -580,7 +581,12 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_c
 
   # exclude files that have had this analysis run before
   usable_md <- metadata[usable_idx,]
-  usable_files <- usable_md[!(usable_md$filename %in% usable_md[usable_md$filter_threshold == filter_abundance,]$filename),]$filename
+  # check that this condition is *new*
+  if(is.null(save_slot)) {
+    usable_files <- usable_md[!(usable_md$filename %in% usable_md[usable_md$filter_threshold == filter_abundance,]$filename),]$filename
+  } else {
+    usable_files <- usable_md$filename
+  }
 
   if(length(usable_files) == 0) {
     dump <- unlock(lck)
@@ -606,7 +612,13 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_c
     #   data$results <- list(data$result)
     #   data$result <- NULL
     # }
-    data$results[[length(data$results) + 1]] <- save_obj$results[[1]]
+    rewritten_run <- NULL
+    if(is.null(save_slot)) {
+      data$results[[length(data$results) + 1]] <- save_obj$results[[1]]
+    } else {
+      rewritten_run <- data$results[[save_slot]]
+      data$results[[save_slot]] <- save_obj$results[[1]]
+    }
     saveRDS(data, file = data_filename)
     # add to save object
     
@@ -614,6 +626,16 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_c
     lck <- lock(lock_file, timeout = Inf)
     metadata <- read.table(metadata_file, header = T, stringsAsFactors = FALSE)
     metadata[metadata$filename == candidate_short_filename,]$in_use <- FALSE
+    # remove any entry we just rewrote
+    if(!is.null(rewritten_run)) {
+      remove_idx <- which(metadata$filename == candidate_short_filename &
+                                   metadata$p == p &
+                                   metadata$proportion_da == proportion_da &
+                                   metadata$k == k &
+                                   metadata$size_factor_correlation == size_factor_correlation &
+                                   metadata$filter_threshold == rewritten_run$filter_abundance)
+      metadata <- metadata[setdiff(1:nrow(metadata), remove_idx),]
+    }
     # update the metadata: add the new entry
     metadata <- rbind(metadata,
                       data.frame(filename = candidate_short_filename,
@@ -644,12 +666,14 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_c
 #' permutation test
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @param use_existing_simulations if TRUE looks for existing simulations (specified in a metadata file) rather than simulating new data sets
+#' @param save_slot if not NULL, this specifies the results index in the saved object to write (or overwrite)
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
 sweep_simulations <- function(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
                          corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), alpha = 0.05, use_ALR = FALSE,
-                         filter_abundance = 0, call_DA_by_NB = TRUE, rarefy = FALSE, use_existing_simulations = FALSE) {
+                         filter_abundance = 0, call_DA_by_NB = TRUE, rarefy = FALSE,
+                         use_existing_simulations = FALSE, save_slot = NULL) {
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
       out_str <- paste0("simulated evaluating size factor correlation = ",round(sf_corr, 2)," and DA proportion = ",round(de_prop, 2),"\n")
@@ -661,7 +685,7 @@ sweep_simulations <- function(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.
       if(use_existing_simulations) {
         evaluate_existing_RNAseq_instance(p, proportion_da = de_prop, k = k, size_factor_correlation = sf_corr,
                                                       alpha = 0.05, use_ALR = use_ALR, filter_abundance = filter_abundance,
-                                                      call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
+                                                      call_DA_by_NB = call_DA_by_NB, rarefy = rarefy, save_slot = save_slot)
       } else {
         run_RNAseq_evaluation_instance(p, n, proportion_da = de_prop, k = k,
                                        size_factor_correlation = sf_corr,

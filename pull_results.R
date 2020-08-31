@@ -27,15 +27,27 @@ lower_lim <- max(1, cap - 999)
 upper_lim <- min(nrow(metadata), cap)
 #lower_lim <- 1
 #upper_lim <- nrow(metadata)
+slot <- NULL
 for(idx in lower_lim:upper_lim) {
   cat(paste0("Pulling data set ",idx," / ",nrow(metadata),"\n"))
   cat(paste0("\t",metadata$filename[idx],"\n"))
   data <- readRDS(file.path(data_dir, metadata$filename[idx]))
   # record the metadata we want
-  metadata[idx,"tp"] <- data$results[[1]]$tp
-  metadata[idx,"fp"] <- data$results[[1]]$fp
-  metadata[idx,"tn"] <- data$results[[1]]$tn
-  metadata[idx,"fn"] <- data$results[[1]]$fn
+  if(is.null(slot)) {
+    # find the results index that corresponds to this level of filtering
+    slot <- 1
+    while(data$results[[slot]]$filter_abundance != filter_abundance & slot <= length(data$results)) {
+      slot <- slot + 1
+    }
+    if(slot > length(data$results)) {
+      cat("Filter abundance not found in",metadata$filename[idx],"\n")
+      quit()
+    }
+  }
+  metadata[idx,"tp"] <- data$results[[slot]]$tp
+  metadata[idx,"fp"] <- data$results[[slot]]$fp
+  metadata[idx,"tn"] <- data$results[[slot]]$tn
+  metadata[idx,"fn"] <- data$results[[slot]]$fn
   metadata[idx,"median_expr_da_quantile"] <- data$properties$median_expr_da_quantile
   metadata[idx,"net_dir_da"] <- data$properties$net_dir_da
   metadata[idx,"sparsity"] <- data$properties$sparsity
