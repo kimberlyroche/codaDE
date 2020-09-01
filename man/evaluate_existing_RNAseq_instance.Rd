@@ -5,10 +5,18 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 differential abundance calls and write these to an output file}
 \usage{
-evaluate_existing_RNAseq_instance(p, proportion_da, k,
-  size_factor_correlation, alpha = 0.05, use_ALR = FALSE,
-  filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE,
-  save_slot = NULL)
+evaluate_existing_RNAseq_instance(
+  p,
+  proportion_da,
+  k,
+  size_factor_correlation,
+  alpha = 0.05,
+  use_ALR = FALSE,
+  filter_abundance = 1,
+  call_DA_by_NB = TRUE,
+  rarefy = FALSE,
+  analysis_label = NULL
+)
 }
 \arguments{
 \item{p}{number of genes}
@@ -31,7 +39,7 @@ permutation test}
 
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 
-\item{save_slot}{if not NULL, this specifies the results index in the saved object to write (or overwrite)}
+\item{analysis_label}{this is a short name for this analysis that should correspond to a folder name in simulated_analyses}
 
 \item{n}{number of samples per group}
 }
