@@ -17,8 +17,9 @@ if(!rewrite & file.exists(metadata_file)) {
 }
 
 for(idx in 1:length(simdata_files)) {
-  if(idx %% 1 == 0) {
+  if(idx %% 100 == 0) {
     cat("Evaluating file",idx,"\n")
+    write.table(metadata, file = metadata_file, quote = FALSE, sep = '\t', row.names = FALSE)
   }
   data <- readRDS(file.path("simulated_data", simdata_files[idx]))
   for(rr in 1:length(data$results)) {
