@@ -23,10 +23,10 @@ option_list = list(
               help = "minimum average abundance of a gene on which to test differential abundance", metavar = "numeric"),
   make_option(c("--rarefy"), type = "logical", default = FALSE, 
               help = "flag indicating whether or not to rarefy samples", metavar = "logical"),
+  make_option(c("--label"), type = "character", default = NULL,
+              help = "analysis label associated with output directory in simulated_analyses", metavar = "character"),
   make_option(c("--existing"), type = "logical", default = FALSE, 
-              help = "use existing simulation", metavar = "logical"),
-  make_option(c("--save_slot"), type = "numeric", default = NULL, 
-              help = "index in results to save evaluation run into", metavar = "numeric")
+              help = "use existing simulation", metavar = "logical")
 ); 
 
 opt_parser = OptionParser(option_list=option_list);
@@ -49,9 +49,9 @@ sweep_simulations(p = opt$p,
                   k = opt$k,
                   de_sweep = de_sweep,
                   corr_sweep = corr_sweep,
+                  call_DA_by_NB = opt$NB_for_DE,
                   use_ALR = opt$use_ALR,
                   filter_abundance = opt$filter_abundance,
-                  call_DA_by_NB = opt$NB_for_DE,
                   rarefy = opt$rarefy,
-                  use_existing_simulations = opt$existing,
-                  save_slot = opt$save_slot)
+                  analysis_label = opt$label,
+                  use_existing_simulations = opt$existing)

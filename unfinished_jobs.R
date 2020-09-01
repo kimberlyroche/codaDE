@@ -1,18 +1,17 @@
 library(dplyr)
 
+# V1: simulated_data directory
 md <- read.table(file.path("simulated_data", "metadata.tsv"), header = TRUE, stringsAsFactors = FALSE)
-filter_abundance <- 10
 
 # (1) Show all recorded runs associated with all conditions for a GIVEN GENE NUMBER
-p <- 10000
-temp <- md[md$filter_threshold == filter_abundance & md$p == p,] %>%
+temp <- md %>%
   group_by(p, proportion_da, size_factor_correlation) %>%
   tally()
 print(as_tibble(temp), n = 100)
 
 # (2) Get conditions from a set of runs with more or less than 20 replicates.
 #     This should be empty!
-temp <- md[md$filter_threshold == filter_abundance,] %>%
+temp <- md %>%
   group_by(p, proportion_da, size_factor_correlation) %>%
   tally() %>%
   filter(n != 20)
@@ -50,3 +49,13 @@ if(nrow(temp) > 0) {
   }
 }
 
+# V2: simulated_analysis directory
+analysis_label <- "analysis3"
+filenames <- list.files(path = file.path("simulated_analyses", analysis_label), pattern = "*.rds")
+md <- read.table(file.path("simulated_data", "metadata.tsv"), header = TRUE, stringsAsFactors = FALSE)
+md <- md[md$filename %in% filenames,]
+temp <- md %>%
+  group_by(p, proportion_da, size_factor_correlation) %>%
+  tally() %>%
+  filter(n != 20)
+print(as_tibble(temp), n = 100)

@@ -1,3 +1,4 @@
+# PT 1
 # pull simulations with high and low false positive rates
 results <- read.table("simulated_data/results_filter0.tsv", header = T, stringsAsFactors = FALSE)
 results$fpr <- results$fp / (results$fp + results$tn)
@@ -34,5 +35,24 @@ plot(density(diff1), col = "black", lty = 1)
 lines(density(diff2), col = "black", lty = 2, type = "l")
 lines(density(diff3), col = "red", lty = 1, type = "l")
 lines(density(diff4), col = "red", lty = 2, type = "l")
+dev.off()
+
+
+# PT 2
+# Visualize some erroneous DA calls
+data <- readRDS("simulated_data/0170698d-1aea-4142-b320-08971893a0ae.rds")
+
+non_da_genes <- !(1:ncol(data$data$abundances) %in% data$data$da_genes)
+evaluate_features <- apply(data$data$observed_counts, 2, function(x) mean(x) > 3)
+plot_genes <- which(non_da_genes & evaluate_features)
+
+non_da_gene <- sample(plot_genes)[1]
+
+png("before.png")
+plot(data$data$abundances[,non_da_gene])
+dev.off()
+
+png("after.png")
+plot(data$data$observed_counts[,non_da_gene])
 dev.off()
 

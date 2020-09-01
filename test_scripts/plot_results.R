@@ -3,30 +3,23 @@ library(gridExtra)
 library(codaDE)
 library(wesanderson)
 
-measure <- "counts"
-# options:
-# (1) 0   -- no filtering of lowly abundant features
-# (1) 1   -- omission of calls on features with mean abundance < 1
-min_abundance <- 0
+args = commandArgs(trailingOnly=TRUE)
+label <- args[1]
 
-output_file <- "results_filter0.tsv"
+data_dir <- file.path("simulated_analyses", label)
+results_file <- "results.tsv"
 
-data <- read.table(file.path("simulated_data", output_file), header = T)
-# subset to a condition of interest
-data <- data[data$filter_threshold == min_abundance,]
-
-# length(data$filename %in% list.files(path = "simulated_data", pattern = "*.rds"))
-# length(list.files(path = "simulated_data", pattern = "*.rds") %in% data$filename)
+data <- read.table(file.path(data_dir, results_file), header = TRUE)
 
 # calculate error rates of interest
 data$tpr <- data$tp / (data$tp + data$fn)
 data$fpr <- data$fp / (data$fp + data$tn)
-data$proportion_da <- round(data$proportion_da, 2)
-data <- data[data$proportion_da %in% c(0.2, 0.4, 0.8),]
-data <- data[data$size_factor_correlation %in% c(0.1, 0.5, 0.9),]
+data$proportion_da <- round(data$prop_da, 2)
+data <- data[data$prop_da %in% c(0.2, 0.4, 0.8),]
+data <- data[data$sf_corr %in% c(0.1, 0.5, 0.9),]
 
-data$proportion_da <- as.factor(data$proportion_da)
-data$size_factor_correlation <- as.factor(data$size_factor_correlation)
+data$prop_da <- as.factor(data$prop_da)
+data$sf_corr <- as.factor(data$sf_corr)
 
 # filter out 0/0 that occasionally crops up in filtered ALR w/ low number of features
 # these are tp = 0, fn = 0
@@ -34,7 +27,7 @@ data <- data[!(is.nan(data$tpr)),]
 
 for(ng in unique(data$p)) {
   subdata <- data[data$p == ng,]
-  p1 <- ggplot(subdata, aes(x = fpr, y = tpr, color = proportion_da)) +
+  p1 <- ggplot(subdata, aes(x = fpr, y = tpr, color = prop_da)) +
     geom_point(size = 1) +
     scale_color_manual(values=c("#E3AF14", "#E36A14", "#E31B14")) +
     xlim(c(0, 1)) +
@@ -43,10 +36,10 @@ for(ng in unique(data$p)) {
     ylab("true postitive rate") +
     ggtitle(paste0("p = ", ng)) +
     labs(color = "proportion genes\ndifferentially\nexpressed")
-  ggsave(paste0("ROC_",ng,"_min",min_abundance,"_01.png"),
+  ggsave(paste0("ROC_",ng,"_01.png"),
         p1, dpi = 150, units = "in", height = 4, width = 6)
 
-  p2 <- ggplot(subdata, aes(x = fpr, y = tpr, color = size_factor_correlation)) +
+  p2 <- ggplot(subdata, aes(x = fpr, y = tpr, color = sf_corr)) +
     geom_point(size = 1) +
     scale_color_manual(values=c("#11BF43", "#22a4d4", "#2225D4")) +
     xlim(c(0, 1)) +
@@ -56,8 +49,7 @@ for(ng in unique(data$p)) {
     ggtitle(paste0("p = ", ng)) +
     labs(color = "size factor\ncorrelation")
 
-  ggsave(paste0("ROC_",ng,"_min",min_abundance,"_02.png"),
+  ggsave(paste0("ROC_",ng,"_02.png"),
           p2, dpi = 150, units = "in", height = 4, width = 6)
   #p <- grid.arrange(p1, p2, nrow = 1)
 }
-

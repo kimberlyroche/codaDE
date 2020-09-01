@@ -15,9 +15,10 @@ use POSIX;
 #   below that number make sense)
 # FUTURE THING: I should really consider how read depth influences error
 #   here, it's random
-my @features = qw(10000 15000 20000 25000 30000);
+my @features = qw(20000 25000 30000);
 my @evaluate_alr = qw(FALSE);
 my @filter_abundance = qw(3);
+my $analysis_label = "analysis3";
 my $NB_for_DE = "TRUE"; # TRUE: NB, FALSE: log-LM + permutation
 
 my $filename = "job.slurm";
@@ -47,7 +48,7 @@ for my $i (0 .. $#features) {
       print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
       # FALSE refers to rarefication
-      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --NB_for_DE='.$NB_for_DE.' --filter_abundance='.$fa.' --existing=TRUE --save_slot=2'."\n\n";
+      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --NB_for_DE='.$NB_for_DE.' --filter_abundance='.$fa.' --existing=TRUE --label='.$analysis_label."\n\n";
 
       close $fh;
 

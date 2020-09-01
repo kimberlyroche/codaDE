@@ -16,6 +16,14 @@ call_DA(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0)
 \item{call_abundances}{if TRUE, call DA on abundances; if FALSE, on observed counts}
 
 \item{rarefy_depth}{if non-zero, specifies the depth at which to resample the counts}
+
+\item{data}{simulated data set}
+
+\item{feature_idx}{index of gene to test for differential abundance}
+
+\item{call_abundances}{if TRUE, call DA on abundances; if FALSE, on observed counts}
+
+\item{rarefy_depth}{if non-zero, specifies the depth at which to resample the counts}
 }
 \value{
 p-value from NB GLM fit with MASS::glm.nb associated with group coefficient

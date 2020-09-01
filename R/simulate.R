@@ -620,14 +620,14 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_c
     lck <- lock(lock_file, timeout = Inf)
     ledger <- read.table(ledger_file, header = T, stringsAsFactors = FALSE)
     file_to_use <- sample(usable_filenames[!(usable_filenames %in% ledger$filename)])[1]
-    if(!is.null(file_to_use)) {
+    if(!is.na(file_to_use)) {
       ledger <- rbind(ledger, data.frame(filename = file_to_use))
       write.table(ledger, file = ledger_file, quote = FALSE, sep = '\t', row.names = FALSE)
     }
     dump <- unlock(lck)
   }
 
-  if(!is.null(file_to_use)) {
+  if(!is.na(file_to_use)) {
     # run the differential abundance test
     cat("Evaluating file",file_to_use,"\n")
     data_filename <- file.path("simulated_data", file_to_use)
@@ -666,7 +666,7 @@ sweep_simulations <- function(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.
   }
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
-      out_str <- paste0("w/ ",p,"genes, DA proportion = ",round(de_prop, 2),", and size factor correlation = ",round(sf_corr, 2),"\n")
+      out_str <- paste0("w/ ",p," genes, DA proportion = ",round(de_prop, 2),", and size factor correlation = ",round(sf_corr, 2),"\n")
       if(is.null(k)) {
         cat("Bulk RNA-seq",out_str)
       } else {
