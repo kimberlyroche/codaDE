@@ -2,24 +2,17 @@
 % Please edit documentation in R/simulate.R
 \name{evaluate_DA}
 \alias{evaluate_DA}
-\title{#' Write simulation result to a file
-#'
-#' @param out_str string to write to file
-#' @param out_file log file path and name
-#' @return NULL
-#' @import filelock
-#' @export
-record_result <- function(out_str, out_file) {
-  lock_file <- paste0(out_file, ".lck")
-  lck <- lock(lock_file, timeout = Inf)
-  write(out_str, file = out_file, append = TRUE)
-  unlock(lck)
-}
-Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
+\title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 differential abundance calls and write these to an output file}
 \usage{
-evaluate_DA(data, alpha = 0.05, use_ALR = FALSE,
-  filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE)
+evaluate_DA(
+  data,
+  alpha = 0.05,
+  use_ALR = FALSE,
+  filter_abundance = 1,
+  call_DA_by_NB = TRUE,
+  rarefy = FALSE
+)
 }
 \arguments{
 \item{data}{simulated data set}
@@ -37,19 +30,6 @@ permutation test}
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }
 \description{
-#' Write simulation result to a file
-#'
-#' @param out_str string to write to file
-#' @param out_file log file path and name
-#' @return NULL
-#' @import filelock
-#' @export
-record_result <- function(out_str, out_file) {
-  lock_file <- paste0(out_file, ".lck")
-  lck <- lock(lock_file, timeout = Inf)
-  write(out_str, file = out_file, append = TRUE)
-  unlock(lck)
-}
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 differential abundance calls and write these to an output file
 }
