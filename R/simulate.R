@@ -143,13 +143,36 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
   # assign control vs. treatment groups
   groups <- c(rep(0, n), rep(1, n))
   
-  # randomly selection some proportion of genes to be differentially abundant between conditions
   n_da <- round(p * proportion_da)
   da_genes <- as.logical(rbinom(p, size = 1, prob = proportion_da))
   # pick a random change for each differential gene
   da_factor <- rep(1, p)
-  fold_changes <- c(3, 4, 5)
-  da_factor[da_genes] <- sample(c(1/fold_changes, fold_changes), size = sum(da_genes), replace = TRUE)
+  
+  # method 1: randomly selection some proportion of genes to be differentially abundant between conditions
+  # fold_changes <- c(3, 4, 5)
+  # da_factor[da_genes] <- sample(c(1/fold_changes, fold_changes), size = sum(da_genes), replace = TRUE)
+  
+  # method 2: use empirical data (tissue vs. tissue expression levels) to choose a realistic fold change
+  #           given a gene's quantile of expression; in particular, some lowly expressed genes are
+  #           observed jumping between modes (on/off) of expression
+  GTEx_data <- readRDS("data/GTEx_empirical_DA.rds")
+  da_genes_idx <- which(da_genes == TRUE)
+  da_factor[da_genes_idx] <- sapply(da_genes_idx, function(x) {
+    x_quantile <- sum(baseline_abundances <= baseline_abundances[x])/p
+    if(x_quantile < 0.5) {
+      sample(GTEx_data[[1]])[1]
+    } else if(x_quantile < 0.6) {
+      sample(GTEx_data[[2]])[1]
+    } else if(x_quantile < 0.6) {
+      sample(GTEx_data[[3]])[1]
+    } else if(x_quantile < 0.6) {
+      sample(GTEx_data[[4]])[1]
+    } else if(x_quantile < 0.6) {
+      sample(GTEx_data[[5]])[1]
+    } else {
+      sample(GTEx_data[[6]])[1]
+    }
+  })
   
   # sample true counts (format: samples [rows] x genes [columns])
   abundances <- sapply(1:p, function(j) {
@@ -458,15 +481,16 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
 
   # calculate the log mean expression for the DA group at baseline and include a measure of how different
   #     this is from overall log mean expression at baseline -- i.e. is our selection of DE genes biased?
-  if(length(data$da_genes) > 0) {
-    baseline_expr_all <- colMeans(log(data$abundances[data$groups == 0,] + 0.5))
-    baseline_expr_da <- colMeans(log(data$abundances[data$groups == 0, data$da_genes] + 0.5))
+  baseline_expr_all <- colMeans(log(data$abundances[data$groups == 0,] + 0.5))
+  detected_da <- which(calls.abundances == TRUE)
+  if(length(detected_da) > 0) {
+    baseline_expr_da <- colMeans(log(data$abundances[data$groups == 0, detected_da] + 0.5))
     ordered_baseline <- baseline_expr_all[order(baseline_expr_all)]
     median_expr_da_quantile <- sum(ordered_baseline < median(baseline_expr_da))/length(ordered_baseline)
-  
+
     # calculate the log mean expression for the DA group under "treatment"; the median of the signed different
     #     will be a predictor too
-    affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, data$da_genes] + 0.5))
+    affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, detected_da] + 0.5))
     net_dir_da <- median(affected_expr_dat - baseline_expr_da)
   } else {
     median_expr_da_quantile <- NULL
@@ -485,17 +509,21 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
                    properties = list(median_expr_da_quantile = median_expr_da_quantile,
                                      net_dir_da = net_dir_da,
                                      sparsity = sparsity,
-                                     sim_entropy = sim_entropy),
-                   results = list(tp = TP,
-                                  fp = FP,
-                                  tn = TN,
-                                  fn = FN,
-                                  tpr = TP / (TP + FN),
-                                  fpr = FP / (FP + TN),
+                                     sim_entropy = sim_entropy
+                   ),
+                   results = list(FN = FN,
+                                  FP = FP,
+                                  TN = TN,
+                                  TP = TP,
+                                  TPR = TP / (TP + FN),
+                                  FPR = FP / (FP + TN),
                                   quantity_evaluated = quantity_evaluated,
                                   call_DA_by_NB = call_DA_by_NB,
                                   filter_abundance = filter_abundance,
-                                  no_features_evaluated = sum(evaluate_features)))
+                                  no_features_above_threshold = sum(evaluate_features),
+                                  no_features_detectable = sum(calls.abundances == TRUE),
+                                  calls.abundances = calls.abundances,
+                                  calls.observed_counts = calls.observed_counts))
 
   return(save_obj)
 }

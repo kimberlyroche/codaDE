@@ -16,12 +16,6 @@ call_DA_CODA(logratios, feature_idx, groups)
 \item{feature_idx}{index of gene to test for differential abundance}
 
 \item{groups}{treatment group assignments across samples}
-
-\item{logratios}{data in ALR format}
-
-\item{feature_idx}{index of gene to test for differential abundance}
-
-\item{groups}{treatment group assignments across samples}
 }
 \value{
 p-value from lm
