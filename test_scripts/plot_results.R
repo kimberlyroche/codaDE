@@ -1,7 +1,7 @@
 library(ggplot2)
 library(gridExtra)
 library(codaDE)
-library(wesanderson)
+# library(wesanderson)
 
 args = commandArgs(trailingOnly=TRUE)
 label <- args[1]

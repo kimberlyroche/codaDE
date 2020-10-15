@@ -19,39 +19,43 @@ temp
 
 # If it's not empty, dump out argument strings associated with missing conditions; we can feed these
 # to an instance of `run.R` to fill in missing instances.
-use_existing_str <- "TRUE"
-new_filter_abundance <- 3
-save_slot <- 2
-p <- 10000
-if(nrow(temp) > 0) {
-  temp <- as.data.frame(temp)
-  temp <- temp[order(temp$n),]
-  for(i in 1:nrow(temp)) {
-    if(temp[i,]$p == p) {
-      arguments_str <- paste0("--p=",temp[i,]$p," --n=250 --k=1 --prop_da=",temp[i,]$proportion_da," --sf_corr=",temp[i,]$size_factor_correlation," --filter_abundance=",new_filter_abundance," --existing=",use_existing_str," --save_slot=",save_slot)
-      # cat(arguments_str,"\n")
-      fileConn <- file("job.slurm")
-      writeLines(c('#!/bin/bash',
-        paste0('#SBATCH -J DA',temp[i,]$p),
-        '#SBATCH --mem=16GB',
-        '#SBATCH --get-user-env',
-        '#SBATCH --time=00:30:00',
-        '#\n',
-        'module add R/3.6.1-gcb03',
-        'module add gcc/7.1.0-fasrc01\n',
-        'cd /data/mukherjeelab/roche/codaDE',
-        paste0('srun Rscript run.R ',arguments_str)), fileConn)
-      close(fileConn)
-      submit_str <- paste0("sbatch --array=1-",temp[i,]$n," job.slurm")
-      # cat(submit_str,"\n")
-      system(submit_str)
-    }
-  }
-}
+# NOTE: Update the arguments used here before use!
+
+# use_existing_str <- "TRUE"
+# new_filter_abundance <- 3
+# save_slot <- 2
+# p <- 10000
+# if(nrow(temp) > 0) {
+#   temp <- as.data.frame(temp)
+#   temp <- temp[order(temp$n),]
+#   for(i in 1:nrow(temp)) {
+#     if(temp[i,]$p == p) {
+#       arguments_str <- paste0("--p=",temp[i,]$p," --n=250 --k=1 --prop_da=",temp[i,]$proportion_da," --sf_corr=",temp[i,]$size_factor_correlation," --filter_abundance=",new_filter_abundance," --existing=",use_existing_str," --save_slot=",save_slot)
+#       # cat(arguments_str,"\n")
+#       fileConn <- file("job.slurm")
+#       writeLines(c('#!/bin/bash',
+#         paste0('#SBATCH -J DA',temp[i,]$p),
+#         '#SBATCH --mem=16GB',
+#         '#SBATCH --get-user-env',
+#         '#SBATCH --time=00:30:00',
+#         '#\n',
+#         'module add R/3.6.1-gcb03',
+#         'module add gcc/7.1.0-fasrc01\n',
+#         'cd /data/mukherjeelab/roche/codaDE',
+#         paste0('srun Rscript run.R ',arguments_str)), fileConn)
+#       close(fileConn)
+#       submit_str <- paste0("sbatch --array=1-",temp[i,]$n," job.slurm")
+#       # cat(submit_str,"\n")
+#       system(submit_str)
+#     }
+#   }
+# }
 
 # V2: simulated_analysis directory
-analysis_label <- "analysis3"
+analysis_label <- "analysis2"
 filenames <- list.files(path = file.path("simulated_analyses", analysis_label), pattern = "*.rds")
+
+# what ran but didn't hit 20 reps?
 md <- read.table(file.path("simulated_data", "metadata.tsv"), header = TRUE, stringsAsFactors = FALSE)
 md <- md[md$filename %in% filenames,]
 temp <- md %>%
@@ -59,3 +63,32 @@ temp <- md %>%
   tally() %>%
   filter(n != 20)
 print(as_tibble(temp), n = 100)
+
+# what conditions didn't run at all?
+md <- read.table(file.path("simulated_data", "metadata.tsv"), header = TRUE, stringsAsFactors = FALSE)
+md <- md[!(md$filename %in% filenames),]
+temp <- md %>%
+  group_by(p, proportion_da, size_factor_correlation) %>%
+  tally()
+print(as_tibble(temp), n = 100)
+
+temp <- as.data.frame(temp)
+if(nrow(temp) > 0) {
+  for(i in 2:nrow(temp)) {
+    arguments_str <- paste0("--p=",temp[i,]$p," --n=250 --k=1 --prop_da=",temp[i,]$proportion_da," --sf_corr=",temp[i,]$size_factor_correlation," --filter_abundance=3 --label=",analysis_label," --existing=TRUE")
+    fileConn <- file("job.slurm")
+    writeLines(c('#!/bin/bash',
+      paste0('#SBATCH -J DA',temp[i,]$p),
+      '#SBATCH --mem=16GB',
+      '#SBATCH --get-user-env',
+      '#SBATCH --time=02:00:00',
+      '#\n',
+      'module add R/3.6.1-gcb03',
+      'module add gcc/7.1.0-fasrc01\n',
+      'cd /data/mukherjeelab/roche/codaDE',
+      paste0('srun Rscript run.R ',arguments_str)), fileConn)
+    close(fileConn)
+    submit_str <- paste0("sbatch --array=1-20 job.slurm")
+    system(submit_str)
+  }
+}
