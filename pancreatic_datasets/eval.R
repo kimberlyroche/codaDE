@@ -2,6 +2,7 @@ library(Matrix)
 library(ggplot2)
 library(stringr)
 library(MASS)
+library(edgeR)
 
 ## --------------------------------------------------------------------------------------------------------------------------------
 ##   Some notes
@@ -13,7 +14,7 @@ library(MASS)
 ##         respectively."
 ## --------------------------------------------------------------------------------------------------------------------------------
 
-setwd("C:/Users/kim/Desktop/beta_cells")
+setwd("C:/Users/kim/Documents/codaDE/pancreatic_datasets")
 
 bulk_dir <- "Adriaenssens2016"
 sc_dir <- "MarquinaSanchez2020"
@@ -42,6 +43,48 @@ show_images <- TRUE
 umi_to_tpm <- function(mat_obj) {
   tpm.sc <- t(t(mat_obj) * SCALE.FACTOR/Matrix::colSums(mat_obj))
   as(tpm.sc, "dgTMatrix")
+}
+
+pull_bulk_expr <- function(bulk_expr, gene_idx) {
+  bulk_alpha <- round(unname(bulk_expr[gene_idx, colnames(bulk_expr) == "Alpha"]))
+  bulk_beta <- round(unname(bulk_expr[gene_idx, colnames(bulk_expr) == "Beta"]))
+  list(alpha = bulk_alpha, beta = bulk_beta)
+}
+
+pull_sc_expr <- function(sc_expr, gene_idx, sc_alpha_samples, sc_beta_samples) {
+  sc_alpha <- round(sc_expr[gene_idx, sc_alpha_samples])
+  sc_beta <- round(sc_expr[gene_idx, sc_beta_samples])
+  list(alpha = sc_alpha, beta = sc_beta)
+}
+
+quick_plot_expr <- function(bulk_expr_obj, sc_expr_obj, named_gene, sc_alpha_idx, sc_beta_idx) {
+  gene_name <- names(named_gene)
+  gene_idx <- unname(named_gene)
+  bulk_expr_vector <- pull_bulk_expr(bulk_expr_obj, gene_idx)
+  bulk_celltypes <- c(rep("alpha", length(bulk_expr_vector$alpha)), rep("beta", length(bulk_expr_vector$beta)))
+  sc_expr_vector <- pull_sc_expr(sc_expr_obj, gene_idx, sc_alpha_idx, sc_beta_idx)
+  sc_celltypes <- character(ncol(sc_expr_obj))
+  sc_celltypes[sc_alpha_idx] <- "alpha"
+  sc_celltypes[sc_beta_idx] <- "beta"
+  df <- data.frame(index = 1:length(bulk_celltypes),
+                   expression = c(bulk_expr_vector$alpha, bulk_expr_vector$beta),
+                   type = "bulk",
+                   celltype = factor(bulk_celltypes))
+  df <- rbind(df, data.frame(index = 1:length(sc_celltypes),
+                             expression = c(sc_expr_vector$alpha, sc_expr_vector$beta),
+                             type = "SC",
+                             celltype = factor(sc_celltypes)))
+  ggplot(df, aes(x = index, y = expression, color = celltype)) +
+    geom_point() +
+    facet_wrap(~ type, ncol = 2, scales = "free")
+}
+
+# call_set is TP, FP, TN, or FN
+visualize_calls <- function(bulk_expr_obj, sc_expr_obj, call_set, sc_alpha_idx, sc_beta_idx) {
+  gene <- sample(call_set)[1]
+  gene_obj <- which(rownames(bulk_subset) == gene)
+  names(gene_obj) <- gene
+  quick_plot_expr(bulk_subset, sc_subset, gene_obj, 1:100, 101:200)
 }
 
 ## --------------------------------------------------------------------------------------------------------------------------------
@@ -86,7 +129,7 @@ p <- ggplot(df, aes(x = as.factor(celltype), y = expression)) +
 if(show_images) {
   show(p)
 } else {
-  ggsave("01_marker_expression_in_bulk.png", p, units = "in", dpi = 100, height = 4, width = 4)
+  ggsave("01_marker_expression_in_bulk.png", p, units = "in", dpi = 100, height = 4, width = 6)
 }
 
 ## --------------------------------------------------------------------------------------------------------------------------------
@@ -167,7 +210,7 @@ p <- ggplot(df, aes(x = as.factor(celltype), y = expression)) +
 if(show_images) {
   show(p)
 } else {
-  ggsave("02_marker_expression_in_sc.png", p, units = "in", dpi = 100, height = 4, width = 4)
+  ggsave("02_marker_expression_in_sc.png", p, units = "in", dpi = 100, height = 4, width = 6)
 }
 
 # The total UMIs is systematically lower in alpha cells.
@@ -200,7 +243,7 @@ p <- ggplot(df, aes(x = as.factor(celltype), y = expression)) +
 if(show_images) {
   show(p)
 } else {
-  ggsave("04_marker_expression_in_sc_TPM.png", p, units = "in", dpi = 100, height = 4, width = 4)
+  ggsave("04_marker_expression_in_sc_TPM.png", p, units = "in", dpi = 100, height = 4, width = 6)
 }
 
 # Gapdh x library size (nUMI)
@@ -208,12 +251,12 @@ df <- data.frame(x = Matrix::colSums(sc), y = sc[gapdh_idx_sc,])
 p <- ggplot(df, aes(x = x, y = y)) +
   geom_point() +
   geom_smooth(formula = y ~ x, method = "lm") +
-  xlab("mUMI") +
+  xlab("nUMI") +
   ylab("Gadph expression")
 if(show_images) {
   show(p)
 } else {
-  ggsave("05_marker_expression_in_sc_TPM.png", p, units = "in", dpi = 100, height = 4, width = 4)
+  ggsave("05_marker_expression_in_sc_TPM.png", p, units = "in", dpi = 100, height = 6, width = 6)
 }
 
 ## --------------------------------------------------------------------------------------------------------------------------------
@@ -249,7 +292,7 @@ p <- ggplot(df, aes(x = x, y = y)) +
 if(show_images) {
   show(p)
 } else {
-  ggsave("06_bulk_vs_sc.png", p, units = "in", dpi = 100, height = 4, width = 4)
+  ggsave("06_bulk_vs_sc.png", p, units = "in", dpi = 100, height = 6, width = 6)
 }
 
 # Now do the TPM x TPM version.
@@ -270,72 +313,105 @@ p <- ggplot(df, aes(x = x, y = y)) +
 if(show_images) {
   show(p)
 } else {
-  ggsave("07_bulk_vs_sc_TPM.png", p, units = "in", dpi = 100, height = 4, width = 4)
+  ggsave("07_bulk_vs_sc_TPM.png", p, units = "in", dpi = 100, height = 6, width = 6)
 }
 
 ## --------------------------------------------------------------------------------------------------------------------------------
-##   CRUDE DIFFERENTIAL EXPRESSION CALLING
+##   DIFFERENTIAL EXPRESSION CALLING WITH edgeR
 ## --------------------------------------------------------------------------------------------------------------------------------
 
-alpha <- 0.05 / n_shared
-
-pull_bulk_expr <- function(bulk_shared, gene_idx) {
-  bulk_beta <- round(unname(bulk_shared[gene_idx, colnames(bulk_shared) == "Beta"]))
-  bulk_alpha <- round(unname(bulk_shared[gene_idx, colnames(bulk_shared) == "Alpha"]))
-  list(beta = bulk_beta, alpha = bulk_alpha)
-}
-
-pull_sc_expr <- function(sc_shared, gene_idx) {
-  sc_beta <- round(sc_shared[gene_idx, sc_beta_samples])
-  sc_alpha <- round(sc_shared[gene_idx, sc_alpha_samples])
-  list(beta = sc_beta, alpha = sc_alpha)
-}
+alpha <- 0.05
 
 sc_beta_samples <- which(sc_annot$celltype == "Beta")
 sc_alpha_samples <- which(sc_annot$celltype == "Alpha")
 
-target_genes <- c(which(rownames(sc_shared) == "Ins2"),
-                  which(rownames(sc_shared) == "Gcg"),
-                  1:5)
+n_genes_to_test <- nrow(bulk_shared)
+bulk_subset <- bulk_shared[1:n_genes_to_test,]
+group_bulk <- colnames(bulk_subset)
+group_sc <- c(sc_alpha_samples[1:100], sc_beta_samples[1:100])
+sc_subset <- sc_shared[1:n_genes_to_test,group_sc]
 
-target_genes <- sample(1:n_shared)[1:10]
+de_calls_bulk <- numeric(n_genes_to_test)
+de_calls_sc <- numeric(n_genes_to_test)
 
-de_calls_bulk <- c()
-de_calls_sc <- c()
-for(gene_idx in target_genes) {
-  cat("Gene:",rownames(bulk_shared)[gene_idx],"\n")
-  # Pull expression for this gene between conditions
-  bulk_gene_expr <- pull_bulk_expr(bulk_shared, gene_idx)
-  sc_gene_expr <- pull_sc_expr(sc_shared, gene_idx)
-  # If a gene has zero variance, the model fit will fail. Usually these are all-zero expression values.
-  # Mark this gene as not DE and skip.
-  if(var(c(bulk_gene_expr$beta, bulk_gene_expr$alpha)) == 0) {
-    de_calls_bulk <- c(de_calls_bulk, 1)
-  } else {
-    # Fit a NB GLM (crude but reasonable) -- bulk.
-    df <- data.frame(y = c(bulk_gene_expr$alpha, bulk_gene_expr$beta), x = c(rep(0, length(bulk_gene_expr$alpha)), rep(1, length(bulk_gene_expr$beta))))
-    fit <- glm.nb(formula = y ~ x, data = df)
-    de_calls_bulk <- c(de_calls_bulk, summary(fit)$coef[2,4])
-  }
-  if(var(c(sc_gene_expr$beta, sc_gene_expr$alpha)) == 0) {
-    de_calls_sc <- c(de_calls_sc, 1)
-  } else {
-    # Fit a NB GLM (crude but reasonable) -- single-cell.
-    df <- data.frame(y = c(sc_gene_expr$alpha, sc_gene_expr$beta), x = c(rep(0, length(sc_gene_expr$alpha)), rep(1, length(sc_gene_expr$beta))))
-    fit <- glm.nb(formula = y ~ x, data = df)
-    de_calls_sc <- c(de_calls_sc, summary(fit)$coef[2,4])
-  }
+# From the edgeR quick start guide here:
+# https://www.bioconductor.org/packages/release/bioc/vignettes/edgeR/inst/doc/edgeRUsersGuide.pdf
+# Note: Column names must be unique for DGEList().
+
+colnames(bulk_subset) <- paste0("sample", 1:ncol(bulk_subset))
+y_bulk <- DGEList(counts = bulk_subset, group = factor(group_bulk))
+keep_bulk <- filterByExpr(y_bulk)
+
+colnames(sc_subset) <- paste0("sample", 1:ncol(sc_subset))
+y_sc <- DGEList(counts = sc_subset, group = factor(group_sc))
+keep_sc <- filterByExpr(y_sc)
+
+keep_intersection <- keep_bulk & keep_sc
+kept_genes <- names(keep_intersection)[keep_intersection]
+
+y_bulk <- calcNormFactors(y_bulk)
+design <- model.matrix(~ group_bulk)
+y_bulk <- estimateDisp(y_bulk, design)
+# quasi-likelihood recommended for bulk RNA-seq
+fit <- glmQLFit(y_bulk, design)
+qlf <- glmQLFTest(fit, coef = 2)
+hits <- topTags(qlf, n = n_genes_to_test, p.value = 0.05)
+hits_genes_bulk <- rownames(hits@.Data[[1]])
+stable_genes_bulk <- kept_genes[!(kept_genes %in% hits_genes_bulk)]
+
+y_sc <- calcNormFactors(y_sc)
+design <- model.matrix(~ group_sc)
+y_sc <- estimateDisp(y_sc, design)
+# quasi-likelihood recommended for bulk RNA-seq
+fit <- glmQLFit(y_sc, design)
+qlf <- glmQLFTest(fit, coef = 2)
+hits <- topTags(qlf, n = n_genes_to_test, p.value = 0.05)
+hits_genes_sc <- rownames(hits@.Data[[1]])
+stable_genes_sc <- kept_genes[!(kept_genes %in% hits_genes_sc)]
+
+# Bulk RNA-seq calls are "truth"
+TP <- intersect(hits_genes_bulk, hits_genes_sc)
+FN <- intersect(hits_genes_bulk, stable_genes_sc)
+TN <- intersect(stable_genes_bulk, stable_genes_sc)
+FP <- intersect(stable_genes_bulk, hits_genes_sc)
+
+cat("Genes evaluated:",length(kept_genes),"/",n_genes_to_test,"\n")
+cat("TP:",length(TP),"/",length(kept_genes),"/",round(length(TP)/length(kept_genes), 2)*100,"\n")
+cat("FN:",length(FN),"/",length(kept_genes),"/",round(length(FN)/length(kept_genes), 2)*100,"\n")
+cat("TN:",length(TN),"/",length(kept_genes),"/",round(length(TN)/length(kept_genes), 2)*100,"\n")
+cat("FP:",length(FP),"/",length(kept_genes),"/",round(length(FP)/length(kept_genes), 2)*100,"\n")
+
+# Restore column labels to bulk_subset for subsequent visualization.
+colnames(bulk_subset) <- group_bulk
+
+# Which genes were excluded by "keep"? Ans: These seem to be genes with constant near-zero expression.
+par(mfrow = c(1,2))
+
+kept <- sample(which(keep_bulk == TRUE))[1]
+quick_plot_expr(bulk_subset, kept)
+quick_plot_expr(sc_subset, kept, sc_alpha_samples = 1:100, sc_beta_samples = 101:200)
+
+discarded <- sample(which(keep_bulk == FALSE))[1]
+quick_plot_expr(bulk_subset, discarded)
+quick_plot_expr(sc_subset, discarded, sc_alpha_samples = 1:100, sc_beta_samples = 101:200)
+
+# What do hits and misses look like?
+
+p <- visualize_calls(bulk_shared, sc_shared, FP, 1:100, 101:200)
+if(show_images) {
+  show(p)
+} else {
+  ggsave("08_DE_FP.png", p, units = "in", dpi = 100, height = 3, width = 6)
+}
+p <- visualize_calls(bulk_shared, sc_shared, FN, 1:100, 101:200)
+if(show_images) {
+  show(p)
+} else {
+  ggsave("09_DE_FN.png", p, units = "in", dpi = 100, height = 3, width = 6)
 }
 
-de_calls_bulk < alpha
-de_calls_sc < alpha
 
-par(mfrow = c(1,2))
-idx <- 9
-temp <- pull_sc_expr(sc_shared, target_genes[idx])
-plot(c(temp$alpha, temp$beta))
-temp <- pull_bulk_expr(bulk_shared, target_genes[idx])
-plot(c(temp$alpha, temp$beta))
+
 
 
 
