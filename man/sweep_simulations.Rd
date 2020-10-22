@@ -5,17 +5,35 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
 differential abundance calls and write these to an output file}
 \usage{
-sweep_simulations(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.9,
-  by = 0.1), corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-  alpha = 0.05, use_ALR = FALSE, filter_abundance = 0,
-  call_DA_by_NB = TRUE, rarefy = FALSE,
-  use_existing_simulations = FALSE, analysis_label = NULL)
+sweep_simulations(
+  p,
+  n,
+  k = NULL,
+  de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  alpha = 0.05,
+  use_ALR = FALSE,
+  filter_abundance = 0,
+  method = "NB",
+  rarefy = FALSE,
+  use_existing_simulations = FALSE,
+  analysis_label = NULL
+)
 
-sweep_simulations(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.9,
-  by = 0.1), corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-  alpha = 0.05, use_ALR = FALSE, filter_abundance = 0,
-  call_DA_by_NB = TRUE, rarefy = FALSE,
-  use_existing_simulations = FALSE, analysis_label = NULL)
+sweep_simulations(
+  p,
+  n,
+  k = NULL,
+  de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+  alpha = 0.05,
+  use_ALR = FALSE,
+  filter_abundance = 0,
+  method = "NB",
+  rarefy = FALSE,
+  use_existing_simulations = FALSE,
+  analysis_label = NULL
+)
 }
 \arguments{
 \item{p}{number of genes}
@@ -35,8 +53,7 @@ sweep_simulations(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.9,
 \item{filter_abundance}{the minimum average abundance to require of features we'll evaluate for differential abundance
 (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
 
-\item{call_DA_by_NB}{if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
-permutation test}
+\item{method}{differential abundance testing method to use; options are "NB", "GLM", "edgeR"}
 
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 
@@ -48,27 +65,8 @@ permutation test}
 
 \item{output_file}{output file to append to}
 
-\item{p}{number of genes}
-
-\item{n}{number of samples per group}
-
-\item{k}{number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated}
-
-\item{de_sweep}{vector of proportions of differentially abundant genes to simulate}
-
-\item{corr_sweep}{vector of correlations of size factors (true vs. observed abundances) to simulate}
-
-\item{alpha}{significant level below which to call a feature differentially abundant}
-
-\item{use_ALR}{if TRUE, evaluates differential abundance using a spike-in and the additive logratio}
-
-\item{filter_abundance}{the minimum average abundance to require of features we'll evaluate for differential abundance
-(e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
-
 \item{call_DA_by_NB}{if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
 permutation test}
-
-\item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }
 \description{
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in

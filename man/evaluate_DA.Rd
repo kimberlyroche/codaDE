@@ -5,8 +5,15 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 differential abundance calls and write these to an output file}
 \usage{
-evaluate_DA(data, alpha = 0.05, use_ALR = FALSE,
-  filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE)
+evaluate_DA(
+  data,
+  alpha = 0.05,
+  use_ALR = FALSE,
+  filter_abundance = 1,
+  method = "NB",
+  rarefy = FALSE,
+  save_output = TRUE
+)
 }
 \arguments{
 \item{data}{simulated data set}
@@ -18,10 +25,11 @@ evaluate_DA(data, alpha = 0.05, use_ALR = FALSE,
 \item{filter_abundance}{the minimum average abundance to require of features we'll evaluate for differential abundance
 (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
 
-\item{call_DA_by_NB}{if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
-permutation test}
+\item{method}{differential abundance testing method to use; options are "NB", "GLM", "edgeR"}
 
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
+
+\item{save_output}{if TRUE, saves data, differential abundance calls, and metadata, otherwise returns results}
 }
 \description{
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in

@@ -4,8 +4,15 @@
 \alias{simulate_singlecell_RNAseq}
 \title{Simulate UMI count single-cell RNA-seq data}
 \usage{
-simulate_singlecell_RNAseq(p = 20000, n = 500, k = 1,
-  proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE)
+simulate_singlecell_RNAseq(
+  p = 20000,
+  n = 500,
+  k = 1,
+  proportion_da = 0.1,
+  size_factor_correlation = 0,
+  spike_in = FALSE,
+  possible_fold_changes = NULL
+)
 }
 \arguments{
 \item{p}{number of genes}
@@ -19,6 +26,8 @@ simulate_singlecell_RNAseq(p = 20000, n = 500, k = 1,
 \item{size_factor_correlation}{correlation of observed abundances to original total abundances}
 
 \item{spike_in}{simulate a control spike in with low dispersion}
+
+\item{possible_fold_changes}{if specified, a distribution of possible fold changes available for differential abundance simulation}
 }
 \value{
 named list of true abundances, observed abundances, and group assignments
