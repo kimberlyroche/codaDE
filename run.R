@@ -33,13 +33,12 @@ opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
 
 de_sweep <- seq(from = 0.1, to = 0.9, by = 0.1)
-de_sweep <- c(0.3, 0.7, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 0.9)
 if(!is.null(opt$prop_da)) {
   de_sweep <- c(opt$prop_da)
 }
 
 corr_sweep <- seq(from = 0.1, to = 0.9, by = 0.1)
-corr_sweep <- c(0.3, 0.7, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 0.9)
+corr_sweep <- c(0.1, 0.5, 0.9)
 if(!is.null(opt$sf_corr)) {
   corr_sweep <- c(opt$sf_corr)
 }

@@ -5,33 +5,15 @@
 \title{Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
 differential abundance calls and write these to an output file}
 \usage{
-run_RNAseq_evaluation_instance(
-  p,
-  n,
-  proportion_da,
-  k = NULL,
-  size_factor_correlation = 0,
-  alpha = 0.05,
-  use_ALR = FALSE,
-  filter_abundance = 1,
-  call_DA_by_NB = TRUE,
-  rarefy = FALSE,
-  analysis_label = NULL
-)
+run_RNAseq_evaluation_instance(p, n, proportion_da, k = NULL,
+  size_factor_correlation = 0, alpha = 0.05, use_ALR = FALSE,
+  filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE,
+  analysis_label = NULL)
 
-run_RNAseq_evaluation_instance(
-  p,
-  n,
-  proportion_da,
-  k = NULL,
-  size_factor_correlation = 0,
-  alpha = 0.05,
-  use_ALR = FALSE,
-  filter_abundance = 1,
-  call_DA_by_NB = TRUE,
-  rarefy = FALSE,
-  analysis_label = NULL
-)
+run_RNAseq_evaluation_instance(p, n, proportion_da, k = NULL,
+  size_factor_correlation = 0, alpha = 0.05, use_ALR = FALSE,
+  filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE,
+  analysis_label = NULL)
 }
 \arguments{
 \item{p}{number of genes}
@@ -61,6 +43,28 @@ permutation test}
 \item{run_label}{human-readable string identifier for this simulation run}
 
 \item{output_file}{output file to append to}
+
+\item{p}{number of genes}
+
+\item{n}{number of samples per group}
+
+\item{proportion_da}{proportion of differentially abundant genes}
+
+\item{k}{number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated}
+
+\item{size_factor_correlation}{correlation of observed abundances to original total abundances}
+
+\item{alpha}{significant level below which to call a feature differentially abundant}
+
+\item{use_ALR}{if TRUE, evaluates differential abundance using a spike-in and the additive logratio}
+
+\item{filter_abundance}{the minimum average abundance to require of features we'll evaluate for differential abundance
+(e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
+
+\item{call_DA_by_NB}{if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
+permutation test}
+
+\item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }
 \description{
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
