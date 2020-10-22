@@ -1,5 +1,4 @@
 library(codaDE)
-# library(LaplacesDemon)
 library(optparse)
 
 option_list = list(
@@ -33,8 +32,8 @@ if(opt$cond == 1) {
 }
 
 # First, estimate an empirical fold change profile between tissues.
-tissue_path <- file.path("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct","samples_by_tissues.rds")
-if(!file.exists(tissue_path)) {
+#tissue_path <- file.path("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct","samples_by_tissues.rds")
+#if(!file.exists(tissue_path)) {
   # Parse the GTEx data set.
   GTEx <- readRDS(file.path("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct","parsed_GTEx.rds"))
   GTEx_annot <- read.table(file.path("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct",
@@ -44,10 +43,10 @@ if(!file.exists(tissue_path)) {
   for(tissue in unique(GTEx_annot$SMTSD)) {
     samples_by_tissue[[tissue]] <- GTEx_annot$SAMPID[GTEx_annot$SMTSD == tissue]
   }
-  saveRDS(samples_by_tissue, tissue_path)
-} else {
-  samples_by_tissue <- readRDS(tissue_path)
-}
+#  saveRDS(samples_by_tissue, tissue_path)
+#} else {
+#  samples_by_tissue <- readRDS(tissue_path)
+#}
 
 # Pull a random pair of tissues.
 tissue_pair <- sample(names(samples_by_tissue), size = 2, replace = FALSE)
@@ -71,8 +70,8 @@ emp_fc <- empirical_fold_change[empirical_fold_change >= 2 | empirical_fold_chan
 # Note: We only achieve about 1/2 to 2/3 the differential expression we request. This is because even a 2-fold change
 #       can be imperceptible from noise.
 results <- data.frame(prop_de = c(), sf_corr = c(), TPR = c(), FPR = c(), prop_de_detectable = c(), runtime = c())
-p <- 1000
-n <- 100
+p <- 20000
+n <- 200
 for(prop_de in prop_de_vec) {
   for(sf_corr in sf_corr_vec) {
     cat("Evaluating % DE",round(prop_de*100),"x library size correlation",round(sf_corr,2),"\n")
