@@ -122,12 +122,13 @@ simulate_bulk_RNAseq <- function(p = 20000, n = 500, proportion_da = 0.1, size_f
 #' @param proportion_da proportion of differentially abundant genes
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param spike_in simulate a control spike in with low dispersion
+#' @param possible_fold_changes if specified, a distribution of possible fold changes available for differential abundance simulation
 #' @return named list of true abundances, observed abundances, and group assignments
 #' @details Samples the mean gene abundances from Halpern et al. (2017) as a references. This gives a data set
 #' with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
 #' @import LaplacesDemon
 #' @export
-simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE) {
+simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE, possible_fold_changes = NULL) {
   proportions_components <- rdirichlet(1, alpha = rep(1/k, k)*5)
   counts_components <- round(proportions_components[1:(k-1)]*n)
   counts_components <- c(counts_components, n - sum(counts_components))
@@ -148,31 +149,32 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
   # pick a random change for each differential gene
   da_factor <- rep(1, p)
   
-  # method 1: randomly selection some proportion of genes to be differentially abundant between conditions
-  # fold_changes <- c(3, 4, 5)
-  # da_factor[da_genes] <- sample(c(1/fold_changes, fold_changes), size = sum(da_genes), replace = TRUE)
-  
-  # method 2: use empirical data (tissue vs. tissue expression levels) to choose a realistic fold change
-  #           given a gene's quantile of expression; in particular, some lowly expressed genes are
-  #           observed jumping between modes (on/off) of expression
-  GTEx_data <- readRDS("data/GTEx_empirical_DA.rds")
-  da_genes_idx <- which(da_genes == TRUE)
-  da_factor[da_genes_idx] <- sapply(da_genes_idx, function(x) {
-    x_quantile <- sum(baseline_abundances <= baseline_abundances[x])/p
-    if(x_quantile < 0.5) {
-      sample(GTEx_data[[1]])[1]
-    } else if(x_quantile < 0.6) {
-      sample(GTEx_data[[2]])[1]
-    } else if(x_quantile < 0.6) {
-      sample(GTEx_data[[3]])[1]
-    } else if(x_quantile < 0.6) {
-      sample(GTEx_data[[4]])[1]
-    } else if(x_quantile < 0.6) {
-      sample(GTEx_data[[5]])[1]
-    } else {
-      sample(GTEx_data[[6]])[1]
-    }
-  })
+  if(!is.null(possible_fold_changes)) {
+    # method 1: randomly selection some proportion of genes to be differentially abundant between conditions
+    da_factor[da_genes] <- sample(c(1/possible_fold_changes, possible_fold_changes), size = sum(da_genes), replace = TRUE)
+  } else {
+    # method 2: use empirical data (tissue vs. tissue expression levels) to choose a realistic fold change
+    #           given a gene's quantile of expression; in particular, some lowly expressed genes are
+    #           observed jumping between modes (on/off) of expression
+    GTEx_data <- readRDS("data/GTEx_empirical_DA.rds")
+    da_genes_idx <- which(da_genes == TRUE)
+    da_factor[da_genes_idx] <- sapply(da_genes_idx, function(x) {
+      x_quantile <- sum(baseline_abundances <= baseline_abundances[x])/p
+      if(x_quantile < 0.5) {
+        sample(GTEx_data[[1]])[1]
+      } else if(x_quantile < 0.6) {
+        sample(GTEx_data[[2]])[1]
+      } else if(x_quantile < 0.6) {
+        sample(GTEx_data[[3]])[1]
+      } else if(x_quantile < 0.6) {
+        sample(GTEx_data[[4]])[1]
+      } else if(x_quantile < 0.6) {
+        sample(GTEx_data[[5]])[1]
+      } else {
+        sample(GTEx_data[[6]])[1]
+      }
+    })
+  }
   
   # sample true counts (format: samples [rows] x genes [columns])
   abundances <- sapply(1:p, function(j) {
@@ -266,7 +268,7 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
 #' @return p-value from NB GLM fit with MASS::glm.nb associated with group coefficient
 #' @import MASS
 #' @export
-call_DA <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0) {
+call_DA_NB <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0) {
   if(call_abundances) {
     gene_data <- data.frame(counts = data$abundances[,feature_idx], groups = data$groups)
   } else {
@@ -319,6 +321,31 @@ call_DA_LM <- function(data, feature_idx, call_abundances = TRUE) {
   # there seems to be no way to suppress the status output
   discard_str <- capture.output(fit <- lmp(log_counts ~ groups, data = gene_data))
   pval <- summary(fit)$coef[2,3]
+  return(pval)
+}
+
+#' Evaluate differential abundance with edgeR
+#' This evaluates expression on all features of the count matrix together
+#'
+#' @param data simulated data set
+#' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
+#' @return p-value associated with group coefficient
+#' @import edgeR
+#' @export
+call_DA_edgeR <- function(data, call_abundances = TRUE) {
+  # DGEList expects samples as columns
+  if(call_abundances) {
+    dge_obj <- DGEList(counts = t(data$abundances), group = factor(data$groups))
+  } else {
+    dge_obj <- DGEList(counts = t(data$observed_counts), group = factor(data$groups))
+  }
+  dge_obj <- calcNormFactors(dge_obj)
+  design <- model.matrix(~ data$groups)
+  dge_obj <- estimateDisp(dge_obj, design)
+  # quasi-likelihood recommended for bulk RNA-seq
+  fit <- glmQLFit(dge_obj, design)
+  qlf <- glmQLFTest(fit, coef = 2)
+  pval <- qlf@.Data[[17]]$PValue
   return(pval)
 }
 
@@ -412,13 +439,14 @@ update_metadata <- function(filename, p, n, proportion_da, size_factor_correlati
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
-#' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
-#' permutation test
+#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR"
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
+#' @param save_output if TRUE, saves data, differential abundance calls, and metadata, otherwise returns results
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
+#' @import edgeR
 #' @export
-evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE) {
+evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 1, method = "NB", rarefy = FALSE, save_output = TRUE) {
   # calculate and compare differential abundance calls
   cat("Evaluating differential abundance...\n")
   calls.abundances <- c()
@@ -428,7 +456,7 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
     rarefy_total <- min(apply(data$observed_counts, 1, sum))
   } else {
     rarefy_total <- 0
-  }  
+  }
   evaluate_features <- apply(data$observed_counts, 2, function(x) mean(x) > filter_abundance)
 
   p <- ncol(data$abundances)
@@ -448,21 +476,31 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
       }
     }
   } else {
-    for(i in 1:p) {
-      if(i %% 100 == 0) {
-        cat("Evaluating DA on feature:",i,"\n")
-      }
-      if(evaluate_features[i]) {
-        if(call_DA_by_NB) {
-          pval.abundances <- call_DA(data, i, call_abundances = TRUE, rarefy = rarefy_total)
-          pval.observed_counts <- call_DA(data, i, call_abundances = FALSE, rarefy = rarefy_total)
-        } else {
-          pval.abundances <- call_DA_LM(data, i, call_abundances = TRUE)
-          pval.observed_counts <- call_DA_LM(data, i, call_abundances = FALSE)
+    if(method == "edgeR") {
+      # Note: This is performing library size normalization via `calcNormFactors`!
+      pval.abundances <- call_DA_edgeR(data, call_abundances = TRUE)
+      pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE)
+      calls.abundances <- pval.abundances <= alpha/length(evaluate_features)
+      calls.observed_counts <- pval.observed_counts <= alpha/length(evaluate_features)
+    } else {
+      for(i in 1:p) {
+        if(i %% 100 == 0) {
+          cat("Evaluating DA on feature:",i,"\n")
         }
-        if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-          calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
-          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/length(evaluate_features))
+        if(evaluate_features[i]) {
+          if(method == "NB") {
+            pval.abundances <- call_DA_NB(data, i, call_abundances = TRUE, rarefy = rarefy_total)
+            pval.observed_counts <- call_DA_NB(data, i, call_abundances = FALSE, rarefy = rarefy_total)
+          } else if(method == "GLM") {
+            pval.abundances <- call_DA_LM(data, i, call_abundances = TRUE)
+            pval.observed_counts <- call_DA_LM(data, i, call_abundances = FALSE)
+          } else {
+            stop("Unknown differential abundance calling method!")
+          }
+          if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+            calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
+            calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/length(evaluate_features))
+          }
         }
       }
     }
@@ -477,55 +515,69 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
     quantity_evaluated <- "logratios"
   }
   
-  # calculate a couple of quantities that might help us model error in low-feature-number, high DE cases
-
-  # calculate the log mean expression for the DA group at baseline and include a measure of how different
-  #     this is from overall log mean expression at baseline -- i.e. is our selection of DE genes biased?
-  baseline_expr_all <- colMeans(log(data$abundances[data$groups == 0,] + 0.5))
-  detected_da <- which(calls.abundances == TRUE)
-  if(length(detected_da) > 0) {
-    baseline_expr_da <- colMeans(log(data$abundances[data$groups == 0, detected_da] + 0.5))
-    ordered_baseline <- baseline_expr_all[order(baseline_expr_all)]
-    median_expr_da_quantile <- sum(ordered_baseline < median(baseline_expr_da))/length(ordered_baseline)
-
-    # calculate the log mean expression for the DA group under "treatment"; the median of the signed different
-    #     will be a predictor too
-    affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, detected_da] + 0.5))
-    net_dir_da <- median(affected_expr_dat - baseline_expr_da)
-  } else {
-    median_expr_da_quantile <- NULL
-    net_dir_da <- NULL
-  }
-
-  # sparsity level (percent zeros)
-  sparsity <- sum(data$observed_counts == 0)/(nrow(data$observed_counts)*ncol(data$observed_counts))
+  if(save_output) {
+    # calculate a couple of quantities that might help us model error in low-feature-number, high DE cases
+    # calculate the log mean expression for the DA group at baseline and include a measure of how different
+    #     this is from overall log mean expression at baseline -- i.e. is our selection of DE genes biased?
+    baseline_expr_all <- colMeans(log(data$abundances[data$groups == 0,] + 0.5))
+    detected_da <- which(calls.abundances == TRUE)
+    if(length(detected_da) > 0) {
+      baseline_expr_da <- colMeans(log(data$abundances[data$groups == 0, detected_da] + 0.5))
+      ordered_baseline <- baseline_expr_all[order(baseline_expr_all)]
+      median_expr_da_quantile <- sum(ordered_baseline < median(baseline_expr_da))/length(ordered_baseline)
   
-  # uniformity of composition at baseline
-  binned_log_expression <- as.numeric(table(cut(baseline_expr_all, breaks = seq(from = min(baseline_expr_all), to = max(baseline_expr_all), length.out = 10))))
-  max_entropy <- entropy(rep(round(sum(binned_log_expression) / length(binned_log_expression)), length(binned_log_expression)))
-  sim_entropy <- entropy(binned_log_expression) / max_entropy
-
-  save_obj <- list(data = data,
-                   properties = list(median_expr_da_quantile = median_expr_da_quantile,
-                                     net_dir_da = net_dir_da,
-                                     sparsity = sparsity,
-                                     sim_entropy = sim_entropy
-                   ),
-                   results = list(FN = FN,
-                                  FP = FP,
-                                  TN = TN,
-                                  TP = TP,
-                                  TPR = TP / (TP + FN),
-                                  FPR = FP / (FP + TN),
-                                  quantity_evaluated = quantity_evaluated,
-                                  call_DA_by_NB = call_DA_by_NB,
-                                  filter_abundance = filter_abundance,
-                                  no_features_above_threshold = sum(evaluate_features),
-                                  no_features_detectable = sum(calls.abundances == TRUE),
-                                  calls.abundances = calls.abundances,
-                                  calls.observed_counts = calls.observed_counts))
-
-  return(save_obj)
+      # calculate the log mean expression for the DA group under "treatment"; the median of the signed different
+      #     will be a predictor too
+      affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, detected_da] + 0.5))
+      net_dir_da <- median(affected_expr_dat - baseline_expr_da)
+    } else {
+      median_expr_da_quantile <- NULL
+      net_dir_da <- NULL
+    }
+  
+    # sparsity level (percent zeros)
+    sparsity <- sum(data$observed_counts == 0)/(nrow(data$observed_counts)*ncol(data$observed_counts))
+    
+    # uniformity of composition at baseline
+    binned_log_expression <- as.numeric(table(cut(baseline_expr_all, breaks = seq(from = min(baseline_expr_all), to = max(baseline_expr_all), length.out = 10))))
+    max_entropy <- entropy(rep(round(sum(binned_log_expression) / length(binned_log_expression)), length(binned_log_expression)))
+    sim_entropy <- entropy(binned_log_expression) / max_entropy
+  
+    save_obj <- list(data = data,
+                     properties = list(median_expr_da_quantile = median_expr_da_quantile,
+                                       net_dir_da = net_dir_da,
+                                       sparsity = sparsity,
+                                       sim_entropy = sim_entropy
+                     ),
+                     results = list(FN = FN,
+                                    FP = FP,
+                                    TN = TN,
+                                    TP = TP,
+                                    TPR = TP / (TP + FN),
+                                    FPR = FP / (FP + TN),
+                                    quantity_evaluated = quantity_evaluated,
+                                    method = method,
+                                    filter_abundance = filter_abundance,
+                                    no_features_above_threshold = sum(evaluate_features),
+                                    no_features_detectable = sum(calls.abundances == TRUE),
+                                    calls.abundances = calls.abundances,
+                                    calls.observed_counts = calls.observed_counts))
+    return(save_obj)
+  } else {
+    return(list(FN = FN,
+                          FP = FP,
+                          TN = TN,
+                          TP = TP,
+                          TPR = TP / (TP + FN),
+                          FPR = FP / (FP + TN),
+                          quantity_evaluated = quantity_evaluated,
+                          method = method,
+                          filter_abundance = filter_abundance,
+                          no_features_above_threshold = sum(evaluate_features),
+                          no_features_detectable = sum(calls.abundances == TRUE),
+                          calls.abundances = calls.abundances,
+                          calls.observed_counts = calls.observed_counts))
+  }
 }
 
 #' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
@@ -540,8 +592,7 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
-#' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
-#' permutation test
+#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR"
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @param analysis_label this is a short name for this analysis that should correspond to a folder name in simulated_analyses
 #' @details Writes out error and simulation run statistics to a file.
@@ -551,7 +602,7 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
 #' @export
 run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_factor_correlation = 0,
                                            alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
-                                           call_DA_by_NB = TRUE, rarefy = FALSE, analysis_label = NULL) {
+                                           method = "NB", rarefy = FALSE, analysis_label = NULL) {
   if(is.null(analysis_label)) {
     stop("Missing analysis label!\n")
   }
@@ -593,7 +644,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
     data$observed_counts[sample(which(data$groups == 0))[1],d] <- 1
   }
   
-  save_obj <- evaluate_DA(data, alpha = alpha, use_ALR = use_ALR, filter_abundance = filter_abundance, call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
+  save_obj <- evaluate_DA(data, alpha = alpha, use_ALR = use_ALR, filter_abundance = filter_abundance, method = method, rarefy = rarefy)
   data_obj <- save_obj
   data_obj$properties$p <- p
   data_obj$properties$proportion_da <- proportion_da
@@ -618,8 +669,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
-#' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
-#' permutation test
+#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR"
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @param analysis_label this is a short name for this analysis that should correspond to a folder name in simulated_analyses
 #' @details Writes out error and simulation run statistics to a file.
@@ -628,7 +678,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = NULL, size_f
 #' @export
 evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_correlation,
                                               alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
-                                              call_DA_by_NB = TRUE, rarefy = FALSE, analysis_label = NULL) {
+                                              method = "NB", rarefy = FALSE, analysis_label = NULL) {
   metadata_file <- file.path("simulated_data", "metadata.tsv") # assume this isn't being actively written to!
   metadata <- read.table(metadata_file, header = T, stringsAsFactors = FALSE)
   # find filenames matching conditions
@@ -660,7 +710,7 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_c
     cat("Evaluating file",file_to_use,"\n")
     data_filename <- file.path("simulated_data", file_to_use)
     data <- readRDS(data_filename)
-    save_obj <- evaluate_DA(data$data, alpha = alpha, use_ALR = use_ALR, filter_abundance = filter_abundance, call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
+    save_obj <- evaluate_DA(data$data, alpha = alpha, use_ALR = use_ALR, filter_abundance = filter_abundance, method = method, rarefy = rarefy)
     saveRDS(save_obj$results, file.path("simulated_analyses", analysis_label, file_to_use))
   }
 }
@@ -677,8 +727,7 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_c
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
-#' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
-#' permutation test
+#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR"
 #' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
 #' @param use_existing_simulations if TRUE looks for existing simulations (specified in a metadata file) rather than simulating new data sets
 #' @param analysis_label this is a short name for this analysis that should correspond to a folder name in simulated_analyses
@@ -687,7 +736,7 @@ evaluate_existing_RNAseq_instance <- function(p, proportion_da, k, size_factor_c
 #' @export
 sweep_simulations <- function(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
                          corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), alpha = 0.05, use_ALR = FALSE,
-                         filter_abundance = 0, call_DA_by_NB = TRUE, rarefy = FALSE,
+                         filter_abundance = 0, method = "NB", rarefy = FALSE,
                          use_existing_simulations = FALSE, analysis_label = NULL) {
   if(is.null(analysis_label)) {
     stop("Missing analysis label!\n")
@@ -703,12 +752,12 @@ sweep_simulations <- function(p, n, k = NULL, de_sweep = seq(from = 0.1, to = 0.
       if(use_existing_simulations) {
         evaluate_existing_RNAseq_instance(p, proportion_da = de_prop, k = k, size_factor_correlation = sf_corr,
                                                       alpha = 0.05, use_ALR = use_ALR, filter_abundance = filter_abundance,
-                                                      call_DA_by_NB = call_DA_by_NB, rarefy = rarefy, analysis_label = analysis_label)
+                                                      method = method, rarefy = rarefy, analysis_label = analysis_label)
       } else {
         run_RNAseq_evaluation_instance(p, n, proportion_da = de_prop, k = k,
                                        size_factor_correlation = sf_corr,
                                        alpha = 0.05, use_ALR = use_ALR, filter_abundance = filter_abundance,
-                                       call_DA_by_NB = call_DA_by_NB, rarefy = rarefy, analysis_label = analysis_label)
+                                       method = method, rarefy = rarefy, analysis_label = analysis_label)
       }
     }
   }

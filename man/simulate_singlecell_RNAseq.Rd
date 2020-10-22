@@ -10,7 +10,8 @@ simulate_singlecell_RNAseq(
   k = 1,
   proportion_da = 0.1,
   size_factor_correlation = 0,
-  spike_in = FALSE
+  spike_in = FALSE,
+  possible_fold_changes = NULL
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ simulate_singlecell_RNAseq(
 \item{size_factor_correlation}{correlation of observed abundances to original total abundances}
 
 \item{spike_in}{simulate a control spike in with low dispersion}
+
+\item{possible_fold_changes}{if specified, a distribution of possible fold changes available for differential abundance simulation}
 }
 \value{
 named list of true abundances, observed abundances, and group assignments

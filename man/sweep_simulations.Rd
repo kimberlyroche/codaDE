@@ -14,7 +14,7 @@ sweep_simulations(
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 0,
-  call_DA_by_NB = TRUE,
+  method = "NB",
   rarefy = FALSE,
   use_existing_simulations = FALSE,
   analysis_label = NULL
@@ -29,7 +29,7 @@ sweep_simulations(
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 0,
-  call_DA_by_NB = TRUE,
+  method = "NB",
   rarefy = FALSE,
   use_existing_simulations = FALSE,
   analysis_label = NULL
@@ -53,8 +53,7 @@ sweep_simulations(
 \item{filter_abundance}{the minimum average abundance to require of features we'll evaluate for differential abundance
 (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
 
-\item{call_DA_by_NB}{if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
-permutation test}
+\item{method}{differential abundance testing method to use; options are "NB", "GLM", "edgeR"}
 
 \item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 
@@ -65,6 +64,9 @@ permutation test}
 \item{run_label}{human-readable string identifier for this simulation run}
 
 \item{output_file}{output file to append to}
+
+\item{call_DA_by_NB}{if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
+permutation test}
 }
 \description{
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
