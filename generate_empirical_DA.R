@@ -55,4 +55,4 @@ empirical_DA <- list()
 for(i in 1:length(sub_results)) {
   empirical_DA[[i]] <- sub_results[[i]]$mean2 / sub_results[[i]]$mean1
 }
-saveRDS(empirical_DA, file = file.path("data", "empirical_DA.rds"))
+saveRDS(empirical_DA, file = file.path("data", "GTEx_empirical_DA.rds"))
