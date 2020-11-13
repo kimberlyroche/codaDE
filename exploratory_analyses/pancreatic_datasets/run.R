@@ -14,7 +14,8 @@ library(edgeR)
 ##         respectively."
 ## --------------------------------------------------------------------------------------------------------------------------------
 
-setwd("C:/Users/kim/Documents/codaDE/pancreatic_datasets")
+#setwd("C:/Users/kim/Documents/codaDE/pancreatic_datasets")
+setwd("/data/mukherjeelab/roche/codaDE/exploratory/pancreatic_datasets")
 
 bulk_dir <- "Adriaenssens2016"
 sc_dir <- "MarquinaSanchez2020"

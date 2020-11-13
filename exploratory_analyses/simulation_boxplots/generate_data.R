@@ -19,7 +19,7 @@ if(opt$cond < 1 | opt$cond > 2) {
 
 # Generate data for boxplots of simulated TPR and FPR.
 
-# We want to simulate 3 conditions:
+# We want to simulate 2 conditions:
 #  (1) Fixed library size correlation, increasing DE
 #  (2) Fixed DE, decreasing library size correlation
 
@@ -32,21 +32,13 @@ if(opt$cond == 1) {
 }
 
 # First, estimate an empirical fold change profile between tissues.
-#tissue_path <- file.path("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct","samples_by_tissues.rds")
-#if(!file.exists(tissue_path)) {
-  # Parse the GTEx data set.
-  GTEx <- readRDS(file.path("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct","parsed_GTEx.rds"))
-  GTEx_annot <- read.table(file.path("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct",
-                                     "GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt"),
-                           header = TRUE, sep = "\t")
-  samples_by_tissue <- list()
-  for(tissue in unique(GTEx_annot$SMTSD)) {
-    samples_by_tissue[[tissue]] <- GTEx_annot$SAMPID[GTEx_annot$SMTSD == tissue]
-  }
-#  saveRDS(samples_by_tissue, tissue_path)
-#} else {
-#  samples_by_tissue <- readRDS(tissue_path)
-#}
+# Parse the GTEx data set.
+GTEx <- readRDS(file.path("data", "GTEx_data", "parsed_GTEx.rds"))
+GTEx_annot <- read.table(file.path("data", "GTEx_data", "GTEx_annotations.txt"), header = TRUE, sep = "\t")
+samples_by_tissue <- list()
+for(tissue in unique(GTEx_annot$SMTSD)) {
+  samples_by_tissue[[tissue]] <- GTEx_annot$SAMPID[GTEx_annot$SMTSD == tissue]
+}
 
 # Pull a random pair of tissues.
 tissue_pair <- sample(names(samples_by_tissue), size = 2, replace = FALSE)
@@ -86,15 +78,6 @@ for(prop_de in prop_de_vec) {
     results <- rbind(results,
                      data.frame(prop_de = prop_de, sf_corr = sf_corr, TPR = res$TPR, FPR = res$FPR,
                                 prop_de_detectable = res$no_features_detectable/p, runtime = runtime))
-    # Does the realized fold change profile look plausible?
-    # condition_means_sim <- cbind(colMeans(data$abundances[1:n,]),
-    #                              colMeans(data$abundances[(n+1):(2*n),]))
-    # keep <- which(condition_means_sim[,1] >= expr_lower_cutoff | condition_means_sim[,2] >= expr_lower_cutoff)
-    # condition_means_sim <- condition_means_sim[keep,]
-    # empirical_fold_change_sim <- (condition_means_sim[,1] + 0.001) / (condition_means_sim[,2] + 0.001)
-    # par(mfrow = c(1,2))
-    # hist(log(empirical_fold_change), breaks = 50, xlim = c(-10, 10))
-    # hist(log(empirical_fold_change_sim), breaks = 50, xlim = c(-10, 10))
   }
 }
-saveRDS(results, paste0("results_",opt$cond,"_",as.numeric(Sys.time()),".rds"))
+saveRDS(results, file.path("output", paste0("results_",opt$cond,"_",as.numeric(Sys.time()),".rds")))

@@ -2,7 +2,7 @@ library(ggplot2)
 
 for(cond in c(1,2)) {
   pattern_str <- paste0("results_", cond, "_.*?\\.rds")
-  results_dir <- "boxplot_results"
+  results_dir <- "output"
   results_files <- list.files(path = results_dir, pattern = pattern_str, full.names = TRUE, recursive = FALSE)
   full_results <- NULL
   for(rf in results_files) {
