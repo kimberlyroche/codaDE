@@ -99,19 +99,23 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
     da_genes_idx <- which(da_genes == TRUE)
     da_factor[da_genes_idx] <- sapply(da_genes_idx, function(x) {
       x_quantile <- sum(baseline_abundances <= baseline_abundances[x])/p
-      if(x_quantile < 0.5) {
-        sample(GTEx_data[[1]])[1]
-      } else if(x_quantile < 0.6) {
-        sample(GTEx_data[[2]])[1]
-      } else if(x_quantile < 0.6) {
-        sample(GTEx_data[[3]])[1]
-      } else if(x_quantile < 0.6) {
-        sample(GTEx_data[[4]])[1]
-      } else if(x_quantile < 0.6) {
-        sample(GTEx_data[[5]])[1]
+      list_idx <- 1
+      if(x_quantile < 0.6) {
+        list_idx <- 2
+      } else if(x_quantile < 0.7) {
+        list_idx <- 3
+      } else if(x_quantile < 0.8) {
+        list_idx <- 4
+      } else if(x_quantile < 0.9) {
+        list_idx <- 5
       } else {
-        sample(GTEx_data[[6]])[1]
+        list_idx <- 6
       }
+      # Sample from fold changes that are at least +/- a 2-fold change
+      # Anything less than this definitely will not be "visible" as differential expression
+      fold_change_list <- GTEx_data[[list_idx]]
+      fold_change_list <- fold_change_list[fold_change_list >= 5 | fold_change_list <= (1/5)]
+      sample(fold_change_list)[1]
     })
   }
   
@@ -228,10 +232,14 @@ call_DA_edgeR <- function(data, call_abundances = TRUE) {
   dge_obj <- calcNormFactors(dge_obj, method = "none") # library size normalization
   design <- model.matrix(~ data$groups)
   dge_obj <- estimateDisp(dge_obj, design)
-  # quasi-likelihood recommended for bulk RNA-seq
+  # LRT recommended for single-cell data
   fit <- glmFit(dge_obj, design)
   res <- glmLRT(fit, coef = 2)
   pval <- res@.Data[[14]]$PValue
+  # quasi-likelihood recommended for bulk RNA-seq (different dispersion estimation procedure)
+  # fit <- glmQLFit(dge_obj, design)
+  # res <- glmQLFTest(fit, coef=2)
+  # pval <- res@.Data[[17]]$PValue
   return(pval)
 }
 
@@ -323,6 +331,7 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
         if(evaluate_features[i]) {
           if(method == "NB") {
             pval.abundances <- call_DA_NB(data, i, call_abundances = TRUE)
+            pval.observed_counts <- call_DA_NB(data, i, call_abundances = FALSE)
           } else if(method == "GLM") {
             pval.abundances <- call_DA_LM(data, i, call_abundances = TRUE)
             pval.observed_counts <- call_DA_LM(data, i, call_abundances = FALSE)
