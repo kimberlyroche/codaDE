@@ -2,25 +2,10 @@ use strict;
 use warnings;
 use POSIX;
 
-# bulk RNA-seq
-# my @features = qw(20000);
-# my @evaluate_alr = qw(TRUE);
-# my @filter_abundance = qw(1);
-# my $label = "bulkRNAseq";
-# my $label = "bulkRNAseq_ALR";
-
-# single-cell RNA-seq
-#   I had been using p = 100, 200, 500, 1000, 2000, 5000, 10000, 20000
-#   but I don't think sizes below 10K are realistic (FILTERED data sets
-#   below that number make sense)
-# FUTURE THING: I should really consider how read depth influences error
-#   here, it's random
-my @features = qw(10000 15000 20000 25000 30000);
+my @features = qw(20000);
 my @evaluate_alr = qw(FALSE);
-my @filter_abundance = qw(3);
-my $analysis_label = "analysis2";
-my $NB_for_DE = "TRUE"; # TRUE: NB, FALSE: log-LM + permutation
-my $existing_str = "TRUE";
+my @filter_abundance = qw(0);
+my $method = "edgeR";
 
 my $filename = "job.slurm";
 my $f = 0;
@@ -44,12 +29,12 @@ for my $i (0 .. $#features) {
       print $fh '#'."\n\n";
   
       print $fh 'module add R/3.6.1-gcb03'."\n";
-      print $fh 'module add gcc/7.1.0-fasrc01'."\n\n";
+      print $fh 'module add gcc/7.3.0-gcb01'."\n\n";
 
       print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
       # FALSE refers to rarefication
-      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --NB_for_DE='.$NB_for_DE.' --filter_abundance='.$fa.' --existing='.$existing_str.' --label='.$analysis_label."\n\n";
+      print $fh 'srun Rscript run.R --p='.$f.' --n=250 --k=1 --method_for_DE='.$method.' --filter_abundance='.$fa."\n\n";
 
       close $fh;
 

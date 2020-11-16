@@ -15,30 +15,23 @@ option_list = list(
               help = "proportion of differential expression", metavar = "numeric"),
   make_option(c("--sf_corr"), type = "numeric", default = NULL, 
               help = "size factor correlation", metavar = "numeric"),
-  make_option(c("--NB_for_DE"), type = "logical", default = TRUE,
-              help = "flag associated with method to use for differential expression calling: TRUE = NB + LRT, FALSE = log-LM + permutations", metavar = "numeric"),
+  make_option(c("--method_for_DE"), type = "character", default = TRUE,
+              help = "method to use for differential expression calling: edgeR, NB, LM", metavar = "character"),
   make_option(c("--use_ALR"), type = "logical", default = FALSE, 
               help = "flag indicating whether or not to perform differential abundance testing on logratios", metavar = "logical"),
   make_option(c("--filter_abundance"), type = "numeric", default = 0, 
-              help = "minimum average abundance of a gene on which to test differential abundance", metavar = "numeric"),
-  make_option(c("--rarefy"), type = "logical", default = FALSE, 
-              help = "flag indicating whether or not to rarefy samples", metavar = "logical"),
-  make_option(c("--label"), type = "character", default = NULL,
-              help = "analysis label associated with output directory in simulated_analyses", metavar = "character"),
-  make_option(c("--existing"), type = "logical", default = FALSE, 
-              help = "use existing simulation", metavar = "logical")
+              help = "minimum average abundance of a gene on which to test differential abundance", metavar = "numeric")
 ); 
 
 opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
 
-de_sweep <- seq(from = 0.1, to = 0.9, by = 0.1)
+de_sweep <- c(0.2, 0.4, 0.6, 0.8)
 if(!is.null(opt$prop_da)) {
   de_sweep <- c(opt$prop_da)
 }
 
-corr_sweep <- seq(from = 0.1, to = 0.9, by = 0.1)
-corr_sweep <- c(0.1, 0.5, 0.9)
+corr_sweep <- c(0, 0.5, 0.9)
 if(!is.null(opt$sf_corr)) {
   corr_sweep <- c(opt$sf_corr)
 }
@@ -48,9 +41,6 @@ sweep_simulations(p = opt$p,
                   k = opt$k,
                   de_sweep = de_sweep,
                   corr_sweep = corr_sweep,
-                  call_DA_by_NB = opt$NB_for_DE,
                   use_ALR = opt$use_ALR,
                   filter_abundance = opt$filter_abundance,
-                  rarefy = opt$rarefy,
-                  analysis_label = opt$label,
-                  use_existing_simulations = opt$existing)
+                  method = opt$method_for_DE)
