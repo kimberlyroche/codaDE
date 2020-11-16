@@ -8,31 +8,25 @@ differential abundance calls and write these to an output file}
 sweep_simulations(
   p,
   n,
-  k = NULL,
+  k = 1,
   de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
   corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 0,
-  method = "NB",
-  rarefy = FALSE,
-  use_existing_simulations = FALSE,
-  analysis_label = NULL
+  method = "edgeR"
 )
 
 sweep_simulations(
   p,
   n,
-  k = NULL,
+  k = 1,
   de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
   corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 0,
-  method = "NB",
-  rarefy = FALSE,
-  use_existing_simulations = FALSE,
-  analysis_label = NULL
+  method = "edgeR"
 )
 }
 \arguments{
@@ -40,7 +34,7 @@ sweep_simulations(
 
 \item{n}{number of samples per group}
 
-\item{k}{number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated}
+\item{k}{number of cell types to simulate}
 
 \item{de_sweep}{vector of proportions of differentially abundant genes to simulate}
 
@@ -55,18 +49,14 @@ sweep_simulations(
 
 \item{method}{differential abundance testing method to use; options are "NB", "GLM", "edgeR"}
 
-\item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
-
-\item{use_existing_simulations}{if TRUE looks for existing simulations (specified in a metadata file) rather than simulating new data sets}
-
-\item{analysis_label}{this is a short name for this analysis that should correspond to a folder name in simulated_analyses}
-
 \item{run_label}{human-readable string identifier for this simulation run}
 
 \item{output_file}{output file to append to}
 
 \item{call_DA_by_NB}{if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
 permutation test}
+
+\item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }
 \description{
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in

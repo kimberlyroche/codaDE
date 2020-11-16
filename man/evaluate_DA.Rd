@@ -9,10 +9,8 @@ evaluate_DA(
   data,
   alpha = 0.05,
   use_ALR = FALSE,
-  filter_abundance = 1,
-  method = "NB",
-  rarefy = FALSE,
-  save_output = TRUE
+  filter_abundance = 0,
+  method = "edgeR"
 )
 }
 \arguments{
@@ -26,10 +24,6 @@ evaluate_DA(
 (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
 
 \item{method}{differential abundance testing method to use; options are "NB", "GLM", "edgeR"}
-
-\item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
-
-\item{save_output}{if TRUE, saves data, differential abundance calls, and metadata, otherwise returns results}
 }
 \description{
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in

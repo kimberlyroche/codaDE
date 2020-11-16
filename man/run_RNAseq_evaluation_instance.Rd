@@ -9,28 +9,24 @@ run_RNAseq_evaluation_instance(
   p,
   n,
   proportion_da,
-  k = NULL,
+  k = 1,
   size_factor_correlation = 0,
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 1,
-  method = "NB",
-  rarefy = FALSE,
-  analysis_label = NULL
+  method = "edgeR"
 )
 
 run_RNAseq_evaluation_instance(
   p,
   n,
   proportion_da,
-  k = NULL,
+  k = 1,
   size_factor_correlation = 0,
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 1,
-  method = "NB",
-  rarefy = FALSE,
-  analysis_label = NULL
+  method = "edgeR"
 )
 }
 \arguments{
@@ -40,7 +36,7 @@ run_RNAseq_evaluation_instance(
 
 \item{proportion_da}{proportion of differentially abundant genes}
 
-\item{k}{number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated}
+\item{k}{number of cell types to simulate}
 
 \item{size_factor_correlation}{correlation of observed abundances to original total abundances}
 
@@ -53,16 +49,14 @@ run_RNAseq_evaluation_instance(
 
 \item{method}{differential abundance testing method to use; options are "NB", "GLM", "edgeR"}
 
-\item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
-
-\item{analysis_label}{this is a short name for this analysis that should correspond to a folder name in simulated_analyses}
-
 \item{run_label}{human-readable string identifier for this simulation run}
 
 \item{output_file}{output file to append to}
 
 \item{call_DA_by_NB}{if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
 permutation test}
+
+\item{rarefy}{if TRUE, resamples the counts in each sample to the lowest observed total counts}
 }
 \description{
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
