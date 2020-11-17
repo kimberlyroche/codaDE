@@ -15,8 +15,8 @@ option_list = list(
               help = "proportion of differential expression", metavar = "numeric"),
   make_option(c("--sf_corr"), type = "numeric", default = NULL, 
               help = "size factor correlation", metavar = "numeric"),
-  make_option(c("--method_for_DE"), type = "character", default = TRUE,
-              help = "method to use for differential expression calling: edgeR, NB, LM", metavar = "character"),
+  make_option(c("--method"), type = "character", default = NULL, 
+              help = "differential abundance calling method", metavar = "character"),
   make_option(c("--use_ALR"), type = "logical", default = FALSE, 
               help = "flag indicating whether or not to perform differential abundance testing on logratios", metavar = "logical"),
   make_option(c("--filter_abundance"), type = "numeric", default = 0, 
@@ -43,4 +43,4 @@ sweep_simulations(p = opt$p,
                   corr_sweep = corr_sweep,
                   use_ALR = opt$use_ALR,
                   filter_abundance = opt$filter_abundance,
-                  method = opt$method_for_DE)
+                  methods = c(opt$method))
