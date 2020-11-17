@@ -309,10 +309,11 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
     logratios.observed_counts <- get_logratios(data, call_abundances = FALSE)
     for(i in 1:p) {
       if(evaluate_features[i]) {
-        pval.abundances <- call_DA_CODA(logratios.abundances, i, data$groups)
+        # pval.abundances <- call_DA_CODA(logratios.abundances, i, data$groups)
         pval.observed_counts <- call_DA_CODA(logratios.observed_counts, i, data$groups)
-        if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-          calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
+        #if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+        if(!is.na(pval.observed_counts)) {
+          # calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
           calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/length(evaluate_features))
         }
       }
@@ -339,7 +340,8 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
           } else {
             stop("Unknown differential abundance calling method!")
           }
-          if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+          #if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+          if(!is.na(pval.observed_counts)) {
             # calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
             # calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/length(evaluate_features))
             calls.observed_counts[i] <- pval.observed_counts <= alpha/length(evaluate_features)
