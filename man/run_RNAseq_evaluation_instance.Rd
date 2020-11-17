@@ -14,7 +14,7 @@ run_RNAseq_evaluation_instance(
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 1,
-  method = "edgeR"
+  methods = c("NB", "edgeR")
 )
 
 run_RNAseq_evaluation_instance(
@@ -26,7 +26,7 @@ run_RNAseq_evaluation_instance(
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 1,
-  method = "edgeR"
+  methods = c("NB", "edgeR")
 )
 }
 \arguments{
@@ -47,7 +47,7 @@ run_RNAseq_evaluation_instance(
 \item{filter_abundance}{the minimum average abundance to require of features we'll evaluate for differential abundance
 (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
 
-\item{method}{differential abundance testing method to use; options are "NB", "GLM", "edgeR"}
+\item{methods}{vector of differential abundance testing methods to use; options are "NB", "GLM", "edgeR"}
 
 \item{run_label}{human-readable string identifier for this simulation run}
 

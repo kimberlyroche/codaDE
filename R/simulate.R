@@ -234,12 +234,13 @@ call_DA_edgeR <- function(data, call_abundances = TRUE) {
   dge_obj <- estimateDisp(dge_obj, design)
   # LRT recommended for single-cell data
   fit <- glmFit(dge_obj, design)
-  res <- glmLRT(fit, coef = 2)
-  pval <- res@.Data[[14]]$PValue
+  lrt <- glmLRT(fit, coef = 2)
+  # alternatively: is.de <- decideTestsDGE(lrt)
+  pval <- lrt@.Data[[14]]$PValue
   # quasi-likelihood recommended for bulk RNA-seq (different dispersion estimation procedure)
   # fit <- glmQLFit(dge_obj, design)
-  # res <- glmQLFTest(fit, coef=2)
-  # pval <- res@.Data[[17]]$PValue
+  # lrt <- glmQLFTest(fit, coef=2)
+  # pval <- lrt@.Data[[17]]$PValue
   return(pval)
 }
 
@@ -295,12 +296,12 @@ call_DA_CODA <- function(logratios, feature_idx, groups) {
 evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, method = "edgeR") {
   # calculate and compare differential abundance calls
   cat("Evaluating differential abundance...\n")
-  calls.abundances <- c()
-  calls.observed_counts <- c()
-  
   evaluate_features <- apply(data$observed_counts, 2, function(x) mean(x) > filter_abundance)
-  
   p <- ncol(data$abundances)
+  # Use intended DE as a baseline...
+  calls.abundances <- rep(FALSE, p)
+  calls.abundances[data$da_genes] <- TRUE
+  calls.observed_counts <- rep(FALSE, p)
   
   if(use_ALR) {
     # this setup is currently only possible with NB DA calling
@@ -318,10 +319,10 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
     }
   } else {
     if(method == "edgeR") {
-      # Note: This is performing library size normalization via `calcNormFactors`!
-      pval.abundances <- call_DA_edgeR(data, call_abundances = TRUE)
+      # Note: This inherently looks for DE over relative abundances!
+      # pval.abundances <- call_DA_edgeR(data, call_abundances = TRUE)
+      # calls.abundances <- pval.abundances <= alpha/length(evaluate_features)
       pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE)
-      calls.abundances <- pval.abundances <= alpha/length(evaluate_features)
       calls.observed_counts <- pval.observed_counts <= alpha/length(evaluate_features)
     } else {
       for(i in 1:p) {
@@ -330,17 +331,18 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
         }
         if(evaluate_features[i]) {
           if(method == "NB") {
-            pval.abundances <- call_DA_NB(data, i, call_abundances = TRUE)
+            # pval.abundances <- call_DA_NB(data, i, call_abundances = TRUE)
             pval.observed_counts <- call_DA_NB(data, i, call_abundances = FALSE)
           } else if(method == "GLM") {
-            pval.abundances <- call_DA_LM(data, i, call_abundances = TRUE)
+            # pval.abundances <- call_DA_LM(data, i, call_abundances = TRUE)
             pval.observed_counts <- call_DA_LM(data, i, call_abundances = FALSE)
           } else {
             stop("Unknown differential abundance calling method!")
           }
           if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-            calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
-            calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/length(evaluate_features))
+            # calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
+            # calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/length(evaluate_features))
+            calls.observed_counts[i] <- pval.observed_counts <= alpha/length(evaluate_features)
           }
         }
       }
@@ -388,7 +390,7 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
-#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR"
+#' @param methods vector of differential abundance testing methods to use; options are "NB", "GLM", "edgeR"
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @import entropy
@@ -396,7 +398,7 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
 #' @export
 run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = 1, size_factor_correlation = 0,
                                            alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
-                                           method = "edgeR") {
+                                           methods = c("NB", "edgeR")) {
   data <- simulate_singlecell_RNAseq(p = p, n = n, k = k, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
                                      spike_in = use_ALR)
   # we've got to make sure there's non-zero variation in all genes in each condition
@@ -429,16 +431,18 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = 1, size_fact
     data$observed_counts[sample(which(data$groups == 0))[1],d] <- 1
   }
   
-  save_obj <- evaluate_DA(data, alpha = alpha, use_ALR = use_ALR, filter_abundance = filter_abundance, method = method)
-  data_obj <- save_obj
-  data_obj$p <- p
-  data_obj$proportion_da <- proportion_da
-  data_obj$size_factor_correlation <- size_factor_correlation
-  new_filename <- paste0(UUIDgenerate(), ".rds")
-  # saveRDS(data_obj, file.path("simulated_data", new_filename))
-  save_path <- file.path("simulated_analyses", new_filename)
-  cat("Saving to",save_path,"\n")
-  saveRDS(data_obj, save_path)
+  for(method in methods) {
+    save_obj <- evaluate_DA(data, alpha = alpha, use_ALR = use_ALR, filter_abundance = filter_abundance, method = method)
+    data_obj <- save_obj
+    data_obj$p <- p
+    data_obj$proportion_da <- proportion_da
+    data_obj$size_factor_correlation <- size_factor_correlation
+    new_filename <- paste0(UUIDgenerate(), ".rds")
+    # saveRDS(data_obj, file.path("simulated_data", new_filename))
+    save_path <- file.path("simulated_analyses", new_filename)
+    cat("Saving to",save_path,"\n")
+    saveRDS(data_obj, save_path)
+  }
 }
 
 #' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
@@ -453,13 +457,13 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = 1, size_fact
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
-#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR"
+#' @param methods vector of differential abundance testing methods to use; options are "NB", "GLM", "edgeR"
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
 sweep_simulations <- function(p, n, k = 1, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
                               corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), alpha = 0.05, use_ALR = FALSE,
-                              filter_abundance = 0, method = "edgeR") {
+                              filter_abundance = 0, methods = c("NB", "edgeR")) {
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
       out_str <- paste0("w/ ",p," genes, DA proportion = ",round(de_prop, 2),", and size factor correlation = ",round(sf_corr, 2),"\n")
@@ -467,7 +471,7 @@ sweep_simulations <- function(p, n, k = 1, de_sweep = seq(from = 0.1, to = 0.9, 
       run_RNAseq_evaluation_instance(p, n, proportion_da = de_prop, k = k,
                                      size_factor_correlation = sf_corr,
                                      alpha = 0.05, use_ALR = use_ALR, filter_abundance = filter_abundance,
-                                     method = method)
+                                     methods = methods)
     }
   }
 }
