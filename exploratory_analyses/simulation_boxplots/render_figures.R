@@ -1,41 +1,52 @@
+library(dplyr)
 library(ggplot2)
 
-for(cond in c(1,2)) {
-  pattern_str <- paste0("results_", cond, "_.*?\\.rds")
-  results_dir <- "output"
-  results_files <- list.files(path = results_dir, pattern = pattern_str, full.names = TRUE, recursive = FALSE)
-  full_results <- NULL
-  for(rf in results_files) {
-    if(is.null(full_results)) {
-      full_results <- readRDS(rf)
-    } else {
-      full_results <- rbind(full_results, readRDS(rf))
-    }
-  }
+sim_dir <- "simulated_analyses"
+files <- list.files(sim_dir)
 
-  if(cond == 1) {
-    p <- ggplot(full_results, aes(x = as.factor(prop_de), y = FPR)) +
+df <- data.frame(FPR = c(), method = c(), prop_da = c(), sf_corr = c())
+for(file in files) {
+	data <- readRDS(file.path(sim_dir, file))
+	df <- rbind(df, data.frame(p = data$p,
+                             FPR = data$FPR,
+                             method = data$method,
+                             prop_da = data$proportion_da,
+                             sf_corr = data$size_factor_correlation))
+}
+
+# Conditions:
+# (1) Sweep over number of features (1K, 5K, 10K, 20K), fixing DE at 50%, lib. sz. correlation at 0
+# (2) Sweep over number of DE (20%, 40%, 60%, 80%), fixing features at 20K, lib. sz. correlation at 0
+# (3) Sweep over number of DE (20%, 40%, 60%, 80%), fixing features at 20K, lib. sz. correlation at 0.5
+
+for(condition in c(1,3)) {
+  if(condition == 1) {
+    # 1: Effect of feature (gene) number
+    sub_df <- df[(df$sf_corr == 0 & df$method == "edgeR"),]
+    p <- ggplot(sub_df, aes(x = as.factor(prop_da), y = FPR)) +
       geom_boxplot() +
-      ylim(0, 0.3) +
-      xlab("approx. proportion DE genes")
-    ggsave(paste0("FPR_", cond, ".png"), p, units = "in", dpi = 100, height = 5, width = 5)
-    p <- ggplot(full_results, aes(x = as.factor(prop_de), y = TPR)) +
+      ylim(0, 0.75)
+  } else if(condition == 2) {
+    # 2: Library size normalization
+    sub_df <- df[(df$sf_corr == 0 & df$method == "edgeR"),]
+    p <- ggplot(sub_df, aes(x = as.factor(prop_da), y = FPR)) +
       geom_boxplot() +
-      ylim(0.75, 1) +
-      xlab("approx. proportion DE genes")
-    ggsave(paste0("TPR_", cond, ".png"), p, units = "in", dpi = 100, height = 5, width = 5)
+      ylim(0, 0.25)
+    ggsave(paste0("test_",condition,".png"), p, units = "in", dpi = 100, height = 5, width = 5)
   } else {
-    p <- ggplot(full_results, aes(x = as.factor(sf_corr), y = FPR)) +
+    # 3: Faithful library size preservation
+    sub_df <- df[(df$prop_da == 0.5 & df$method == "NB"),]
+    p <- ggplot(sub_df, aes(x = as.factor(sf_corr), y = FPR)) +
       geom_boxplot() +
-      ylim(0, 0.3) +
-      xlab("approx. correlation true/observed library sizes")
-    ggsave(paste0("FPR_", cond, ".png"), p, units = "in", dpi = 100, height = 5, width = 5)
-    p <- ggplot(full_results, aes(x = as.factor(sf_corr), y = TPR)) +
-      geom_boxplot() +
-      ylim(0.75, 1) +
-      xlab("approx. correlation true/observed library sizes")
-    ggsave(paste0("TPR_", cond, ".png"), p, units = "in", dpi = 100, height = 5, width = 5)
+      ylim(0, 0.25)
+    ggsave(paste0("test_",condition,".png"), p, units = "in", dpi = 100, height = 5, width = 5)
   }
 }
 
 
+
+# Calculate fold change in total abundance
+sub_df <- df[(df$sf_corr == 0 & df$method == "edgeR"),]
+m1 <- mean(data$library_size.abundances[1:100])
+m2 <- mean(data$library_size.abundances[101:200])
+cat("Approx. fold change in total abundance:",round(m2/m1, 2),"\n")

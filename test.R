@@ -1,15 +1,16 @@
 library(codaDE)
 
-p <- 1000
+p <- 10000
 n <- 100
-prop_da <- 0.33
+prop_da <- 0.8
 k <- 1
 sf_corr <- 0
 sim_dir <- "simulated_analyses"
 
 # Sweep
 sweep_simulations(p, n, k = k, de_sweep = c(prop_da), corr_sweep = c(sf_corr),
-                  alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, methods = c("NB", "edgeR"))
+                  alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, methods = c("edgeR"))
+
 output_files <- list.files(sim_dir)
 for(i in 1:2) {
   data <- readRDS(file.path(sim_dir, output_files[i]))
