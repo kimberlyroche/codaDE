@@ -249,7 +249,8 @@ call_DA_edgeR <- function(data, call_abundances = TRUE, normalization_method = N
       rownames(cell_metadata) <- paste0("cell_", 1:ncol(y))
       sce <- SingleCellExperiment(assays = list(counts = y),
                                   colData = cell_metadata)
-      sce <- suppressWarnings(scran::computeSumFactors(sce))
+      clust.sce <- quickCluster(sce)
+      sce <- suppressWarnings(scran::computeSumFactors(sce, cluster = clust.sce))
       dge_obj <- convertTo(sce, type = "edgeR")
     } else {
       stop("Unknown normalization method!")
