@@ -58,7 +58,7 @@ for(condition in 1:3) {
     p <- ggplot(sub_df, aes(x = as.factor(prop_da), y = FPR)) +
       geom_boxplot() +
       ylim(0, 0.75)
-  } else if(condition == 3) {
+  } else if(condition == 2) {
     sub_df <- df[df$method == "edgeR_TMM",]
     p <- ggplot(sub_df, aes(x = as.factor(prop_da), y = FPR)) +
       geom_boxplot() +
