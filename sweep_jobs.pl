@@ -6,10 +6,10 @@ my @evaluate_alr = qw(FALSE);
 my @filter_abundance = qw(5);
 
 # sweep over number of features
-my @features = qw(1000 5000 10000 20000);
-my @de_sweep = qw(0.5);
-my @corr_sweep = qw(0);
-my $method = "edgeR";
+#my @features = qw(1000 5000 10000 20000);
+#my @de_sweep = qw(0.5);
+#my @corr_sweep = qw(0);
+#my $method = "edgeR";
 
 # sweep over DE (discarding library size info)
 #my @features = qw(20000);
@@ -22,6 +22,12 @@ my $method = "edgeR";
 #my @de_sweep = qw(0.2 0.4 0.6 0.8);
 #my @corr_sweep = qw(0.5);
 #my $method = "NB";
+
+# sweep over DE (using TMM normalization)
+my @features = qw(2000);
+my @de_sweep = qw(0.2 0.4 0.6 0.8);
+my @corr_sweep = qw(0);
+my $method = "edgeR_TMM";
 
 my $filename = "job.slurm";
 my $f = 0;
