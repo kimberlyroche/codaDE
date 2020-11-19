@@ -23,7 +23,7 @@ evaluate_DA(
 \item{filter_abundance}{the minimum average abundance to require of features we'll evaluate for differential abundance
 (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)}
 
-\item{method}{differential abundance testing method to use; options are "NB", "GLM", "edgeR"}
+\item{method}{differential abundance testing method to use; options are "NB", "GLM", "edgeR", "edgeR_TMM", "edgeR_scran"}
 }
 \description{
 Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in

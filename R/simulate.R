@@ -68,7 +68,7 @@ resample_counts <- function(theta, groups, size_factor_correlation, spike_in = F
 #' @import LaplacesDemon
 #' @export
 simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE, possible_fold_changes = NULL) {
-  proportions_components <- rdirichlet(1, alpha = rep(1/k, k)*5)
+  proportions_components <- LaplacesDemon::rdirichlet(1, alpha = rep(1/k, k)*5)
   counts_components <- round(proportions_components[1:(k-1)]*n)
   counts_components <- c(counts_components, n - sum(counts_components))
   # if differentially expressed, a gene will be differentially expressed in all cell types (for now)
@@ -219,19 +219,47 @@ call_DA_LM <- function(data, feature_idx, call_abundances = TRUE) {
 #'
 #' @param data simulated data set
 #' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
+#' @param normalization_method if NULL, uses library size normalization; other options include "TMM" and "scran"
 #' @return p-value associated with group coefficient
 #' @import edgeR
+#' @import SingleCellExperiment
+#' @import scran
 #' @export
-call_DA_edgeR <- function(data, call_abundances = TRUE, use_TMM = FALSE) {
+call_DA_edgeR <- function(data, call_abundances = TRUE, normalization_method = NULL) {
   # DGEList expects samples as columns
-  if(call_abundances) {
-    dge_obj <- DGEList(counts = t(data$abundances), group = factor(data$groups))
+  if(!is.null(normalization_method)) {
+    if(normalization_method == "TMM") {
+      if(call_abundances) {
+        dge_obj <- DGEList(counts = t(data$abundances), group = factor(data$groups))
+      } else {
+        dge_obj <- DGEList(counts = t(data$observed_counts), group = factor(data$groups))
+      }
+      dge_obj <- calcNormFactors(dge_obj, method = "TMM")
+    } else if(normalization_method == "scran") {
+      # First, get the data into a SingleCellExperiment (Bioconductor) object
+      if(call_abundances) {
+        y <- t(data$abundances)
+      } else {
+        y <- t(data$observed_counts)
+      }
+      # These labels may not be strictly necessary but it's probably not bad form
+      rownames(y) <- paste0("gene_", 1:nrow(y))
+      y <- as.matrix(y)
+      cell_metadata <- data.frame(condition = data$groups)
+      rownames(cell_metadata) <- paste0("cell_", 1:ncol(y))
+      sce <- SingleCellExperiment(assays = list(counts = y),
+                                  colData = cell_metadata)
+      sce <- suppressWarnings(scran::computeSumFactors(sce))
+      dge_obj <- convertTo(sce, type = "edgeR")
+    } else {
+      stop("Unknown normalization method!")
+    }
   } else {
-    dge_obj <- DGEList(counts = t(data$observed_counts), group = factor(data$groups))
-  }
-  if(use_TMM) {
-    dge_obj <- calcNormFactors(dge_obj, method = "TMM")
-  } else {
+    if(call_abundances) {
+      dge_obj <- DGEList(counts = t(data$abundances), group = factor(data$groups))
+    } else {
+      dge_obj <- DGEList(counts = t(data$observed_counts), group = factor(data$groups))
+    }
     dge_obj <- calcNormFactors(dge_obj, method = "none") # library size normalization-only
   }
   design <- model.matrix(~ data$groups)
@@ -292,7 +320,7 @@ call_DA_CODA <- function(logratios, feature_idx, groups) {
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
-#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR", "edgeR_TMM"
+#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR", "edgeR_TMM", "edgeR_scran"
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @import edgeR
@@ -323,14 +351,17 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
       }
     }
   } else {
-    if(method == "edgeR") {
+    if(method %in% c("edgeR", "edgeR_TMM", "edgeR_scran")) {
       # Note: This inherently looks for DE over relative abundances!
       # pval.abundances <- call_DA_edgeR(data, call_abundances = TRUE)
       # calls.abundances <- pval.abundances <= alpha/length(evaluate_features)
-      pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE)
-      calls.observed_counts <- pval.observed_counts <= alpha/length(evaluate_features)
-    } else if(method == "edgeR_TMM") {
-      pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE, use_TMM = TRUE)
+      if(method == "edgeR_TMM") {
+        pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE, normalization_method = "TMM")
+      } else if(method == "edgeR_scran") {
+        pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE, normalization_method = "scran")
+      } else {
+        pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE)
+      }
       calls.observed_counts <- pval.observed_counts <= alpha/length(evaluate_features)
     } else {
       for(i in 1:p) {
