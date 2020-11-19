@@ -222,14 +222,18 @@ call_DA_LM <- function(data, feature_idx, call_abundances = TRUE) {
 #' @return p-value associated with group coefficient
 #' @import edgeR
 #' @export
-call_DA_edgeR <- function(data, call_abundances = TRUE) {
+call_DA_edgeR <- function(data, call_abundances = TRUE, use_TMM = FALSE) {
   # DGEList expects samples as columns
   if(call_abundances) {
     dge_obj <- DGEList(counts = t(data$abundances), group = factor(data$groups))
   } else {
     dge_obj <- DGEList(counts = t(data$observed_counts), group = factor(data$groups))
   }
-  dge_obj <- calcNormFactors(dge_obj, method = "none") # library size normalization
+  if(use_TMM) {
+    dge_obj <- calcNormFactors(dge_obj, method = "TMM")
+  } else {
+    dge_obj <- calcNormFactors(dge_obj, method = "none") # library size normalization-only
+  }
   design <- model.matrix(~ data$groups)
   dge_obj <- estimateDisp(dge_obj, design)
   # LRT recommended for single-cell data
@@ -288,7 +292,7 @@ call_DA_CODA <- function(logratios, feature_idx, groups) {
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
-#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR"
+#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR", "edgeR_TMM"
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @import edgeR
@@ -324,6 +328,9 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
       # pval.abundances <- call_DA_edgeR(data, call_abundances = TRUE)
       # calls.abundances <- pval.abundances <= alpha/length(evaluate_features)
       pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE)
+      calls.observed_counts <- pval.observed_counts <= alpha/length(evaluate_features)
+    } else if(method == "edgeR_TMM") {
+      pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE, use_TMM = TRUE)
       calls.observed_counts <- pval.observed_counts <= alpha/length(evaluate_features)
     } else {
       for(i in 1:p) {
