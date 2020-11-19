@@ -17,6 +17,7 @@ for(file in files) {
                              mean2 = mean(data$library_size.abundances[101:200])))
 }
 head(df)
+table(df$method)
 
 # V1
 # Conditions:
@@ -49,18 +50,24 @@ for(condition in c(3)) {
 # Conditions:
 # (1) 2000 genes, sweeping over number of DE (20%, 40%, 60%, 80%), library size normalization (edgeR)
 # (2) 2000 genes, sweeping over number of DE (20%, 40%, 60%, 80%), TMM normalization (edgeR)
+# (3) 2000 genes, sweeping over number of DE (20%, 40%, 60%, 80%), scran normalization (edgeR_scran)
 
-for(condition in 1:2) {
+for(condition in 1:3) {
   if(condition == 1) {
     sub_df <- df[df$method == "edgeR",]
-    p <- ggplot(sub_df, aes(x = as.factor(prop_da), y = TPR)) +
+    p <- ggplot(sub_df, aes(x = as.factor(prop_da), y = FPR)) +
       geom_boxplot() +
-      ylim(0, 1)
-  } else {
+      ylim(0, 0.75)
+  } else if(condition == 3) {
     sub_df <- df[df$method == "edgeR_TMM",]
-    p <- ggplot(sub_df, aes(x = as.factor(prop_da), y = TPR)) +
+    p <- ggplot(sub_df, aes(x = as.factor(prop_da), y = FPR)) +
       geom_boxplot() +
-      ylim(0, 1)
+      ylim(0, 0.75)
+  } else {
+    sub_df <- df[df$method == "edgeR_scran",]
+    p <- ggplot(sub_df, aes(x = as.factor(prop_da), y = FPR)) +
+      geom_boxplot() +
+      ylim(0, 0.75)
   }
   ggsave(paste0("test_",condition,".png"), p, units = "in", dpi = 100, height = 5, width = 5)
 }

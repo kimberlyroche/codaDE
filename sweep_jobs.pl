@@ -9,25 +9,25 @@ my @filter_abundance = qw(5);
 #my @features = qw(1000 5000 10000 20000);
 #my @de_sweep = qw(0.5);
 #my @corr_sweep = qw(0);
-#my $methods = c("edgeR");
+#my @methods = qw(edgeR);
 
 # sweep over DE (discarding library size info)
 #my @features = qw(20000);
 #my @de_sweep = qw(0.2 0.4 0.6 0.8);
 #my @corr_sweep = qw(0);
-#my $methods = c("edgeR");
+#my @methods = qw(edgeR);
 
 # sweep over DE (retaining library size info)
 #my @features = qw(20000);
 #my @de_sweep = qw(0.2 0.4 0.6 0.8);
 #my @corr_sweep = qw(0.5);
-#my $methods = c("NB");
+#my @methods = qw(NB);
 
 # sweep over DE (using TMM normalization)
 my @features = qw(2000);
 my @de_sweep = qw(0.2 0.4 0.6 0.8);
 my @corr_sweep = qw(0);
-my $methods = c("edgeR", "edgeR_TMM", "edgeR_scran");
+my @methods = qw(edgeR edgeR_TMM edgeR_scran);
 
 my $filename = "job.slurm";
 my $f = 0;
