@@ -10,10 +10,17 @@ library(driver)
 # Use GTEx data set to determine a pseudo-max proportion of differentially expressed genes across
 # different tissue types. Do we every see DE proportions this large in vivo?
 
-GTEx <- readRDS(file.path("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct","parsed_GTEx.rds"))
-GTEx_annot <- read.table(file.path("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct",
-                                 "GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt"),
-                       header = TRUE, sep = "\t")
+# Function stolen from
+slugify <- function(x, alphanum_replace="", space_replace="_", tolower=TRUE) {
+  x <- gsub("[^[:alnum:] ]", alphanum_replace, x)
+  x <- gsub(" ", space_replace, x)
+  if(tolower) { x <- tolower(x) }
+  return(x)
+}
+
+GTEx <- readRDS("/data/mukherjeelab/roche/codaDE/data/GTEx_data/parsed_GTEx.rds")
+GTEx_annot <- read.table("/data/mukherjeelab/roche/codaDE/data/GTEx_data/GTEx_annotations.txt",
+  header = TRUE, sep = "\t")
 samples_by_tissue <- list()
 for(tissue in unique(GTEx_annot$SMTSD)) {
   samples_by_tissue[[tissue]] <- GTEx_annot$SAMPID[GTEx_annot$SMTSD == tissue]
@@ -25,8 +32,10 @@ if(within_tissue) {
   tissue <- sample(names(samples_by_tissue), size = 1)
   tissue_pair <- rep(tissue, 2)
   t_idx <- which(colnames(GTEx) %in% samples_by_tissue[[tissue]])
-  t1_idx <- sample(t_idx, size = 100, replace = TRUE)
-  t2_idx <- sample(t_idx, size = 100, replace = TRUE)
+  t_all_idx <- sample(t_idx, size = min(200, length(t_idx)), replace = FALSE)
+  idx <- round(length(t_all_idx)/2)
+  t1_idx <- t_all_idx[1:idx]
+  t2_idx <- t_all_idx[(idx+1):length(t_all_idx)]
 } else {
   # Pull a random pair of tissues.
   tissue_pair <- sample(names(samples_by_tissue), size = 2, replace = FALSE)
@@ -34,7 +43,8 @@ if(within_tissue) {
   t2_idx <- which(colnames(GTEx) %in% samples_by_tissue[[tissue_pair[2]]])
 }
 
-cat("Using tissues:",tissue_pair[1],"x",tissue_pair[2],"\n")
+pair_string <- paste0(tissue_pair[1]," x ",tissue_pair[2])
+cat("Using tissues:",pair_string,"\n")
 gene_expr <- cbind(GTEx[,t1_idx],
                    GTEx[,t2_idx])
 
@@ -44,19 +54,37 @@ tissues <- as.factor(c(rep("A", length(c_idx1)), rep("B", length(c_idx2))))
 colnames(gene_expr) <- c(paste("A", 1:length(c_idx1), sep = "_"), paste("B", 1:length(c_idx2), sep = "_"))
 rownames(gene_expr) <- paste(unname(unlist(GTEx[,2])), unname(unlist(GTEx[,1])), sep = "-")
 
-# Filter to genes above a minimum number of non-zero appearances
-keep <- which(apply(gene_expr[,c_idx1], 1, function(x) { sum(x > 0) > 5 }), apply(gene_expr[,c_idx2], 1, function(x) { sum(x > 0) > 5 }))
+# Testing
+# gene_expr <- gene_expr[sort(sample(1:nrow(gene_expr))[1:1000]),]
 
-gene_expr <- gene_expr[keep,]
+# Tutorial: https://bioinformatics-core-shared-training.github.io/cruk-bioinf-sschool/Day3/Supplementary-RNAseq-practical.pdf
+dgList <- DGEList(counts = gene_expr, group = tissues, genes = rownames(gene_expr))
+keep <- rowSums(cpm(dgList) > 5) >= 10 # CPM of at least 5 in at least 10 samples (pretty strict)
+dgList <- dgList[keep,]
+# Re-compute the library sizes
+dgList$samples$lib.size <- colSums(dgList$counts)
+dgList <- calcNormFactors(dgList)
+dgList <- estimateCommonDisp(dgList)
+dgList <- estimateTagwiseDisp(dgList, trend = "none")
 
-dgList <- DGEList(counts = gene_expr, genes = rownames(gene_expr))
-dgList <- calcNormFactors(dgList, method = "TMM")
-design <- model.matrix(~tissues)
-# See also: estimateGLMCommonDisp
-dgList <- estimateGLMTrendedDisp(dgList, design = design)
-fit <- glmFit(dgList, design)
-lrt <- glmLRT(fit, coef = 2)
-is.de <- decideTestsDGE(lrt)
-sum.de <- summary(is.de)
-prop.de <- sum(sum.de[rownames(sum.de) != "NotSig"]) / nrow(gene_expr)
-cat("Proportion DE genes:",round(prop.de, 2),"\n")
+et <- exactTest(dgList)
+de <- decideTestsDGE(et, adjust.method = "BH", p.value = 0.01, lfc = log(2))
+summary(de)
+cat("Proportion DE genes:", round(sum(de != 0)/length(de), 2), "\n")
+
+# Visualize the cutoff
+# detags <- rownames(dgList)[as.logical(de)]
+# png("test.png")
+# plotSmear(et, de.tags=detags)
+# abline(h=c(-1, 1), col="blue")
+# dev.off()
+
+# Visualize a results
+gene <- sample(which(de == 1))[1]
+png(paste0(slugify(pair_string),"_UP.png"))
+plot(as.vector(unlist(dgList$counts[gene,])))
+dev.off()
+gene <- sample(which(de == -1))[1]
+png(paste0(slugify(pair_string),"_DOWN.png"))
+plot(as.vector(unlist(dgList$counts[gene,])))
+dev.off()
