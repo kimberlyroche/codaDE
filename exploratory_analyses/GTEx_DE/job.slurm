@@ -10,5 +10,5 @@
 module add R/3.6.1-gcb03
 module add gcc/7.1.0-fasrc01
 
-cd /data/mukherjeelab/roche/codaDE/exploratory/GTEx_DE
+cd /data/mukherjeelab/roche/codaDE/exploratory_analyses/GTEx_DE
 srun Rscript run.R
