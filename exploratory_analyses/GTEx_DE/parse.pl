@@ -10,16 +10,18 @@ opendir(DIR, $folder) or die "cannot open directory";
 my @docs = grep(/\.out$/, readdir(DIR));
 foreach my $file (@docs) {
   open(RES, $folder."/".$file) or die "could not open $file\n";
-  while(<RES>){
-    open my $in, "<:encoding(utf8)", $folder."/".$file or die "$file: $!";
-    while (my $line = <$in>) {
-      chomp $line;
-      if($_ =~ /^Proportion DE genes: (.*?)$/) {
-        push(@props, $1);
-      }
+  while(my $line = <RES>) {
+    chomp $line;
+    if($line =~ /^Using tissues:/) {
+      #print($line."\n");
     }
-    close $in;
+    if($line =~ /^Proportion DE genes: (.*?)$/) {
+      print($1."\n");
+      push(@props, $1);
+    }
   }
+  close RES;
 }
 
-print("Average: ".(sum(@props)/@props)."\n");
+# print("Average: ".(sum(@props)/@props)."\n");
+
