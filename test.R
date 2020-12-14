@@ -1,6 +1,6 @@
 library(codaDE)
 
-p <- 1000
+p <- 5000
 n <- 100
 prop_da <- 0.8
 k <- 1
