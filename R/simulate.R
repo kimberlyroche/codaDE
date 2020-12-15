@@ -58,6 +58,7 @@ resample_counts <- function(theta, groups, size_factor_correlation, spike_in = F
 #' @param p number of genes
 #' @param n number of samples per group
 #' @param k number of distinct cell types
+#' @param sequencing_depth average total nUMI to simulate
 #' @param proportion_da proportion of differentially abundant genes
 #' @param size_factor_correlation correlation of observed abundances to original total abundances
 #' @param spike_in simulate a control spike in with low dispersion
@@ -67,7 +68,8 @@ resample_counts <- function(theta, groups, size_factor_correlation, spike_in = F
 #' with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
 #' @import LaplacesDemon
 #' @export
-simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE, possible_fold_changes = NULL) {
+simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, sequencing_depth = 100000,
+                                       proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE, possible_fold_changes = NULL) {
   proportions_components <- LaplacesDemon::rdirichlet(1, alpha = rep(1/k, k)*5)
   counts_components <- round(proportions_components[1:(k-1)]*n)
   counts_components <- c(counts_components, n - sum(counts_components))
@@ -77,7 +79,7 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
   # re-close
   sampled_relative_abundances <- sampled_relative_abundances / sum(sampled_relative_abundances)
   # convert these to baseline abundances
-  baseline_abundances <- sampled_relative_abundances * 20000
+  baseline_abundances <- sampled_relative_abundances * 1e6 # was 20000
   # this grossly looks like real data
   #   plot(density(log(round(baseline_abundances) + 0.5)))
   # assign control vs. treatment groups
@@ -128,6 +130,8 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, proportion_da 
   })
 
   realized_total_counts <- rowSums(abundances)
+  scale_down_factor <- sequencing_depth / mean(realized_total_counts)
+  realized_total_counts <- round(scale_down_factor * realized_total_counts)
   size_factors.observed_counts <- round(simcor(realized_total_counts, mean(realized_total_counts), sd(realized_total_counts),
                                                size_factor_correlation))
   # since we're sampling from a normal around the observed counts occasionally we'll get a suggested

@@ -8,6 +8,7 @@ simulate_singlecell_RNAseq(
   p = 20000,
   n = 500,
   k = 1,
+  sequencing_depth = 1e+05,
   proportion_da = 0.1,
   size_factor_correlation = 0,
   spike_in = FALSE,
@@ -20,6 +21,8 @@ simulate_singlecell_RNAseq(
 \item{n}{number of samples per group}
 
 \item{k}{number of distinct cell types}
+
+\item{sequencing_depth}{average total nUMI to simulate}
 
 \item{proportion_da}{proportion of differentially abundant genes}
 
