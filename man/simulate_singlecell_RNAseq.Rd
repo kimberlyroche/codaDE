@@ -5,19 +5,16 @@
 \title{Simulate UMI count single-cell RNA-seq data}
 \usage{
 simulate_singlecell_RNAseq(
-  p = 20000,
   n = 500,
   k = 1,
   sequencing_depth = 1e+05,
   proportion_da = 0.1,
-  size_factor_correlation = 0,
+  library_size_correlation = 0,
   spike_in = FALSE,
   possible_fold_changes = NULL
 )
 }
 \arguments{
-\item{p}{number of genes}
-
 \item{n}{number of samples per group}
 
 \item{k}{number of distinct cell types}
@@ -26,7 +23,7 @@ simulate_singlecell_RNAseq(
 
 \item{proportion_da}{proportion of differentially abundant genes}
 
-\item{size_factor_correlation}{correlation of observed abundances to original total abundances}
+\item{library_size_correlation}{correlation of observed abundances to original total abundances (see details)}
 
 \item{spike_in}{simulate a control spike in with low dispersion}
 
@@ -39,6 +36,9 @@ named list of true abundances, observed abundances, and group assignments
 Simulate UMI count single-cell RNA-seq data
 }
 \details{
+Library size correlation can be specified as 0, 1, or 2, indicating no correlation, modest correlation, or very strong
+correlation with true abundances.
+
 Samples the mean gene abundances from Halpern et al. (2017) as a references. This gives a data set
 with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
 }

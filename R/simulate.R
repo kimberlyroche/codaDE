@@ -12,11 +12,11 @@ simcor <- function(x, ymean = 0, ysd = 1, correlation = 0) {
 #'
 #' @param theta vector of (2) group dispersion parameters and (2) per-gene log covariates is theta
 #' @param groups condition (e.g. control vs. treatment) labels
-#' @param size_factor_correlation correlation of observed abundances to original absolute abundances
+#' @param library_size_correlation correlation of observed abundances to original absolute abundances
 #' @param spike_in flag indicating whether or not to simulate a spike-in (control) with very low dispersion
 #' @return named list of true abundances and observed abundances
 #' @export
-resample_counts <- function(theta, groups, size_factor_correlation, spike_in = FALSE) {
+resample_counts <- function(theta, groups, library_size_correlation, spike_in = FALSE) {
   p <- (length(theta) - 2)/2
   n_total <- length(groups)
   abundances <- sapply(1:p, function(j) {
@@ -35,7 +35,7 @@ resample_counts <- function(theta, groups, size_factor_correlation, spike_in = F
   sampled_proportions <- apply(abundances, 1, function(x) x/sum(x))
   realized_total_counts <- rowSums(abundances)
   size_factors.observed_counts <- round(simcor(realized_total_counts, mean(realized_total_counts), sd(realized_total_counts),
-                                               size_factor_correlation))
+                                               library_size_correlation))
   # since we're sampling from a normal around the observed counts occasionally we'll get a suggested
   # total count that is negative; reflect this
   # this increases correlation but barely
@@ -55,89 +55,82 @@ resample_counts <- function(theta, groups, size_factor_correlation, spike_in = F
 
 #' Simulate UMI count single-cell RNA-seq data
 #'
-#' @param p number of genes
 #' @param n number of samples per group
 #' @param k number of distinct cell types
 #' @param sequencing_depth average total nUMI to simulate
 #' @param proportion_da proportion of differentially abundant genes
-#' @param size_factor_correlation correlation of observed abundances to original total abundances
+#' @param library_size_correlation correlation of observed abundances to original total abundances (see details)
 #' @param spike_in simulate a control spike in with low dispersion
 #' @param possible_fold_changes if specified, a distribution of possible fold changes available for differential abundance simulation
 #' @return named list of true abundances, observed abundances, and group assignments
-#' @details Samples the mean gene abundances from Halpern et al. (2017) as a references. This gives a data set
+#' @details Library size correlation can be specified as 0, 1, or 2, indicating no correlation, modest correlation, or very strong
+#' correlation with true abundances.
+#' 
+#' Samples the mean gene abundances from Halpern et al. (2017) as a references. This gives a data set
 #' with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
 #' @import LaplacesDemon
 #' @export
-simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, sequencing_depth = 100000,
-                                       proportion_da = 0.1, size_factor_correlation = 0, spike_in = FALSE, possible_fold_changes = NULL) {
-  proportions_components <- LaplacesDemon::rdirichlet(1, alpha = rep(1/k, k)*5)
-  counts_components <- round(proportions_components[1:(k-1)]*n)
-  counts_components <- c(counts_components, n - sum(counts_components))
-  # if differentially expressed, a gene will be differentially expressed in all cell types (for now)
-  Halpern2017_data <- readRDS("data/summary_Halpern2017_base.rds")
-  sampled_relative_abundances <- sample(Halpern2017_data$mean_relative_abundances, size = p, replace = TRUE)
-  # re-close
-  sampled_relative_abundances <- sampled_relative_abundances / sum(sampled_relative_abundances)
-  # convert these to baseline abundances
-  baseline_abundances <- sampled_relative_abundances * 1e6 # was 20000
-  # this grossly looks like real data
-  #   plot(density(log(round(baseline_abundances) + 0.5)))
-  # assign control vs. treatment groups
-  groups <- c(rep(0, n), rep(1, n))
-  
+simulate_singlecell_RNAseq <- function(n = 500, k = 1, sequencing_depth = 1e5, proportion_da = 0.1, library_size_correlation = 0,
+                                       spike_in = FALSE, possible_fold_changes = NULL) {
+  # We'll sample out of GTEx protein-coding gene estimates
+  GTEx_estimates_baseline <- readRDS("data/empirical_mu_size.rds")
+  GTEx_estimates_pairs <- readRDS("data/empirical_mu_size_pairs.rds")
+
+  p <- 20000
   n_da <- round(p * proportion_da)
-  da_genes <- as.logical(rbinom(p, size = 1, prob = proportion_da))
-  # pick a random change for each differential gene
-  da_factor <- rep(1, p)
-  
+  n_not_da <- p - n_da
   if(!is.null(possible_fold_changes)) {
-    # method 1: randomly selection some proportion of genes to be differentially abundant between conditions
-    da_factor[da_genes] <- sample(c(1/possible_fold_changes, possible_fold_changes), size = sum(da_genes), replace = TRUE)
-  } else {
-    # method 2: use empirical data (tissue vs. tissue expression levels) to choose a realistic fold change
-    #           given a gene's quantile of expression; in particular, some lowly expressed genes are
-    #           observed jumping between modes (on/off) of expression
-    GTEx_data <- readRDS("data/GTEx_empirical_DA.rds")
-    da_genes_idx <- which(da_genes == TRUE)
-    da_factor[da_genes_idx] <- sapply(da_genes_idx, function(x) {
-      x_quantile <- sum(baseline_abundances <= baseline_abundances[x])/p
-      list_idx <- 1
-      if(x_quantile < 0.6) {
-        list_idx <- 2
-      } else if(x_quantile < 0.7) {
-        list_idx <- 3
-      } else if(x_quantile < 0.8) {
-        list_idx <- 4
-      } else if(x_quantile < 0.9) {
-        list_idx <- 5
-      } else {
-        list_idx <- 6
+    da_assignment <- as.logical(rbinom(p, size = 1, prob = proportion_da))
+    # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
+    all_params <- unname(GTEx_estimates_baseline[sample(1:nrow(GTEx_estimates_baseline), size = p, replace = TRUE),])
+    all_params <- cbind(all_params, all_params) # before-after are identical but...
+    da_factors <- sample(c(1/possible_fold_changes, possible_fold_changes), size = p, replace = TRUE)
+    for(pp in 1:p) {
+      if(da_assignment[pp]) {
+        all_params[pp,3] <- all_params[pp,3]*da_factors[pp]
+        # Dispersion unchanged
       }
-      # Sample from fold changes that are at least +/- a 2-fold change
-      # Anything less than this definitely will not be "visible" as differential expression
-      fold_change_list <- GTEx_data[[list_idx]]
-      fold_change_list <- fold_change_list[fold_change_list >= 5 | fold_change_list <= (1/5)]
-      sample(fold_change_list)[1]
-    })
+    }
+  } else {
+    da_assignment <- c(rep(FALSE, n_not_da), rep(TRUE, n_da))
+    # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
+    non_da_params <- unname(GTEx_estimates_baseline[sample(1:nrow(GTEx_estimates_baseline), size = n_not_da, replace = TRUE),])
+    non_da_params <- cbind(non_da_params, non_da_params) # before-after are identical
+    # Randomly draw in a similar way for the differential set 
+    da_params <- unname(GTEx_estimates_pairs[sample(1:nrow(GTEx_estimates_pairs), size = n_da, replace = TRUE),])
+    all_params <- rbind(non_da_params, da_params)
   }
   
-  # sample true counts (format: samples [rows] x genes [columns])
+  # Clean up NAs
+  all_params[is.na(all_params[,2]),2] <- 1
+  all_params[is.na(all_params[,4]),4] <- 1
+  
+  # Assign control vs. treatment groups
+  groups <- c(rep(0, n), rep(1, n))
+  
+  # Sample true counts (format: samples [rows] x genes [columns])
   abundances <- sapply(1:p, function(j) {
-    # simulate different baselines for different cell types (TBD; see below)
-    counts <- rnbinom(n*2, mu = c(rep(baseline_abundances[j], n), rep(baseline_abundances[j]*da_factor[j], n)), size = 1)
-    # spike-in also TBD
+    counts <- rnbinom(n*2,
+                      mu = c(rep(all_params[j,1], n), rep(all_params[j,3], n)),
+                      size = c(rep(all_params[j,2], n), rep(all_params[j,4], n)))
     counts
   })
-
+  
   realized_total_counts <- rowSums(abundances)
   scale_down_factor <- sequencing_depth / mean(realized_total_counts)
-  realized_total_counts <- round(scale_down_factor * realized_total_counts)
-  size_factors.observed_counts <- round(simcor(realized_total_counts, mean(realized_total_counts), sd(realized_total_counts),
-                                               size_factor_correlation))
-  # since we're sampling from a normal around the observed counts occasionally we'll get a suggested
-  # total count that is negative; reflect this
-  # this increases correlation but barely
-  size_factors.observed_counts <- abs(size_factors.observed_counts)
+  scaled_real_counts <- round(scale_down_factor*realized_total_counts)
+  
+  # Rescale the observed counts in advance of proportional resampling
+  if(library_size_correlation == 2) {
+    # Very strong correlation
+    library_sizes.observed_counts <- rnbinom(n*2, mu = scaled_real_counts, size = 100)
+  } else if(library_size_correlation == 1) {
+    # Modest correlation
+    library_sizes.observed_counts <- rnbinom(n*2, mu = scaled_real_counts, size = 10)
+  } else {
+    # No correlation
+    library_sizes.observed_counts <- rnbinom(n*2, mu = sequencing_depth, size = 100)
+  }
   
   # transform to proportions
   sampled_proportions <- apply(abundances, 1, function(x) x/sum(x))
@@ -147,14 +140,22 @@ simulate_singlecell_RNAseq <- function(p = 20000, n = 500, k = 1, sequencing_dep
     # I'm trying to simulate some minimum detectable concentration
     # this threshold is pretty arbitrary; we need to tune this to resemble real data
     resample_probs[resample_probs < 1e-8] <- 0
-    rmultinom(1, size = size_factors.observed_counts[i], prob = resample_probs)
+    rmultinom(1, size = library_sizes.observed_counts[i], prob = resample_probs)
   })
   observed_counts <- t(observed_counts)
   
+  # Quick visualization
+  # par(mfrow = c(1, 2))
+  # idx <- sample(which(da_assignment == FALSE))[1]
+  # plot(1:n, abundances[1:n,idx], xlim = c(0, 2*n), ylim = c(0, max(abundances[,idx])))
+  # lines((n+1):(2*n), abundances[(n+1):(2*n),idx], type = "p", col = "red")
+  # plot(1:n, observed_counts[1:n,idx], xlim = c(0, 2*n), ylim = c(0, max(observed_counts[,idx])))
+  # lines((n+1):(2*n), observed_counts[(n+1):(2*n),idx], type = "p", col = "red")
+
   return(list(abundances = abundances,
               observed_counts = observed_counts,
               groups = groups,
-              da_genes = which(da_genes == TRUE)))
+              da_assignment = which(da_assignment == TRUE)))
 }
 
 #' Fit negative binomial model to null and full models and evaluate differential abundance for a focal gene
@@ -430,7 +431,7 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
 #' @param n number of samples per group
 #' @param proportion_da proportion of differentially abundant genes
 #' @param k number of cell types to simulate
-#' @param size_factor_correlation correlation of observed abundances to original total abundances
+#' @param library_size_correlation correlation of observed abundances to original total abundances
 #' @param alpha significant level below which to call a feature differentially abundant
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
@@ -441,10 +442,10 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
 #' @import entropy
 #' @import uuid
 #' @export
-run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = 1, size_factor_correlation = 0,
+run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = 1, library_size_correlation = 0,
                                            alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
                                            methods = c("NB", "edgeR")) {
-  data <- simulate_singlecell_RNAseq(p = p, n = n, k = k, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
+  data <- simulate_singlecell_RNAseq(p = p, n = n, k = k, proportion_da = proportion_da, library_size_correlation = library_size_correlation,
                                      spike_in = use_ALR)
   # we've got to make sure there's non-zero variation in all genes in each condition
   # usually this fails to be true if one gene is 100% unobserved in one condition and minimally present in the other
@@ -481,7 +482,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = 1, size_fact
     data_obj <- save_obj
     data_obj$p <- p
     data_obj$proportion_da <- proportion_da
-    data_obj$size_factor_correlation <- size_factor_correlation
+    data_obj$library_size_correlation <- library_size_correlation
     new_filename <- paste0(UUIDgenerate(), ".rds")
     # saveRDS(data_obj, file.path("simulated_data", new_filename))
     save_path <- file.path("simulated_analyses", new_filename)
@@ -514,7 +515,7 @@ sweep_simulations <- function(p, n, k = 1, de_sweep = seq(from = 0.1, to = 0.9, 
       out_str <- paste0("w/ ",p," genes, DA proportion = ",round(de_prop, 2),", and size factor correlation = ",round(sf_corr, 2),"\n")
       cat("Single-cell RNA-seq",out_str)
       run_RNAseq_evaluation_instance(p, n, proportion_da = de_prop, k = k,
-                                     size_factor_correlation = sf_corr,
+                                     library_size_correlation = sf_corr,
                                      alpha = 0.05, use_ALR = use_ALR, filter_abundance = filter_abundance,
                                      methods = methods)
     }

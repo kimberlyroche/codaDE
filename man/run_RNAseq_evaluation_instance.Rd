@@ -10,7 +10,7 @@ run_RNAseq_evaluation_instance(
   n,
   proportion_da,
   k = 1,
-  size_factor_correlation = 0,
+  library_size_correlation = 0,
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 1,
@@ -22,7 +22,7 @@ run_RNAseq_evaluation_instance(
   n,
   proportion_da,
   k = 1,
-  size_factor_correlation = 0,
+  library_size_correlation = 0,
   alpha = 0.05,
   use_ALR = FALSE,
   filter_abundance = 1,
@@ -38,7 +38,7 @@ run_RNAseq_evaluation_instance(
 
 \item{k}{number of cell types to simulate}
 
-\item{size_factor_correlation}{correlation of observed abundances to original total abundances}
+\item{library_size_correlation}{correlation of observed abundances to original total abundances}
 
 \item{alpha}{significant level below which to call a feature differentially abundant}
 
@@ -50,6 +50,8 @@ run_RNAseq_evaluation_instance(
 \item{methods}{vector of differential abundance testing methods to use; options are "NB", "GLM", "edgeR"}
 
 \item{run_label}{human-readable string identifier for this simulation run}
+
+\item{size_factor_correlation}{correlation of observed abundances to original total abundances}
 
 \item{output_file}{output file to append to}
 

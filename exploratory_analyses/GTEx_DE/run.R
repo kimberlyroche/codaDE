@@ -18,13 +18,31 @@ slugify <- function(x, alphanum_replace="", space_replace="_", tolower=TRUE) {
   return(x)
 }
 
-GTEx <- readRDS("/data/mukherjeelab/roche/codaDE/data/GTEx_data/parsed_GTEx.rds")
-GTEx_annot <- read.table("/data/mukherjeelab/roche/codaDE/data/GTEx_data/GTEx_annotations.txt",
-  header = TRUE, sep = "\t")
+# GTEx <- readRDS("/data/mukherjeelab/roche/codaDE/data/GTEx_data/parsed_GTEx.rds")
+# GTEx_annot <- read.table("/data/mukherjeelab/roche/codaDE/data/GTEx_data/GTEx_annotations.txt",
+#                          header = TRUE, sep = "\t")
+GTEx <- readRDS("data/GTEx_data/parsed_GTEx.rds")
+GTEx_annot <- read.table("data/GTEx_data/GTEx_annotations.txt",
+                         header = TRUE, sep = "\t")
 samples_by_tissue <- list()
 for(tissue in unique(GTEx_annot$SMTSD)) {
   samples_by_tissue[[tissue]] <- GTEx_annot$SAMPID[GTEx_annot$SMTSD == tissue]
 }
+
+# Are there differences in total abundance across tissues here?
+# tissues <- names(samples_by_tissue)
+# totals <- list()
+# for(tissue in tissues) {
+#   t_idx <- which(colnames(GTEx) %in% samples_by_tissue[[tissue]])
+#   X <- GTEx[,t_idx]
+#   X_totals <- unname(colSums(X))
+#   totals[[tissue]] <- mean(X_totals)
+# }
+# 
+# df <- data.frame(total = unname(unlist(totals)), tissue = names(totals))
+# head(df)
+# ggplot(df, aes(x = as.factor(tissue), y = total)) +
+#   geom_point()
 
 within_tissue <- FALSE
 if(within_tissue) {
