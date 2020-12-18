@@ -28,7 +28,7 @@ if(length(args) < 1) {
 }
 
 tissue_idx <- as.numeric(args[1])
-testing <- TRUE
+testing <- FALSE
 
 # Pull GTEx data
 GTEx <- readRDS("/data/mukherjeelab/roche/codaDE/data/GTEx_data/parsed_GTEx.rds")

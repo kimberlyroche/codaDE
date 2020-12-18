@@ -1,5 +1,4 @@
 # This file uses the GTEx data set to build pull an empirical sample of differences in CPM means between conditions (tissue types).
-# Output of this is ___.
 
 library(driver)
 library(tidyverse)
@@ -24,7 +23,7 @@ est_mu_size <- function(x) {
   }
 }
 
-testing <- TRUE
+testing <- FALSE
 
 # Pull GTEx data
 GTEx <- readRDS("/data/mukherjeelab/roche/codaDE/data/GTEx_data/parsed_GTEx.rds")
@@ -139,4 +138,3 @@ for(j in 1:n_genes) {
 rownames(empirical_mu_size) <- gene_ids[1:n_genes]
 
 saveRDS(empirical_mu_size, file = paste0("empirical_mu_size_pairs_",tissue_idx[1],"_",tissue_idx[2],".rds"))
-

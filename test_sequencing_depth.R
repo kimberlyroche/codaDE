@@ -2,7 +2,6 @@ library(codaDE)
 library(edgeR)
 
 # TBD
-
 args <- commandArgs(trailingOnly = TRUE)
 if(length(args) < 2) {
   stop("Missing arguments!")
