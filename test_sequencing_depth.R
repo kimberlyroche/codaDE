@@ -1,10 +1,16 @@
 library(codaDE)
 library(edgeR)
 
+args <- commandArgs(trailingOnly = TRUE)
+if(length(args) < 2) {
+  stop("Missing arguments!")
+}
+sequencing_depth <- as.numeric(args[1])
+prop_DE <- as.numeric(args[2])
+
 p <- 20000
-sequencing_depth <- 10000
 sim <- simulate_singlecell_RNAseq(p = p, n = 500, k = 1, sequencing_depth = sequencing_depth,
-                                  proportion_da = 0.6, size_factor_correlation = 0, spike_in = FALSE,
+                                  proportion_da = prop_DE, size_factor_correlation = 0, spike_in = FALSE,
                                   possible_fold_changes = NULL)
 
 # Stringent filtering: keep things that are non-zero in at least 10% of samples
@@ -25,7 +31,7 @@ dgList <- estimateTagwiseDisp(dgList, trend = "none")
 
 et <- exactTest(dgList)
 de <- decideTestsDGE(et, adjust.method = "BH", p.value = 0.01, lfc = log(2))
-summary(de)
+# summary(de)
 cat("Proportion DE genes:", round(sum(de != 0)/length(de), 2), "\n")
 
 # Of the genes that were simulated as DE, which did we catch?
