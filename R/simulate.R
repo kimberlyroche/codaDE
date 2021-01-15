@@ -73,16 +73,23 @@ resample_counts <- function(theta, groups, library_size_correlation, spike_in = 
 simulate_singlecell_RNAseq <- function(n = 500, k = 1, sequencing_depth = 1e5, proportion_da = 0.1, library_size_correlation = 0,
                                        spike_in = FALSE, possible_fold_changes = NULL) {
   # We'll sample out of GTEx protein-coding gene estimates
-  GTEx_estimates_baseline <- readRDS("data/empirical_mu_size.rds")
+  # GTEx_estimates_baseline <- readRDS("data/empirical_mu_size.rds")
+  
   GTEx_estimates_pairs <- readRDS("data/empirical_mu_size_pairs.rds")
-
+  # Change zero-mean to 1, still rare
+  GTEx_estimates_pairs[GTEx_estimates_pairs[,1] == 0,1] <- min(GTEx_estimates_pairs[GTEx_estimates_pairs[,1] > 0,1])
+  GTEx_estimates_pairs[GTEx_estimates_pairs[,3] == 0,3] <- min(GTEx_estimates_pairs[GTEx_estimates_pairs[,3] > 0,3])
+  # Fix unestimable (very low) dispersions
+  GTEx_estimates_pairs[is.na(GTEx_estimates_pairs[,2]),2] <- 100
+  GTEx_estimates_pairs[is.na(GTEx_estimates_pairs[,4]),4] <- 100
+  
   p <- 20000
   n_da <- round(p * proportion_da)
   n_not_da <- p - n_da
   if(!is.null(possible_fold_changes)) {
     da_assignment <- as.logical(rbinom(p, size = 1, prob = proportion_da))
     # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
-    all_params <- unname(GTEx_estimates_baseline[sample(1:nrow(GTEx_estimates_baseline), size = p, replace = TRUE),])
+    all_params <- unname(GTEx_estimates_pairs[sample(1:nrow(GTEx_estimates_pairs), size = p, replace = TRUE),])
     all_params <- cbind(all_params, all_params) # before-after are identical but...
     da_factors <- sample(c(1/possible_fold_changes, possible_fold_changes), size = p, replace = TRUE)
     for(pp in 1:p) {
@@ -94,16 +101,19 @@ simulate_singlecell_RNAseq <- function(n = 500, k = 1, sequencing_depth = 1e5, p
   } else {
     da_assignment <- c(rep(FALSE, n_not_da), rep(TRUE, n_da))
     # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
-    non_da_params <- unname(GTEx_estimates_baseline[sample(1:nrow(GTEx_estimates_baseline), size = n_not_da, replace = TRUE),])
+    non_da_params <- unname(GTEx_estimates_pairs[sample(1:nrow(GTEx_estimates_pairs), size = n_not_da, replace = TRUE),1:2])
     non_da_params <- cbind(non_da_params, non_da_params) # before-after are identical
-    # Randomly draw in a similar way for the differential set 
-    da_params <- unname(GTEx_estimates_pairs[sample(1:nrow(GTEx_estimates_pairs), size = n_da, replace = TRUE),])
+    # Randomly draw in a similar way for the differential set
+    # Require a fold change in means that's < 1/2 or > 2
+    ratio_means <- GTEx_estimates_pairs[,3] / GTEx_estimates_pairs[,1]
+    thresholded_genes <- which(ratio_means <= 0.5 | ratio_means >= 2)
+    da_params <- unname(GTEx_estimates_pairs[sample(thresholded_genes, size = n_da, replace = TRUE),])
     all_params <- rbind(non_da_params, da_params)
   }
   
   # Clean up NAs
-  all_params[is.na(all_params[,2]),2] <- 1
-  all_params[is.na(all_params[,4]),4] <- 1
+  # all_params[is.na(all_params[,2]),2] <- 1
+  # all_params[is.na(all_params[,4]),4] <- 1
   
   # Assign control vs. treatment groups
   groups <- c(rep(0, n), rep(1, n))

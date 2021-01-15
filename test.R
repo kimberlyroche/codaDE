@@ -28,8 +28,10 @@ n <- 250
 prop_da <- 0.6
 k <- 1
 
-# data <- simulate_singlecell_RNAseq(n = n, k = k, proportion_da = prop_da, library_size_correlation = 0, possible_fold_changes = NULL)
-data <- simulate_singlecell_RNAseq(n = n, k = k, proportion_da = prop_da, library_size_correlation = 0, possible_fold_changes = c(2,4,6,8))
+# Simulate from a fixed fold change library
+# data <- simulate_singlecell_RNAseq(n = n, k = k, proportion_da = prop_da, library_size_correlation = 0, possible_fold_changes = c(2,4,6,8))
+# Simulate from empirical data (w/ cutoff)
+data <- simulate_singlecell_RNAseq(n = n, k = k, proportion_da = prop_da, library_size_correlation = 0)
 
 avg_expr <- colMeans(data$abundances[1:n,data$da_assignment])
 large_mean_idx <- data$da_assignment[sample(which(avg_expr > 2000), size = 1)]
