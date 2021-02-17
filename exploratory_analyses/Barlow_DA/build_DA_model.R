@@ -3,6 +3,8 @@
 library(MASS)
 library(ggplot2)
 
+rm(list = ls())
+
 # Copied from build_DE_model_1.R
 
 fit_nb_model <- function(x) {
@@ -91,7 +93,9 @@ for(i in 1:ncol(counts)) {
   empirical_mu_size[i,3:4] <- p2
 }
 
-empirical_mu_size
+head(empirical_mu_size)
+
+saveRDS(empirical_mu_size, "data/empirical_mu_size_pairs_16S.rds")
 
 # Estimate the delta total counts between conditions
 

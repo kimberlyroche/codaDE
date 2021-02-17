@@ -56,7 +56,9 @@ resample_counts <- function(theta, groups, library_size_correlation, spike_in = 
 #' Simulate UMI count single-cell RNA-seq data
 #'
 #' @param n number of samples per group
+#' @param p number of features (i.e. genes or bacterial taxa)
 #' @param k number of distinct cell types
+#' @param ref_data specifies the reference data set to use ("barlow", "morton", "athanasidou_yeast", "athanasiadou_ciona")
 #' @param sequencing_depth average total nUMI to simulate
 #' @param proportion_da proportion of differentially abundant genes
 #' @param library_size_correlation correlation of observed abundances to original total abundances (see details)
@@ -70,27 +72,77 @@ resample_counts <- function(theta, groups, library_size_correlation, spike_in = 
 #' with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
 #' @import LaplacesDemon
 #' @export
-simulate_singlecell_RNAseq <- function(n = 500, k = 1, sequencing_depth = 1e5, proportion_da = 0.1, library_size_correlation = 0,
-                                       spike_in = FALSE, possible_fold_changes = NULL) {
+simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "athanasidou_yeast", sequencing_depth = 1e5,
+                                     proportion_da = 0.1, library_size_correlation = 0, spike_in = FALSE, possible_fold_changes = NULL) {
+
   # We'll sample out of GTEx protein-coding gene estimates
   # GTEx_estimates_baseline <- readRDS("data/empirical_mu_size.rds")
+  #
+  # if(microbial) {
+  #   estimate_pairs <- readRDS("data/empirical_mu_size_pairs_16S.rds")
+  #   estimate_pairs <- cbind(estimate_pairs[,3:4], estimate_pairs[,1:2])
+  #   k <- 1
+  #   p <- 1000 # SV count
+  # } else {
+  #   estimate_pairs <- readRDS("data/empirical_mu_size_pairs.rds")
+  #   p <- 20000 # gene count
+  # }
+  # # Change zero-mean to 1, still rare
+  # estimate_pairs[estimate_pairs[,1] == 0,1] <- min(estimate_pairs[estimate_pairs[,1] > 0,1])
+  # estimate_pairs[estimate_pairs[,3] == 0,3] <- min(estimate_pairs[estimate_pairs[,3] > 0,3])
+  # # Fix unestimable (very low) dispersions
+  # estimate_pairs[is.na(estimate_pairs[,2]),2] <- 100
+  # estimate_pairs[is.na(estimate_pairs[,4]),4] <- 100
+  # 
+  # n_da <- round(p * proportion_da)
+  # n_not_da <- p - n_da
+  # if(!is.null(possible_fold_changes)) {
+  #   da_assignment <- as.logical(rbinom(p, size = 1, prob = proportion_da))
+  #   # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
+  #   all_params <- unname(estimate_pairs[sample(1:nrow(estimate_pairs), size = p, replace = TRUE),])
+  #   all_params <- cbind(all_params, all_params) # before-after are identical but...
+  #   da_factors <- sample(c(1/possible_fold_changes, possible_fold_changes), size = p, replace = TRUE)
+  #   for(pp in 1:p) {
+  #     if(da_assignment[pp]) {
+  #       all_params[pp,3] <- all_params[pp,3]*da_factors[pp]
+  #       # Dispersion unchanged
+  #     }
+  #   }
+  # } else {
+  #   da_assignment <- c(rep(FALSE, n_not_da), rep(TRUE, n_da))
+  #   # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
+  #   non_da_params <- unname(estimate_pairs[sample(1:nrow(estimate_pairs), size = n_not_da, replace = TRUE),1:2])
+  #   non_da_params <- cbind(non_da_params, non_da_params) # before-after are identical
+  #   # Randomly draw in a similar way for the differential set
+  #   # Require a fold change in means that's < 1/2 or > 2
+  #   ratio_means <- estimate_pairs[,3] / estimate_pairs[,1]
+  #   thresholded_genes <- which(ratio_means <= 0.5 | ratio_means >= 2)
+  #   da_params <- unname(estimate_pairs[sample(thresholded_genes, size = n_da, replace = TRUE),])
+  #   all_params <- rbind(non_da_params, da_params)
+  # }
+  #
+  # Clean up NAs
+  # all_params[is.na(all_params[,2]),2] <- 1
+  # all_params[is.na(all_params[,4]),4] <- 1
   
-  GTEx_estimates_pairs <- readRDS("data/empirical_mu_size_pairs.rds")
-  # Change zero-mean to 1, still rare
-  GTEx_estimates_pairs[GTEx_estimates_pairs[,1] == 0,1] <- min(GTEx_estimates_pairs[GTEx_estimates_pairs[,1] > 0,1])
-  GTEx_estimates_pairs[GTEx_estimates_pairs[,3] == 0,3] <- min(GTEx_estimates_pairs[GTEx_estimates_pairs[,3] > 0,3])
-  # Fix unestimable (very low) dispersions
-  GTEx_estimates_pairs[is.na(GTEx_estimates_pairs[,2]),2] <- 100
-  GTEx_estimates_pairs[is.na(GTEx_estimates_pairs[,4]),4] <- 100
+  data_obj <- readRDS(paste0("empirical_distro_",ref_data,".rds"))
+  counts <- data_obj$counts
+  baseline_distribution <- data_obj$baseline_distribution
+  differential_distribution <- data_obj$differential_distribution
   
-  p <- 20000
   n_da <- round(p * proportion_da)
   n_not_da <- p - n_da
+
+  sampled_features <- sample(1:nrow(baseline_distribution), size = p, replace = TRUE)
+  all_params <- matrix(NA, p, 2)
+  for(i in 1:length(sampled_features)) {
+    all_params[i,] <- unname(baseline_distribution[sampled_features[i],])
+  }
+  all_params <- cbind(all_params, all_params) # before-after are identical but...
+  
   if(!is.null(possible_fold_changes)) {
     da_assignment <- as.logical(rbinom(p, size = 1, prob = proportion_da))
     # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
-    all_params <- unname(GTEx_estimates_pairs[sample(1:nrow(GTEx_estimates_pairs), size = p, replace = TRUE),])
-    all_params <- cbind(all_params, all_params) # before-after are identical but...
     da_factors <- sample(c(1/possible_fold_changes, possible_fold_changes), size = p, replace = TRUE)
     for(pp in 1:p) {
       if(da_assignment[pp]) {
@@ -99,24 +151,42 @@ simulate_singlecell_RNAseq <- function(n = 500, k = 1, sequencing_depth = 1e5, p
       }
     }
   } else {
-    da_assignment <- c(rep(FALSE, n_not_da), rep(TRUE, n_da))
-    # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
-    non_da_params <- unname(GTEx_estimates_pairs[sample(1:nrow(GTEx_estimates_pairs), size = n_not_da, replace = TRUE),1:2])
-    non_da_params <- cbind(non_da_params, non_da_params) # before-after are identical
-    # Randomly draw in a similar way for the differential set
-    # Require a fold change in means that's < 1/2 or > 2
-    ratio_means <- GTEx_estimates_pairs[,3] / GTEx_estimates_pairs[,1]
-    thresholded_genes <- which(ratio_means <= 0.5 | ratio_means >= 2)
-    da_params <- unname(GTEx_estimates_pairs[sample(thresholded_genes, size = n_da, replace = TRUE),])
-    all_params <- rbind(non_da_params, da_params)
+    differential_baselines <- data_obj$differential_distribution[,1]
+    breaks <- quantile(differential_baselines, probs = seq(from = 0, to = 1, length.out = 5))
+    # Fix for R's cut function being kind of shitty
+    breaks[[1]] <- -Inf
+    breaks[[length(breaks)]] <- Inf
+    
+    da_sample <- sample(1:nrow(all_params), size = n_da)
+    da_assignment <- logical(p)
+    da_assignment[da_sample] <- TRUE
+    
+    for(baseline_idx in da_sample) {
+      baseline_mu <- all_params[baseline_idx,1]
+      baseline_size <- all_params[baseline_idx,2]
+      
+      binned_expression <- cut(c(baseline_mu, differential_baselines), breaks = breaks)
+      baseline_mu_binned <- binned_expression[1]
+      binned_expression <- binned_expression[2:length(binned_expression)]
+      similar_mus <- which(baseline_mu_binned == binned_expression)
+      
+      differential_idx <- sample(similar_mus, size = 1)
+      differential_mu <- differential_distribution[differential_idx,3]
+      differential_size <- differential_distribution[differential_idx,4]
+      
+      all_params[baseline_idx,3:4] <- c(differential_mu, differential_size)
+      
+      # Visually validate a "difference"
+      # expr1 <- rnbinom(100, mu = baseline_mu, size = baseline_size)
+      # expr2 <- rnbinom(100, mu = differential_mu, size = differential_size)
+      # plot(c(expr1, expr2))
+    }
   }
-  
-  # Clean up NAs
-  # all_params[is.na(all_params[,2]),2] <- 1
-  # all_params[is.na(all_params[,4]),4] <- 1
   
   # Assign control vs. treatment groups
   groups <- c(rep(0, n), rep(1, n))
+  # groups <- as.factor(da_assignment)
+  # levels(groups) <- c(0, 1)
   
   # Sample true counts (format: samples [rows] x genes [columns])
   abundances <- sapply(1:p, function(j) {
@@ -455,7 +525,7 @@ evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 
 run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = 1, library_size_correlation = 0,
                                            alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
                                            methods = c("NB", "edgeR")) {
-  data <- simulate_singlecell_RNAseq(p = p, n = n, k = k, proportion_da = proportion_da, library_size_correlation = library_size_correlation,
+  data <- simulate_sequence_counts(p = p, n = n, k = k, proportion_da = proportion_da, library_size_correlation = library_size_correlation,
                                      spike_in = use_ALR)
   # we've got to make sure there's non-zero variation in all genes in each condition
   # usually this fails to be true if one gene is 100% unobserved in one condition and minimally present in the other

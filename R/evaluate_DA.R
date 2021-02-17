@@ -198,7 +198,7 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = N
     data <- simulate_bulk_RNAseq(p = p, n = n, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
                                  spike_in = use_ALR)
   } else {
-    data <- simulate_singlecell_RNAseq(p = p, n = n, k = k, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
+    data <- simulate_sequence_counts(p = p, n = n, k = k, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
                                        spike_in = use_ALR)
   }
   # we've got to make sure there's non-zero variation in all genes in each condition
