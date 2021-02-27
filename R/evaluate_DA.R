@@ -1,21 +1,16 @@
-
 #' Fit negative binomial model to null and full models and evaluate differential abundance for a focal gene
 #'
 #' @param data simulated data set
 #' @param feature_idx index of gene to test for differential abundance
 #' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
-#' @param rarefy_depth if non-zero, specifies the depth at which to resample the counts
 #' @return p-value from NB GLM fit with MASS::glm.nb associated with group coefficient
 #' @import MASS
 #' @export
-call_DA <- function(data, feature_idx, call_abundances = TRUE, rarefy_depth = 0) {
+call_DA_NB <- function(data, feature_idx, call_abundances = TRUE) {
   if(call_abundances) {
     gene_data <- data.frame(counts = data$abundances[,feature_idx], groups = data$groups)
   } else {
     gene_data <- data.frame(counts = data$observed_counts[,feature_idx], groups = data$groups)
-  }
-  if(rarefy_depth > 0) {
-    gene_data$counts <- round(gene_data$counts * (rarefy_depth / sum(gene_data$counts)))
   }
   fit <- tryCatch({
     glm.nb(counts ~ groups, data = gene_data)
@@ -64,61 +59,68 @@ call_DA_LM <- function(data, feature_idx, call_abundances = TRUE) {
   return(pval)
 }
 
-#' #' Fit log linear model to null and full models and evaluate differential abundance for a focal gene
-#' #' This requires a null distribution to have been constructed previously
-#' #' 
-#' #' @param data simulated data set
-#' #' @param use_abundances if TRUE, use abundances to calculate null distro; if FALSE, use observed counts
-#' #' @param n_permutations number of times to permute the full data set
-#' #' @return p-value associated with group coefficient
-#' #' @export
-#' generate_null_distribution <- function(data, use_abundances = TRUE, n_permutations = 10) {
-#'   null_distribution <- c()
-#'   for(p in 1:n_permutations) {
-#'     n_samples <- length(data$groups)
-#'     groups <- rbinom(n_samples, size = 1, prob = rep(0.5, n_samples))
-#'     obs_rsq_vector <- sapply(1:ncol(data$abundances), function(z) {
-#'       call_DA_LM_sub(data, z, call_abundances = use_abundances)
-#'     })
-#'     null_distribution <- c(null_distribution, obs_rsq_vector)
-#'   }
-#'   null_distribution <- null_distribution[order(null_distribution)]
-#'   return(null_distribution)
-#' }
-
-#' #' Fit log linear model to null and full models and evaluate differential abundance for a focal gene
-#' #' 
-#' #' @param data simulated data set
-#' #' @param feature_idx index of gene to test for differential abundance
-#' #' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
-#' #' @return p-value associated with group coefficient
-#' #' @export
-#' call_DA_LM_sub <- function(data, feature_idx, call_abundances = TRUE) {
-#'   if(call_abundances) {
-#'     gene_data <- data.frame(log_counts = log(data$abundances[,feature_idx] + 0.5), groups = data$groups)
-#'   } else {
-#'     gene_data <- data.frame(log_counts = log(data$observed_counts[,feature_idx] + 0.5), groups = data$groups)
-#'   }
-#'   fit <- lm(log_counts ~ groups, data = gene_data)
-#'   obs_rsq <- summary(fit)$adj.r.squared
-#'   return(obs_rsq)
-#' }
-
-#' #' Fit log linear model to null and full models and evaluate differential abundance for a focal gene;
-#' #' this requires a null distribution to have been constructed previously such that p-values can be
-#' #' simulated
-#' #' 
-#' #' @param data simulated data set
-#' #' @param feature_idx index of gene to test for differential abundance
-#' #' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
-#' #' @param null_distribution simulated null distribution of R-squared values
-#' #' @return p-value associated with group coefficient
-#' #' @export
-#' call_DA_LM <- function(data, feature_idx, call_abundances = TRUE, null_distribution) {
-#'   obs_rsq <- call_DA_LM_sub(data, feature_idx, call_abundances)
-#'   pval <- sum(null_distribution > obs_rsq)/length(null_distribution)
-#'   return(pval)
-#' }
+#' Evaluate differential abundance with edgeR
+#' This evaluates expression on all features of the count matrix together
+#'
+#' @param data simulated data set
+#' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
+#' @param normalization_method if NULL, uses library size normalization; other options include "TMM" and "scran"
+#' @return p-value associated with group coefficient
+#' @import edgeR
+#' @import SingleCellExperiment
+#' @import scran
+#' @export
+call_DA_edgeR <- function(data, call_abundances = TRUE, normalization_method = NULL) {
+  # DGEList expects samples as columns
+  if(!is.null(normalization_method)) {
+    if(normalization_method == "TMM") {
+      if(call_abundances) {
+        dge_obj <- DGEList(counts = t(data$abundances), group = factor(data$groups))
+      } else {
+        dge_obj <- DGEList(counts = t(data$observed_counts), group = factor(data$groups))
+      }
+      dge_obj <- calcNormFactors(dge_obj, method = "TMM")
+    } else if(normalization_method == "scran") {
+      # First, get the data into a SingleCellExperiment (Bioconductor) object
+      if(call_abundances) {
+        y <- t(data$abundances)
+      } else {
+        y <- t(data$observed_counts)
+      }
+      # These labels may not be strictly necessary but it's probably not bad form
+      rownames(y) <- paste0("gene_", 1:nrow(y))
+      y <- as.matrix(y)
+      cell_metadata <- data.frame(condition = data$groups)
+      rownames(cell_metadata) <- paste0("cell_", 1:ncol(y))
+      sce <- SingleCellExperiment(assays = list(counts = y),
+                                  colData = cell_metadata)
+      clust.sce <- quickCluster(sce)
+      sce <- suppressWarnings(scran::computeSumFactors(sce, cluster = clust.sce))
+      dge_obj <- convertTo(sce, type = "edgeR")
+    } else {
+      stop("Unknown normalization method!")
+    }
+  } else {
+    if(call_abundances) {
+      dge_obj <- DGEList(counts = t(data$abundances), group = factor(data$groups))
+    } else {
+      dge_obj <- DGEList(counts = t(data$observed_counts), group = factor(data$groups))
+    }
+    dge_obj <- calcNormFactors(dge_obj, method = "none") # library size normalization-only
+  }
+  design <- model.matrix(~ data$groups)
+  dge_obj <- estimateDisp(dge_obj, design)
+  # LRT recommended for single-cell data
+  fit <- glmFit(dge_obj, design)
+  lrt <- glmLRT(fit, coef = 2)
+  # alternatively: is.de <- decideTestsDGE(lrt)
+  pval <- lrt@.Data[[14]]$PValue
+  # quasi-likelihood recommended for bulk RNA-seq (different dispersion estimation procedure)
+  # fit <- glmQLFit(dge_obj, design)
+  # lrt <- glmQLFTest(fit, coef=2)
+  # pval <- lrt@.Data[[17]]$PValue
+  return(pval)
+}
 
 #' Get additive logratios from the data set
 #'
@@ -156,18 +158,110 @@ call_DA_CODA <- function(logratios, feature_idx, groups) {
   return(pval)
 }
 
-#' Write simulation result to a file
+#' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
+#' differential abundance calls and write these to an output file
 #'
-#' @param out_str string to write to file
-#' @param out_file log file path and name
+#' @param data simulated data set
+#' @param alpha significant level below which to call a feature differentially abundant
+#' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
+#' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
+#' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
+#' @param method differential abundance testing method to use; options are "NB", "GLM", "edgeR", "edgeR_TMM", "edgeR_scran"
+#' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
-#' @import filelock
+#' @import edgeR
 #' @export
-record_result <- function(out_str, out_file) {
-  lock_file <- paste0(out_file, ".lck")
-  lck <- lock(lock_file, timeout = Inf)
-  write(out_str, file = out_file, append = TRUE)
-  unlock(lck)
+evaluate_DA <- function(data, alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, method = "edgeR") {
+  # calculate and compare differential abundance calls
+  cat("Evaluating differential abundance...\n")
+  evaluate_features <- apply(data$observed_counts, 2, function(x) mean(x) > filter_abundance)
+  p <- ncol(data$abundances)
+  # Use intended DE as a baseline...
+  calls.abundances <- rep(FALSE, p)
+  calls.abundances[data$da_genes] <- TRUE
+  calls.observed_counts <- rep(FALSE, p)
+  
+  if(use_ALR) {
+    # this setup is currently only possible with NB DA calling
+    logratios.abundances <- get_logratios(data, call_abundances = TRUE)
+    logratios.observed_counts <- get_logratios(data, call_abundances = FALSE)
+    for(i in 1:p) {
+      if(evaluate_features[i]) {
+        # pval.abundances <- call_DA_CODA(logratios.abundances, i, data$groups)
+        pval.observed_counts <- call_DA_CODA(logratios.observed_counts, i, data$groups)
+        #if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+        if(!is.na(pval.observed_counts)) {
+          # calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
+          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/length(evaluate_features))
+        }
+      }
+    }
+  } else {
+    if(method %in% c("edgeR", "edgeR_TMM", "edgeR_scran")) {
+      # Note: This inherently looks for DE over relative abundances!
+      # pval.abundances <- call_DA_edgeR(data, call_abundances = TRUE)
+      # calls.abundances <- pval.abundances <= alpha/length(evaluate_features)
+      if(method == "edgeR_TMM") {
+        pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE, normalization_method = "TMM")
+      } else if(method == "edgeR_scran") {
+        pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE, normalization_method = "scran")
+      } else {
+        pval.observed_counts <- call_DA_edgeR(data, call_abundances = FALSE)
+      }
+      calls.observed_counts <- pval.observed_counts <= alpha/length(evaluate_features)
+    } else {
+      for(i in 1:p) {
+        if(i %% 100 == 0) {
+          cat("Evaluating DA on feature:",i,"\n")
+        }
+        if(evaluate_features[i]) {
+          if(method == "NB") {
+            # pval.abundances <- call_DA_NB(data, i, call_abundances = TRUE)
+            pval.observed_counts <- call_DA_NB(data, i, call_abundances = FALSE)
+          } else if(method == "GLM") {
+            # pval.abundances <- call_DA_LM(data, i, call_abundances = TRUE)
+            pval.observed_counts <- call_DA_LM(data, i, call_abundances = FALSE)
+          } else {
+            stop("Unknown differential abundance calling method!")
+          }
+          #if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
+          if(!is.na(pval.observed_counts)) {
+            # calls.abundances <- c(calls.abundances, pval.abundances <= alpha/length(evaluate_features))
+            # calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/length(evaluate_features))
+            calls.observed_counts[i] <- pval.observed_counts <= alpha/length(evaluate_features)
+          }
+        }
+      }
+    }
+  }
+  
+  FN <- sum(calls.abundances == TRUE & calls.observed_counts == FALSE)
+  FP <- sum(calls.abundances == FALSE & calls.observed_counts == TRUE)
+  TN <- sum(calls.abundances == FALSE & calls.observed_counts == FALSE)
+  TP <- sum(calls.abundances == TRUE & calls.observed_counts == TRUE)
+  quantity_evaluated <- "counts"
+  if(use_ALR) {
+    quantity_evaluated <- "logratios"
+  }
+  
+  library_size.abundances = rowSums(data$abundances)
+  library_size.observed_counts = rowSums(data$observed_counts)
+  
+  return(list(FN = FN,
+              FP = FP,
+              TN = TN,
+              TP = TP,
+              TPR = TP / (TP + FN),
+              FPR = FP / (FP + TN),
+              quantity_evaluated = quantity_evaluated,
+              method = method,
+              filter_abundance = filter_abundance,
+              no_features_above_threshold = sum(evaluate_features),
+              no_features_detectable = sum(calls.abundances == TRUE),
+              calls.abundances = calls.abundances,
+              calls.observed_counts = calls.observed_counts,
+              library_size.abundances = library_size.abundances,
+              library_size.observed_counts = library_size.observed_counts))
 }
 
 #' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate error in
@@ -176,31 +270,23 @@ record_result <- function(out_str, out_file) {
 #' @param p number of genes
 #' @param n number of samples per group
 #' @param proportion_da proportion of differentially abundant genes
-#' @param run_label human-readable string identifier for this simulation run
-#' @param k number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated
-#' @param size_factor_correlation correlation of observed abundances to original total abundances
-#' @param output_file output file to append to
+#' @param k number of cell types to simulate
+#' @param library_size_correlation correlation of observed abundances to original total abundances
 #' @param alpha significant level below which to call a feature differentially abundant
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
-#' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
-#' permutation test
-#' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
+#' @param methods vector of differential abundance testing methods to use; options are "NB", "GLM", "edgeR"
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
+#' @import entropy
+#' @import uuid
 #' @export
-run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = NULL, size_factor_correlation = 0,
-                                           output_file = "results.txt", alpha = 0.05, use_ALR = FALSE,
-                                           filter_abundance = 1, call_DA_by_NB = TRUE, rarefy = FALSE) {
-  cat("Simulating data...\n")
-  if(is.null(k)) {
-    data <- simulate_bulk_RNAseq(p = p, n = n, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
-                                 spike_in = use_ALR)
-  } else {
-    data <- simulate_sequence_counts(p = p, n = n, k = k, proportion_da = proportion_da, size_factor_correlation = size_factor_correlation,
-                                       spike_in = use_ALR)
-  }
+run_RNAseq_evaluation_instance <- function(p, n, proportion_da, k = 1, library_size_correlation = 0,
+                                           alpha = 0.05, use_ALR = FALSE, filter_abundance = 1,
+                                           methods = c("NB", "edgeR")) {
+  data <- simulate_sequence_counts(p = p, n = n, k = k, proportion_da = proportion_da, library_size_correlation = library_size_correlation,
+                                     spike_in = use_ALR)
   # we've got to make sure there's non-zero variation in all genes in each condition
   # usually this fails to be true if one gene is 100% unobserved in one condition and minimally present in the other
   # as a small workaround, if we find any genes will fully no expression in a given condition, we'll drop in a
@@ -231,91 +317,18 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = N
     data$observed_counts[sample(which(data$groups == 0))[1],d] <- 1
   }
   
-  if(rarefy) {
-    rarefy_total <- min(apply(data$observed_counts, 1, sum))
-  } else {
-    rarefy_total <- 0
+  for(method in methods) {
+    save_obj <- evaluate_DA(data, alpha = alpha, use_ALR = use_ALR, filter_abundance = filter_abundance, method = method)
+    data_obj <- save_obj
+    data_obj$p <- p
+    data_obj$proportion_da <- proportion_da
+    data_obj$library_size_correlation <- library_size_correlation
+    new_filename <- paste0(UUIDgenerate(), ".rds")
+    # saveRDS(data_obj, file.path("simulated_data", new_filename))
+    save_path <- file.path("simulated_analyses", new_filename)
+    cat("Saving to",save_path,"\n")
+    saveRDS(data_obj, save_path)
   }
-  
-  # calculate and compare differential abundance calls
-  cat("Evaluating differential abundance...\n")
-  calls.abundances <- c()
-  calls.observed_counts <- c()
-  
-  evaluate_features <- apply(data$observed_counts, 2, function(x) mean(x) > filter_abundance)
-  
-  if(use_ALR) {
-    # this setup is currently only possible with NB DA calling
-    logratios.abundances <- get_logratios(data, call_abundances = TRUE)
-    logratios.observed_counts <- get_logratios(data, call_abundances = FALSE)
-    for(i in 1:p) {
-      if(evaluate_features[i]) {
-        pval.abundances <- call_DA_CODA(logratios.abundances, i, data$groups)
-        pval.observed_counts <- call_DA_CODA(logratios.observed_counts, i, data$groups)
-        if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-          calls.abundances <- c(calls.abundances, pval.abundances <= alpha/p)
-          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/p)
-        }
-      }
-    }
-  } else {
-    for(i in 1:p) {
-      if(i %% 100 == 0) {
-        cat("Evaluating DA on feature:",i,"\n")
-      }
-      if(evaluate_features[i]) {
-        if(call_DA_by_NB) {
-          pval.abundances <- call_DA(data, i, call_abundances = TRUE, rarefy = rarefy_total)
-          pval.observed_counts <- call_DA(data, i, call_abundances = FALSE, rarefy = rarefy_total)
-        } else {
-          pval.abundances <- call_DA_LM(data, i, call_abundances = TRUE)
-          pval.observed_counts <- call_DA_LM(data, i, call_abundances = FALSE)
-        }
-        if(!is.na(pval.abundances) & !is.na(pval.observed_counts)) {
-          calls.abundances <- c(calls.abundances, pval.abundances <= alpha/p)
-          calls.observed_counts <- c(calls.observed_counts, pval.observed_counts <= alpha/p)
-        }
-      }
-    }
-  }
-  
-  FN <- sum(calls.abundances == TRUE & calls.observed_counts == FALSE)
-  FP <- sum(calls.abundances == FALSE & calls.observed_counts == TRUE)
-  TN <- sum(calls.abundances == FALSE & calls.observed_counts == FALSE)
-  TP <- sum(calls.abundances == TRUE & calls.observed_counts == TRUE)
-  quantity_evaluated <- "counts"
-  if(use_ALR) {
-    quantity_evaluated <- "logratios"
-  }
-  
-  # calculate a couple of quantities that might help us model error in low-feature-number, high DE cases
-  # (1) calculate the log mean expression for the DA group at baseline and include a measure of how different
-  #     this is from overall log mean expression at baseline -- i.e. is our selection of DE genes biased?
-  baseline_expr_all <- colMeans(log(data$abundances[data$groups == 0,] + 0.5))
-  baseline_expr_da <- colMeans(log(data$abundances[data$groups == 0, data$da_genes] + 0.5))
-  ordered_baseline <- baseline_expr_all[order(baseline_expr_all)]
-  median_expr_da_quantile <- sum(ordered_baseline < median(baseline_expr_da))/length(ordered_baseline)
-  
-  # (2) calculate the log mean expression for the DA group under "treatment"; the median of the signed different
-  #     will be a predictor too
-  med_affected_expr_dat <- colMeans(log(data$abundances[data$groups == 1, data$da_genes] + 0.5))
-  net_dir_da <- med_affected_expr_dat - med_baseline_expr_da
-  
-  out_str <- paste0(run_label,"\t",
-                    p,"\t",
-                    proportion_da,"\t",
-                    size_factor_correlation,"\t",
-                    round(median_expr_da_quantile, 5),"\t",
-                    round(median(net_dir_da), 5),"\t",
-                    quantity_evaluated,"\t",
-                    call_DA_by_NB,"\t",
-                    filter_abundance,"\t",
-                    TP,"\t",
-                    FP,"\t",
-                    TN,"\t",
-                    FN,"\t",
-                    sum(evaluate_features),"\t")
-  record_result(out_str, file.path("output",output_file))
 }
 
 #' Generate simulated data with RNA-seq like features and > 3 fold differential abundance, evaluate false negatives and positives in
@@ -323,36 +336,28 @@ run_RNAseq_evaluation_instance <- function(p, n, proportion_da, run_label, k = N
 #'
 #' @param p number of genes
 #' @param n number of samples per group
-#' @param run_label human-readable string identifier for this simulation run
-#' @param k number of cell types to simulate; if not NULL, single-cell data is simulated; if NULL, bulk RNA-seq data is simulated
+#' @param k number of cell types to simulate
 #' @param de_sweep vector of proportions of differentially abundant genes to simulate
 #' @param corr_sweep vector of correlations of size factors (true vs. observed abundances) to simulate
-#' @param output_file output file to append to
 #' @param alpha significant level below which to call a feature differentially abundant
 #' @param use_ALR if TRUE, evaluates differential abundance using a spike-in and the additive logratio
 #' @param filter_abundance the minimum average abundance to require of features we'll evaluate for differential abundance
 #' (e.g. a filter_abundance of 1 evaluates features with average abundance across conditions of at least 1)
-#' @param call_DA_by_NB if TRUE, uses a NB GLM to call differential abundance; if FALSE, uses a log linear model with a
-#' permutation test
-#' @param rarefy if TRUE, resamples the counts in each sample to the lowest observed total counts
+#' @param methods vector of differential abundance testing methods to use; options are "NB", "GLM", "edgeR"
 #' @details Writes out error and simulation run statistics to a file.
 #' @return NULL
 #' @export
-sweep_simulations <- function(p, n, run_label, k = NULL, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
-                              corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), output_file = "results.txt",
-                              alpha = 0.05, use_ALR = FALSE, filter_abundance = 0, call_DA_by_NB = TRUE, rarefy = FALSE) {
+sweep_simulations <- function(p, n, k = 1, de_sweep = seq(from = 0.1, to = 0.9, by = 0.1),
+                              corr_sweep = seq(from = 0.1, to = 0.9, by = 0.1), alpha = 0.05, use_ALR = FALSE,
+                              filter_abundance = 0, methods = c("NB", "edgeR")) {
   for(de_prop in de_sweep) {
     for(sf_corr in corr_sweep) {
-      out_str <- paste0("simulated evaluating size factor correlation = ",round(sf_corr, 2)," and DA proportion = ",round(de_prop, 2),"\n")
-      if(is.null(k)) {
-        cat("Bulk RNA-seq",out_str)
-      } else {
-        cat("Single-cell RNA-seq",out_str)
-      }
-      run_RNAseq_evaluation_instance(p, n, proportion_da = de_prop, run_label = run_label, k = k,
-                                     size_factor_correlation = sf_corr, output_file = output_file,
+      out_str <- paste0("w/ ",p," genes, DA proportion = ",round(de_prop, 2),", and size factor correlation = ",round(sf_corr, 2),"\n")
+      cat("Single-cell RNA-seq",out_str)
+      run_RNAseq_evaluation_instance(p, n, proportion_da = de_prop, k = k,
+                                     library_size_correlation = sf_corr,
                                      alpha = 0.05, use_ALR = use_ALR, filter_abundance = filter_abundance,
-                                     call_DA_by_NB = call_DA_by_NB, rarefy = rarefy)
+                                     methods = methods)
     }
   }
 }

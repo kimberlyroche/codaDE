@@ -1,5 +1,7 @@
-# This code runs and evaluates error in differential expression calls for a single
-# simulation instance with the desired characteristics.
+# This code runs and evaluates error in differential expression calls for a single simulation instance with the desired characteristics.
+
+# 2021-02-27
+# Note: This needs a revisit given changes in the simulation framework.
 
 library(codaDE)
 library(optparse)
@@ -23,7 +25,7 @@ option_list = list(
               help = "minimum average abundance of a gene on which to test differential abundance", metavar = "numeric")
 ); 
 
-opt_parser = OptionParser(option_list=option_list);
+opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
 
 de_sweep <- c(0.2, 0.4, 0.6, 0.8)
