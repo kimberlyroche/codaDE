@@ -59,6 +59,7 @@ resample_counts <- function(theta, groups, library_size_correlation, spike_in = 
 #' @param p number of features (i.e. genes or bacterial taxa)
 #' @param k number of distinct cell types
 #' @param ref_data specifies the reference data set to use ("Morton", "Athanasiadou_ciona", "simulated"; case-sensitive)
+#' @param asymmetry proportion of baselines to draw from condition 1
 #' @param sequencing_depth average total nUMI to simulate
 #' @param proportion_da proportion of differentially abundant genes
 #' @param library_size_correlation correlation of observed abundances to original total abundances (see details)
@@ -72,8 +73,9 @@ resample_counts <- function(theta, groups, library_size_correlation, spike_in = 
 #' with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
 #' @import LaplacesDemon
 #' @export
-simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athanasidou_ciona", sequencing_depth = 1e5,
-                                     proportion_da = 0.1, library_size_correlation = 0, spike_in = FALSE, possible_fold_changes = NULL) {
+simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athanasidou_ciona", asymmetry = 0.5,
+                                     sequencing_depth = 1e5, proportion_da = 0.1, library_size_correlation = 0,
+                                     spike_in = FALSE, possible_fold_changes = NULL) {
 
   # We'll sample out of GTEx protein-coding gene estimates
   # GTEx_estimates_baseline <- readRDS("data/empirical_mu_size.rds")
@@ -186,11 +188,16 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
     # }
     
     # Assume symmetric sampling
-    if(p %% 2 != 0) { p <- p + 1 }
+    # if(p %% 2 != 0) { p <- p + 1 }
     
-    baseline_features <- sample(1:length(data_obj$cond1), size = p, replace = TRUE)
-    baseline_features1 <- baseline_features[1:(p/2)]
-    baseline_features2 <- baseline_features[(p/2 + 1):p]
+    p1 <- round(asymmetry*p)
+    p2 <- p - p1
+    
+    # baseline_features <- sample(1:length(data_obj$cond1), size = p, replace = TRUE)
+    # baseline_features1 <- baseline_features[1:(p/2)]
+    # baseline_features2 <- baseline_features[(p/2 + 1):p]
+    baseline_features1 <- sample(1:length(data_obj$cond1), size = p1, replace = TRUE)
+    baseline_features2 <- sample(1:length(data_obj$cond2), size = p2, replace = TRUE)
     baseline_counts <- c(data_obj$cond1[baseline_features1], data_obj$cond2[baseline_features2])
     treatment_counts <- c(data_obj$cond2[baseline_features1], data_obj$cond1[baseline_features2])
     
@@ -222,7 +229,7 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
                       size = c(rep(all_params[j,2], n), rep(all_params[j,4], n)))
     counts
   })
-  
+
   realized_total_counts <- rowSums(abundances)
   scale_down_factor <- sequencing_depth / mean(realized_total_counts)
   scaled_real_counts <- round(scale_down_factor*realized_total_counts)

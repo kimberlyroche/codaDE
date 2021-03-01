@@ -2,7 +2,8 @@
 #'
 #' @param p number of features (genes, taxa) to simulate
 #' @param log_var log variance for condition 1
-#' @return log_noise_var log variance for noise component added to condition 1 to give condition 2
+#' @return log_noise_var log variance for noise component added to condition 1
+#' to give condition 2
 #' @export
 build_simulated_reference <- function(p = 1000, log_var = 2, log_noise_var = 1) {
   log_counts1 <- rnorm(p, 0, log_var)
@@ -150,8 +151,8 @@ build_Morton_reference <- function() {
           file = file.path("data", "absolute_Morton.rds"))
 
   # Build DE model
-  counts1 <- c(counts[,before_events])
-  counts2 <- c(counts[,after_events])
+  counts1 <- c(counts[,1:length(before_events)])
+  counts2 <- c(counts[,(length(before_events)+1):ncol(counts)])
 
   saveRDS(list(cond1 = counts1, cond2 = counts2),
           file = file.path("data", "DE_reference_Morton.rds"))
