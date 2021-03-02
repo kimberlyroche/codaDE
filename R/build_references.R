@@ -19,39 +19,38 @@ build_simulated_reference <- function(p = 1000, log_var = 2, log_noise_var = 1) 
 #' @return named list of observed counts in conditions 1 and 2
 #' @export
 build_Barlow_reference <- function() {
-  # PLACEHOLDER
-  # TBD - match samples, pull DE reference
+  file_dir <- file.path("data", "Barlow_2020")
   
-  # file_dir <- "C:/Users/kim/Documents/codaDE/data/Barlow_2020"
-  # 
-  # data <- read.table(file.path(file_dir, "Absolute_Abundance_Table.csv"), header = TRUE, sep = ",", stringsAsFactors = FALSE)
-  # 
-  # # Clean up data
-  # md_labels <- c("Diet", "Site", "Day", "mouse", "Cage")
-  # metadata <- data[,md_labels]
-  # counts <- data[,!(colnames(data) %in% md_labels)]
-  # counts <- counts[,2:ncol(counts)]
-  # tax <- colnames(counts)
-  # counts <- as.matrix(counts)
-  # colnames(counts) <- NULL
-  # rownames(counts) <- NULL
-  # 
-  # # `counts` is initially 103 samples x 142 taxa
-  # 
-  # # Pull stool samples from days 4, 7, 10
-  # keto_idx <- which(metadata$Diet == "Keto" & metadata$Day %in% c(4,7,10) & metadata$Site == "Stool")
-  # ctrl_idx <- which(metadata$Diet == "Control" & metadata$Day %in% c(4,7,10) & metadata$Site == "Stool")
-  # 
-  # counts <- rbind(counts[ctrl_idx,], counts[keto_idx,])
-  # labels <- c(rep("control", length(ctrl_idx)), rep("keto", length(keto_idx)))
-  # 
-  # # Eliminate all-zero taxa
-  # absent_tax_idx <- which(colSums(counts) == 0)
-  # counts <- counts[,-absent_tax_idx]
-  # tax <- tax[-absent_tax_idx]
-  # 
-  # groups = factor(labels, levels = c("control", "keto"))
-  # 
+  data <- read.table(file.path(file_dir, "Absolute_Abundance_Table.csv"), header = TRUE, sep = ",", stringsAsFactors = FALSE)
+
+  # Clean up data
+  md_labels <- c("Diet", "Site", "Day", "mouse", "Cage")
+  metadata <- data[,md_labels]
+  counts <- data[,!(colnames(data) %in% md_labels)]
+  counts <- counts[,2:ncol(counts)]
+  tax <- colnames(counts)
+  counts <- as.matrix(counts)
+  colnames(counts) <- NULL
+  rownames(counts) <- NULL
+
+  # `counts` is initially 103 samples x 142 taxa
+
+  # Pull stool samples from days 4, 7, 10
+  keto_idx <- which(metadata$Diet == "Keto" & metadata$Day %in% c(4,7,10) & metadata$Site == "Stool")
+  ctrl_idx <- which(metadata$Diet == "Control" & metadata$Day %in% c(4,7,10) & metadata$Site == "Stool")
+
+  days <- metadata[c(ctrl_idx,keto_idx),]$Day
+  
+  counts <- rbind(counts[ctrl_idx,], counts[keto_idx,])
+  labels <- c(rep("control", length(ctrl_idx)), rep("keto", length(keto_idx)))
+
+  # Eliminate all-zero taxa
+  absent_tax_idx <- which(colSums(counts) == 0)
+  counts <- counts[,-absent_tax_idx]
+  tax <- tax[-absent_tax_idx]
+
+  groups = factor(labels, levels = c("control", "keto"))
+
   # # Histograms!
   # plot_counts <- counts[which(groups == "control"),]
   # absent_tax_idx <- which(colSums(plot_counts) == 0)
@@ -65,13 +64,28 @@ build_Barlow_reference <- function() {
   #   geom_histogram(color = "white")
   # ggsave("hist_Barlow_scaled.png", units = "in", dpi = 100, height = 5, width = 6)
   # 
-  # # The scaling does weird things to this data set. The minimum *observed* (non-zero) abundance is huge
-  # # giving a gap between observed and unobserved features that is enormous.
-  # # I'm scaling down all the counts by this minimum observed abundance for now. (2/16/2021)
-  # min_observed <- min(counts[which(counts > 0, arr.ind = TRUE)])
-  # counts <- counts / min_observed
-  # 
-  # saveRDS(list(counts = t(counts), groups = groups, tax = tax), file = file.path(file_dir, "absolute_parsed.rds"))
+  # The scaling does weird things to this data set. The minimum *observed* (non-zero) abundance is huge
+  # giving a gap between observed and unobserved features that is enormous.
+  # I'm scaling down all the counts by this minimum observed abundance for now. (2/16/2021)
+  min_observed <- min(counts[which(counts > 0, arr.ind = TRUE)])
+  counts <- counts / min_observed
+  counts <- t(counts)
+  
+  saveRDS(list(counts = counts, groups = groups, tax = tax),
+         file = file.path(file_dir, "absolute_Barlow.rds"))
+  
+  # Build DE model
+  counts1 <- counts[,groups == "control" & days == 10]
+  counts2 <- counts[,groups == "keto" & days == 10]
+  
+  # Arbitrarily "match" a subject on day 10 in condition 1 with a subject on
+  # day 10 in condition 2
+  
+  counts1 <- c(counts1)
+  counts2 <- c(counts2)
+  
+  saveRDS(list(cond1 = counts1, cond2 = counts2),
+          file = file.path("data", "DE_reference_Barlow.rds"))
   
   return(NULL)
 }
@@ -207,8 +221,7 @@ normalize_Athanasiadou <- function(SI_file, RNA_file, ERCC_annot, groups) {
 #' @return named list of observed counts in conditions 1 and 2
 #' @export
 build_Athanasiadou_reference <- function() {
-  # TBD - match samples, pull DE reference for YEAST
-  #       allow choice of baseline v. treatment
+  # TBD - allow choice of baseline v. treatment
   #       move bipartite graph code
   
   file_dir <- file.path("data", "Athanasiadou_2021", "S1CodeandData")
@@ -227,6 +240,13 @@ build_Athanasiadou_reference <- function() {
   
   saveRDS(list(counts = counts, groups = groups),
           file = file.path("data", "absolute_Athanasiadou_yeast.rds"))
+  
+  # Build DE model (arbitrarily matching replicates)
+  counts1 <- c(counts[,groups == "C12"])
+  counts2 <- c(counts[,groups == "C30"])
+  
+  saveRDS(list(cond1 = counts1, cond2 = counts2),
+          file = file.path("data", "DE_reference_Athanasiadou_yeast.rds"))
   
   groups <- as.factor(rep(c("lacz", "dnfgfr", "camras"), rep(3,3)))
   counts <- normalize_Athanasiadou(SI_file = "YmatSIciona.txt",

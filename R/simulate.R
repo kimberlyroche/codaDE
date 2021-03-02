@@ -53,6 +53,19 @@ resample_counts <- function(theta, groups, library_size_correlation, spike_in = 
   return(list(abundances = abundances, observed_counts = observed_counts))
 }
 
+# Utility function to resample counts
+resample_counts <- function(proportions, library_sizes) {
+  observed_counts <- sapply(1:ncol(proportions), function(i) {
+    resample_probs <- proportions[,i]
+    # censor very low concentration stuff to simulate drop-outs
+    # I'm trying to simulate some minimum detectable concentration
+    # this threshold is pretty arbitrary; we need to tune this to resemble real data
+    resample_probs[resample_probs < 1e-8] <- 0
+    rmultinom(1, size = library_sizes[i], prob = resample_probs)
+  })
+  t(observed_counts)
+}
+
 #' Simulate UMI count single-cell RNA-seq data
 #'
 #' @param n number of samples per group
@@ -62,7 +75,6 @@ resample_counts <- function(theta, groups, library_size_correlation, spike_in = 
 #' @param asymmetry proportion of baselines to draw from condition 1
 #' @param sequencing_depth average total nUMI to simulate
 #' @param proportion_da proportion of differentially abundant genes
-#' @param library_size_correlation correlation of observed abundances to original total abundances (see details)
 #' @param spike_in simulate a control spike in with low dispersion
 #' @param possible_fold_changes if specified, a distribution of possible fold changes available for differential abundance simulation
 #' @return named list of true abundances, observed abundances, and group assignments
@@ -74,7 +86,7 @@ resample_counts <- function(theta, groups, library_size_correlation, spike_in = 
 #' @import LaplacesDemon
 #' @export
 simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athanasidou_ciona", asymmetry = 0.5,
-                                     sequencing_depth = 1e5, proportion_da = 0.1, library_size_correlation = 0,
+                                     sequencing_depth = 1e5, proportion_da = 0.1,
                                      spike_in = FALSE, possible_fold_changes = NULL) {
 
   # We'll sample out of GTEx protein-coding gene estimates
@@ -234,29 +246,18 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
   scale_down_factor <- sequencing_depth / mean(realized_total_counts)
   scaled_real_counts <- round(scale_down_factor*realized_total_counts)
   
-  # Rescale the observed counts in advance of proportional resampling
-  if(library_size_correlation == 2) {
-    # Very strong correlation
-    library_sizes.observed_counts <- rnbinom(n*2, mu = scaled_real_counts, size = 100)
-  } else if(library_size_correlation == 1) {
-    # Modest correlation
-    library_sizes.observed_counts <- rnbinom(n*2, mu = scaled_real_counts, size = 10)
-  } else {
-    # No correlation
-    library_sizes.observed_counts <- rnbinom(n*2, mu = sequencing_depth, size = 100)
-  }
-  
+  # No correlation in true / observed library sizes
+  library_sizes.observed_counts1 <- rnbinom(n*2, mu = sequencing_depth, size = 10)
+  # Modest correlation true / observed library sizes
+  library_sizes.observed_counts2 <- rnbinom(n*2, mu = scaled_real_counts, size = 10)
+  # Very strong correlation in true / observed library sizes
+  library_sizes.observed_counts3 <- rnbinom(n*2, mu = scaled_real_counts, size = 100)
+
   # transform to proportions
   sampled_proportions <- apply(abundances, 1, function(x) x/sum(x))
-  observed_counts <- sapply(1:(n*2), function(i) {
-    resample_probs <- sampled_proportions[,i]
-    # censor very low concentration stuff to simulate drop-outs
-    # I'm trying to simulate some minimum detectable concentration
-    # this threshold is pretty arbitrary; we need to tune this to resemble real data
-    resample_probs[resample_probs < 1e-8] <- 0
-    rmultinom(1, size = library_sizes.observed_counts[i], prob = resample_probs)
-  })
-  observed_counts <- t(observed_counts)
+  observed_counts1 <- resample_counts(sampled_proportions, library_sizes.observed_counts1)
+  observed_counts2 <- resample_counts(sampled_proportions, library_sizes.observed_counts2)
+  observed_counts3 <- resample_counts(sampled_proportions, library_sizes.observed_counts3)
   
   # Quick visualization
   # par(mfrow = c(1, 2))
@@ -267,7 +268,9 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
   # lines((n+1):(2*n), observed_counts[(n+1):(2*n),idx], type = "p", col = "red")
 
   return(list(abundances = abundances,
-              observed_counts = observed_counts,
+              observed_counts1 = observed_counts1,
+              observed_counts2 = observed_counts2,
+              observed_counts3 = observed_counts3,
               groups = groups,
               da_assignment = which(da_assignment == TRUE)))
 }

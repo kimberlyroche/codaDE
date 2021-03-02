@@ -4,7 +4,7 @@
 \alias{resample_counts}
 \title{Simulate sequence counts according to a negative binomial}
 \usage{
-resample_counts(theta, groups, library_size_correlation, spike_in = FALSE)
+resample_counts(proportions, library_sizes)
 }
 \arguments{
 \item{theta}{vector of (2) group dispersion parameters and (2) per-gene log covariates is theta}

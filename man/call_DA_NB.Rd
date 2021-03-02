@@ -4,14 +4,14 @@
 \alias{call_DA_NB}
 \title{Fit negative binomial model to null and full models and evaluate differential abundance for a focal gene}
 \usage{
-call_DA_NB(data, feature_idx, call_abundances = TRUE)
+call_DA_NB(data, groups, feature_idx)
 }
 \arguments{
 \item{data}{simulated data set}
 
-\item{feature_idx}{index of gene to test for differential abundance}
+\item{groups}{group (cohort) labels}
 
-\item{call_abundances}{if TRUE, call DA on abundances; if FALSE, on observed counts}
+\item{feature_idx}{index of gene to test for differential abundance}
 }
 \value{
 p-value from NB GLM fit with MASS::glm.nb associated with group coefficient

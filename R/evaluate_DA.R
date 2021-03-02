@@ -1,17 +1,13 @@
 #' Fit negative binomial model to null and full models and evaluate differential abundance for a focal gene
 #'
 #' @param data simulated data set
+#' @param groups group (cohort) labels
 #' @param feature_idx index of gene to test for differential abundance
-#' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
 #' @return p-value from NB GLM fit with MASS::glm.nb associated with group coefficient
 #' @import MASS
 #' @export
-call_DA_NB <- function(data, feature_idx, call_abundances = TRUE) {
-  if(call_abundances) {
-    gene_data <- data.frame(counts = data$abundances[,feature_idx], groups = data$groups)
-  } else {
-    gene_data <- data.frame(counts = data$observed_counts[,feature_idx], groups = data$groups)
-  }
+call_DA_NB <- function(data, groups, feature_idx) {
+  gene_data <- data.frame(counts = data[,feature_idx], groups = groups)
   fit <- tryCatch({
     glm.nb(counts ~ groups, data = gene_data)
   }, warning = function(w) {
@@ -29,12 +25,7 @@ call_DA_NB <- function(data, feature_idx, call_abundances = TRUE) {
   if(!is.null(fit)) {
     return(coef(summary(fit))[2,4])
   } else {
-    # model fit failed
-    data_type <- "abundances"
-    if(!call_abundances) {
-      data_type <- "observed counts"
-    }
-    cat(paste0("Fit failed on ",data_type," #",feature_idx,"\n"))
+    cat(paste0("Fit failed on feature",feature_idx,"\n"))
     return(NA)
   }
 }
