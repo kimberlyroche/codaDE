@@ -242,6 +242,14 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
     counts
   })
 
+  if(spike_in) {
+    spike_in_mean <- mean(all_params[,1]) # mean baseline abundance
+    # No noise
+    # abundances <- cbind(abundances, rep(spike_in_mean, n*2))
+    # Noisy
+    abundances <- cbind(abundances, rnbinom(n*2, mu = spike_in_mean, size = 100))
+  }
+
   realized_total_counts <- rowSums(abundances)
   scale_down_factor <- sequencing_depth / mean(realized_total_counts)
   scaled_real_counts <- round(scale_down_factor*realized_total_counts)
@@ -267,7 +275,8 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
   # plot(1:n, observed_counts[1:n,idx], xlim = c(0, 2*n), ylim = c(0, max(observed_counts[,idx])))
   # lines((n+1):(2*n), observed_counts[(n+1):(2*n),idx], type = "p", col = "red")
 
-  return(list(abundances = abundances,
+  return(list(spike_in = spike_in,
+              abundances = abundances,
               observed_counts1 = observed_counts1,
               observed_counts2 = observed_counts2,
               observed_counts3 = observed_counts3,

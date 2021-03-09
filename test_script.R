@@ -6,12 +6,14 @@ library(gridExtra)
 library(codaDE)
 
 plot_stacked_bars <- function(data, palette, save_name = NULL) {
-  ggplot(data, aes(fill = OTU, y = abundance, x = sample)) + 
+  p <- ggplot(data, aes(fill = OTU, y = abundance, x = sample)) + 
     geom_bar(position = "stack", stat = "identity") +
     scale_fill_manual(values = palette) +
     theme(legend.position = "none")
+  show(p)
   if(!is.null(save_name)) {
     ggsave(file.path("images", save_name),
+           p,
            units = "in",
            dpi = 100,
            height = 5,
@@ -19,9 +21,28 @@ plot_stacked_bars <- function(data, palette, save_name = NULL) {
   }
 }
 
-calc_DE_discrepancy <- function(ref_data, data, groups) {
+DE_by_NB <- function(ref_data, data, groups) {
   oracle_calls <- sapply(1:p, function(idx) { call_DA_NB(ref_data, groups, idx) } )
   calls <- sapply(1:p, function(idx) { call_DA_NB(data, groups, idx) } )
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
+DE_by_scran <- function(ref_data, data, groups) {
+  oracle_calls <- call_DA_scran(ref_data, groups)
+  calls <- call_DA_scran(data, groups)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
+calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
+  if(method == "scran") {
+    DE_calls <- DE_by_scran(ref_data, data, groups)
+    oracle_calls <- DE_calls$oracle_calls
+    calls <- DE_calls$calls
+  } else {
+    DE_calls <- DE_by_NB(ref_data, data, groups)
+    oracle_calls <- DE_calls$oracle_calls
+    calls <- DE_calls$calls
+  }
 
   de <- calls < 0.05
   sim_de <- oracle_calls < 0.05
@@ -39,9 +60,9 @@ calc_DE_discrepancy <- function(ref_data, data, groups) {
 #   Simulate data
 # ------------------------------------------------------------------------------------------------------------
 
-# build_simulated_reference(p = 1000, log_var = 2, log_noise_var = 2)
-
-n <- 5 # replicate number
+n <- 10 # replicate number
+# Note: 10 seems to be about a minimum within-condition cell/sample number for
+# scran marker gene identification
 p <- 100
 palette <- generate_highcontrast_palette(p)
 ref_data <- "simulated"
@@ -50,12 +71,17 @@ ref_data <- "simulated"
 # ref_data <- "Athanasiadou_ciona"
 # ref_data <- "Athanasiadou_yeast"
 k <- 1
-asymmetry <- 0.5
+asymmetry <- 0.6
 sequencing_depth <- 1e5
-proportion_da <- 0.5
-spike_in <- FALSE
+proportion_da <- 0.75
+spike_in <- TRUE
 possible_fold_changes <- NULL
 
+plot_data <- data.frame(delta_mean = c(),
+                        rate = c(),
+                        rate_type = c(),
+                        corr = c())
+for(i in 1:200) {
 if(FALSE) { # visualize distribution of fold changes from 1K simulations
   q <- 1000
   fcs <- numeric(q)
@@ -82,20 +108,23 @@ if(FALSE) { # visualize distribution of fold changes from 1K simulations
          height = 5,
          width = 6)
 } else {
+  build_simulated_reference(p = 1000, log_var = 2, log_noise_var = 2)
   sim_data <- simulate_sequence_counts(n = n, p = p, k = k, ref_data = ref_data, asymmetry = asymmetry,
                                        sequencing_depth = sequencing_depth, proportion_da = proportion_da,
                                        spike_in = spike_in, possible_fold_changes = possible_fold_changes)
 }
 
+if(FALSE) {
 # ------------------------------------------------------------------------------------------------------------
 #   Visualize simulation - absolute abundances
 # ------------------------------------------------------------------------------------------------------------
 
-data <- pivot_longer(cbind(sample = 1:nrow(sim_data$abundances), as.data.frame(sim_data$abundances)),
+data <- pivot_longer(cbind(sample = 1:nrow(sim_data$abundances), as.data.frame(sim_data$abundances[,1:p])),
                      cols = !sample,
                      names_to = "OTU",
                      values_to = "abundance")
 
+plot_stacked_bars(data, palette)
 plot_stacked_bars(data, palette, save_name = paste0("01_absolute_",ref_data,".png"))
 
 # ------------------------------------------------------------------------------------------------------------
@@ -103,20 +132,33 @@ plot_stacked_bars(data, palette, save_name = paste0("01_absolute_",ref_data,".pn
 # ------------------------------------------------------------------------------------------------------------
 
 # Scenario 1: No correlation between true abundances and observed abundances
-data <- pivot_longer(cbind(sample = 1:nrow(sim_data$observed_counts1), as.data.frame(sim_data$observed_counts1)),
+data <- pivot_longer(cbind(sample = 1:nrow(sim_data$observed_counts1), as.data.frame(sim_data$observed_counts1[,1:p])),
                      cols = !sample,
                      names_to = "OTU",
                      values_to = "abundance")
 
+plot_stacked_bars(data, palette)
 plot_stacked_bars(data, palette, save_name = paste0("02_observed_",ref_data,".png"))
 
 # Scenario 2: Partial correlation between true abundances and observed abundances
-data <- pivot_longer(cbind(sample = 1:nrow(sim_data$observed_counts2), as.data.frame(sim_data$observed_counts2)),
+data <- pivot_longer(cbind(sample = 1:nrow(sim_data$observed_counts2), as.data.frame(sim_data$observed_counts2[,1:p])),
                      cols = !sample,
                      names_to = "OTU",
                      values_to = "abundance")
 
+plot_stacked_bars(data, palette)
 plot_stacked_bars(data, palette, save_name = paste0("02_observed_",ref_data,"_partialcorr.png"))
+
+# Scenario 3: Spike-in normalized
+if(spike_in) {
+  spike_in_normalized <- sim_data$observed_counts1[,1:p] / sim_data$observed_counts1[,(p+1)] # row-wise normalize
+  data <- pivot_longer(cbind(sample = 1:nrow(sim_data$observed_counts1), as.data.frame(spike_in_normalized)),
+                       cols = !sample,
+                       names_to = "OTU",
+                       values_to = "abundance")
+  
+  plot_stacked_bars(data, palette)
+}
 
 # ------------------------------------------------------------------------------------------------------------
 #   Visualize simulation - relative abundances
@@ -130,13 +172,54 @@ data <- pivot_longer(cbind(sample = 1:nrow(props), as.data.frame(props)),
                      values_to = "abundance") # really, relative abundance
 
 plot_stacked_bars(data, palette, save_name = paste0("03_relative_",ref_data,".png"))
-
+}
 # ------------------------------------------------------------------------------------------------------------
 #   Call differential expression/abundance
 # ------------------------------------------------------------------------------------------------------------
 
-rates1 <- calc_DE_discrepancy(sim_data$abundances, sim_data$observed_counts1, sim_data$groups)
-rates2 <- calc_DE_discrepancy(sim_data$abundances, sim_data$observed_counts2, sim_data$groups)
+if(i %% 10 == 0) {
+  cat("Iteration",i,"\n")
+}
+
+m1 <- mean(rowSums(sim_data$abundances[1:n,]))
+m2 <- mean(rowSums(sim_data$abundances[(n+1):(n*2),]))
+delta_mean_v1 <- max(c(m1, m2)) - min(c(m1, m2))
+delta_mean_v2 <- max(c(m1, m2)) / min(c(m1, m2))
+
+rates1 <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups)
+rates1a <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = "scran")
+rates2 <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
 
 rates1
+rates1a
 rates2
+
+plot_data <- rbind(plot_data,
+                   data.frame(delta_mean_v1 = rep(delta_mean_v1, 4), # absolute difference
+                              delta_mean_v2 = rep(delta_mean_v2, 4), # fold change
+                              rate = c(rates1$fpr, rates1$tpr, rates2$fpr, rates2$tpr),
+                              rate_type = rep(c("fpr", "tpr"), 2),
+                              corr = c(rep("zero", 2), rep("partial", 2))))
+
+}
+
+plot_data$rate_type <- as.factor(plot_data$rate_type)
+plot_data$corr <- as.factor(plot_data$corr)
+head(plot_data)
+
+ggplot(plot_data[plot_data$rate_type == "fpr",], aes(x = abs(delta_mean_v2), y = rate, color = corr)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "loess") +
+  xlim(1, 10) +
+  xlab("difference in means")
+ggsave(file.path("images", "fpr_zero_partial_corr.png"),
+       units = "in",
+       dpi = 100,
+       height = 6,
+       width = 8)
+
+
+
+
+
+

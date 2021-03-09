@@ -1,3 +1,63 @@
+#' Apply scran normalization and call differentially expressed (marker) genes
+#' 
+#' @param data simulated data set
+#' @param groups group (cohort) labels
+#' @import SingleCellExperiment
+#' @import scran
+#' @import scater
+#' @export
+call_DA_scran <- function(data, groups) {
+  # data <- sim_data$observed_counts1[,1:100]
+  count_table <- t(data)
+  # groups <- sim_data$groups
+  n_genes <- nrow(count_table)
+  n_samples_condition <- ncol(count_table)/2
+  cell_metadata <- data.frame(condition = groups)
+  
+  rownames(cell_metadata) <- colnames(count_table)
+  rownames(count_table) <- paste0("gene", 1:n_genes)
+  colnames(count_table) <- paste0("cell", 1:(n_samples_condition*2))
+  
+  sce <- SingleCellExperiment(assays = list(counts = count_table),
+                              colData = cell_metadata)
+
+  # Note: We'll need to add QC stuff here ultimately.
+  
+  # Methods below taken from this tutorial:
+  # https://bioconductor.org/packages/release/bioc/vignettes/scran/inst/doc/scran.html
+  
+  clusters <- suppressWarnings(quickCluster(sce, min.size = 1))
+
+  sce <- suppressWarnings(computeSumFactors(sce, clusters = clusters)) # Use a first-pass clustering
+  sce <- logNormCounts(sce)
+  
+  # Cluster from docs: https://rdrr.io/bioc/scran/man/getClusteredPCs.html
+  sce <- suppressWarnings(scater::runPCA(sce))
+  output <- getClusteredPCs(reducedDim(sce))
+  
+  npcs <- metadata(output)$chosen # number of "informative dimensions"
+  reducedDim(sce, "PCAsub") <- reducedDim(sce, "PCA")[,1:npcs,drop=FALSE]
+  
+  # Build a graph based on this truncated dimensionality reduction
+  g <- buildSNNGraph(sce, use.dimred = "PCAsub")
+  cluster <- igraph::cluster_walktrap(g)$membership
+  
+  # Assigning to the 'colLabels' of the 'sce'
+  colLabels(sce) <- factor(cluster)
+  # table(colLabels(sce))
+  
+  # Visualize the clustering
+  # sce <- runTSNE(sce, dimred = "PCAsub")
+  # plotTSNE(sce, colour_by = "label", text_by = "label")
+  
+  markers <- findMarkers(sce, test.type = "wilcox") # t-test by default
+  filter_vector <- markers[[1]][,1:3]$FDR < 0.05
+  sig_genes <- rownames(markers[[1]])[filter_vector]
+  calls <- logical(n_genes)
+  calls[which(rownames(count_table) %in% sig_genes)] <- TRUE
+  return(calls)
+}
+
 #' Fit negative binomial model to null and full models and evaluate differential abundance for a focal gene
 #'
 #' @param data simulated data set
