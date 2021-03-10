@@ -9,22 +9,6 @@ library(codaDE)
 #   Functions
 # ------------------------------------------------------------------------------------------------------------
 
-plot_stacked_bars <- function(data, palette, save_name = NULL) {
-  p <- ggplot(data, aes(fill = OTU, y = abundance, x = sample)) + 
-    geom_bar(position = "stack", stat = "identity") +
-    scale_fill_manual(values = palette) +
-    theme(legend.position = "none")
-  show(p)
-  if(!is.null(save_name)) {
-    ggsave(file.path("images", save_name),
-           p,
-           units = "in",
-           dpi = 100,
-           height = 5,
-           width = 6)
-  }
-}
-
 DE_by_NB <- function(ref_data, data, groups) {
   oracle_calls <- sapply(1:p, function(idx) { call_DA_NB(ref_data, groups, idx) } )
   calls <- sapply(1:p, function(idx) { call_DA_NB(data, groups, idx) } )
@@ -67,14 +51,14 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
 n <- 5 # replicate number
 # Note: 10 seems to be about a minimum within-condition cell/sample number for
 # scran marker gene identification
-p <- 100
+p <- 10000
 palette <- generate_highcontrast_palette(p)
 
 # ref_data <- "simulated"
-ref_data <- "Morton"
+# ref_data <- "Morton"
 # ref_data <- "Barlow"
 # ref_data <- "Athanasiadou_ciona"
-# ref_data <- "Athanasiadou_yeast"
+ref_data <- "Athanasiadou_yeast"
 
 k <- 1
 asymmetry <- 0.5
@@ -91,15 +75,30 @@ iterations <- 10
 
 if(iterations == 1) {
   
+  if(ref_data == "simulated") {
+    # Simulate fresh
+    build_simulated_reference(p = p, log_var = 2, log_noise_var = 2)
+  }
+  sim_data <- simulate_sequence_counts(n = n, p = p, k = k, ref_data = ref_data, asymmetry = asymmetry,
+                                       sequencing_depth = sequencing_depth, proportion_da = proportion_da,
+                                       spike_in = spike_in, possible_fold_changes = possible_fold_changes)
+  m1 <- mean(rowSums(sim_data$abundances[1:n,]))
+  m2 <- mean(rowSums(sim_data$abundances[(n+1):(n*2),]))
+  fc <- max(c(m1, m2)) / min(c(m1, m2))
+  
+  cat("Fold change:",round(fc, 2),"\n")
+  
   #   Absolute abundances
   # ------------------------------------------------------------------------------------------------------------
   
   data <- pivot_longer(cbind(sample = 1:nrow(sim_data$abundances), as.data.frame(sim_data$abundances[,1:p])),
                        cols = !sample,
-                       names_to = "OTU",
+                       names_to = "feature",
                        values_to = "abundance")
-  
-  # plot_stacked_bars(data, palette)
+
+  plot_stacked_bars(data, palette, save_name = "inset_3.png")
+    
+  plot_stacked_bars(data, palette)
   plot_stacked_bars(data, palette, save_name = paste0("01_absolute_",ref_data,".png"))
   
   #   Observed abundances
@@ -108,19 +107,19 @@ if(iterations == 1) {
   # Scenario 1: No correlation between true abundances and observed abundances
   data <- pivot_longer(cbind(sample = 1:nrow(sim_data$observed_counts1), as.data.frame(sim_data$observed_counts1[,1:p])),
                        cols = !sample,
-                       names_to = "OTU",
+                       names_to = "feature",
                        values_to = "abundance")
   
-  # plot_stacked_bars(data, palette)
+  plot_stacked_bars(data, palette)
   plot_stacked_bars(data, palette, save_name = paste0("02_observed_",ref_data,".png"))
   
   # Scenario 2: Partial correlation between true abundances and observed abundances
   data <- pivot_longer(cbind(sample = 1:nrow(sim_data$observed_counts2), as.data.frame(sim_data$observed_counts2[,1:p])),
                        cols = !sample,
-                       names_to = "OTU",
+                       names_to = "feature",
                        values_to = "abundance")
   
-  # plot_stacked_bars(data, palette)
+  plot_stacked_bars(data, palette)
   plot_stacked_bars(data, palette, save_name = paste0("02_observed_",ref_data,"_partialcorr.png"))
   
   # Scenario 3: Spike-in normalized
@@ -128,10 +127,10 @@ if(iterations == 1) {
     spike_in_normalized <- sim_data$observed_counts1[,1:p] / sim_data$observed_counts1[,(p+1)] # row-wise normalize
     data <- pivot_longer(cbind(sample = 1:nrow(sim_data$observed_counts1), as.data.frame(spike_in_normalized)),
                          cols = !sample,
-                         names_to = "OTU",
+                         names_to = "feature",
                          values_to = "abundance")
     
-    # plot_stacked_bars(data, palette)
+    plot_stacked_bars(data, palette)
     plot_stacked_bars(data, palette, save_name = paste0("02_observed_",ref_data,"_spikedin.png"))
   }
   
@@ -141,10 +140,10 @@ if(iterations == 1) {
   props <- t(apply(sim_data$abundances, 1, function(x) x/sum(x)))
   data <- pivot_longer(cbind(sample = 1:nrow(props), as.data.frame(props)),
                        cols = !sample,
-                       names_to = "OTU",
+                       names_to = "feature",
                        values_to = "abundance") # really, relative abundance
   
-  # plot_stacked_bars(data, palette)
+  plot_stacked_bars(data, palette)
   plot_stacked_bars(data, palette, save_name = paste0("03_relative_",ref_data,".png"))
 
 }
@@ -172,7 +171,7 @@ if(FALSE) {
   ggplot(data, aes(x = fc)) +
     geom_histogram(color = "white") +
     xlim(0, 5)
-  ggsave(file.path("images", paste0("00_hist_",ref_data,"_p",p,".png")),
+  ggsave(file.path("output", "images", paste0("00_hist_",ref_data,"_p",p,".png")),
          units = "in",
          dpi = 100,
          height = 5,
@@ -237,7 +236,7 @@ ggplot(plot_data[plot_data$rate_type == "fpr",], aes(x = abs(delta_mean_v2), y =
   # geom_smooth(method = "loess") +
   xlim(1, 10) +
   xlab("difference in means")
-ggsave(file.path("images", "fpr_zero_partial_corr.png"),
+ggsave(file.path("output", "images", paste0("simresults_p",p,"_",ref_data,".png")),
        units = "in",
        dpi = 100,
        height = 6,

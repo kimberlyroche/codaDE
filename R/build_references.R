@@ -161,6 +161,20 @@ build_Morton_reference <- function() {
   # ggplot(plot_data, aes(x = 0, xend = 1, y = before_log_count, yend = after_log_count, color = rank)) +
   #   geom_segment(size = 1.2, alpha = 0.3)
   
+  # # Visualize data
+  # counts1 <- counts[,1:length(before_events)]
+  # counts2 <- counts[,(length(before_events)+1):ncol(counts)]
+  # 
+  # plot_counts <- t(cbind(counts1, counts2))
+  # dim(plot_counts)
+  # 
+  # data <- pivot_longer(cbind(sample = 1:nrow(plot_counts), as.data.frame(plot_counts)),
+  #                        cols = !sample,
+  #                        names_to = "feature",
+  #                        values_to = "abundance")
+  # 
+  # plot_stacked_bars(data, save_name = "Morton_absolute_vizualiation.png")
+  
   saveRDS(list(counts = counts, groups = groups, tax = NULL),
           file = file.path("data", "absolute_Morton.rds"))
 
@@ -289,6 +303,18 @@ build_Athanasiadou_reference <- function() {
   # 
   # ggplot(plot_data, aes(x = 0, xend = 1, y = before_log_count, yend = after_log_count, color = rank)) +
   #   geom_segment(size = 1.2, alpha = 0.3)
+  
+  # # Visualize data
+  # plot_counts <- t(counts)
+  # small_features <- unname(colMeans(plot_counts) < 1)
+  # plot_counts <- plot_counts[,!small_features]
+  # 
+  # data <- pivot_longer(cbind(sample = 1:nrow(plot_counts), as.data.frame(plot_counts)),
+  #                      cols = !sample,
+  #                      names_to = "feature",
+  #                      values_to = "abundance")
+  # 
+  # plot_stacked_bars(data, save_name = "Athanasiadou_ciona_absolute_vizualiation.png")
   
   saveRDS(list(counts = counts, groups = groups),
           file = file.path("data", "absolute_Athanasiadou_ciona.rds"))
