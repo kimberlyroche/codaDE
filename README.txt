@@ -4,8 +4,8 @@ To submit job arrays of simulations/DE evaluations use:
     sbatch --array=1-20 job.slurm
 
 # Update to R/3.6.1
-Use R/3.6.1-gcb03 and
-    gcc/7.1.0-fasrc01
+module add R/3.6.1-gcb03
+module add gcc/7.1.0-fasrc01
 
 2020-08-30 and after
 

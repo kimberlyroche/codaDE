@@ -67,11 +67,11 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
 n <- 5 # replicate number
 # Note: 10 seems to be about a minimum within-condition cell/sample number for
 # scran marker gene identification
-p <- 100
+p <- 10000
 palette <- generate_highcontrast_palette(p)
 
-# ref_data <- "simulated"
-ref_data <- "Morton"
+ref_data <- "simulated"
+# ref_data <- "Morton"
 # ref_data <- "Barlow"
 # ref_data <- "Athanasiadou_ciona"
 # ref_data <- "Athanasiadou_yeast"
@@ -83,7 +83,7 @@ proportion_da <- 2/3
 spike_in <- TRUE
 possible_fold_changes <- NULL
 
-iterations <- 10
+iterations <- 200
 
 # ------------------------------------------------------------------------------------------------------------
 #   Single-simulation visualizations
@@ -224,7 +224,6 @@ for(i in 1:iterations) {
                                 rate_type = rep(c("fpr", "tpr"), 2),
                                 corr = c(rep("zero", 2), rep("partial", 2))))
   
-  }
 }
 
 plot_data$rate_type <- as.factor(plot_data$rate_type)
@@ -237,7 +236,7 @@ ggplot(plot_data[plot_data$rate_type == "fpr",], aes(x = abs(delta_mean_v2), y =
   # geom_smooth(method = "loess") +
   xlim(1, 10) +
   xlab("difference in means")
-ggsave(file.path("images", "fpr_zero_partial_corr.png"),
+ggsave(file.path("output", "images", paste0("simresults_p",p,"_",ref_data,".png")),
        units = "in",
        dpi = 100,
        height = 6,
