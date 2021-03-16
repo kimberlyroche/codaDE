@@ -15,6 +15,24 @@ DE_by_NB <- function(ref_data, data, groups) {
   return(list(oracle_calls = oracle_calls, calls = calls))
 }
 
+DE_by_edgeR <- function(ref_data, data, groups) {
+  oracle_calls <- call_DA_edgeR(ref_data, groups)
+  calls <- call_DA_edgeR(data, groups)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
+DE_by_Seurat <- function(ref_data, data, groups, method) {
+  oracle_calls <- call_DA_Seurat(ref_data, groups, method = method)
+  calls <- call_DA_Seurat(data, groups, method = method)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
+DE_by_MAST <- function(ref_data, data, groups) {
+  oracle_calls <- call_DA_MAST(ref_data, groups)
+  calls <- call_DA_MAST(data, groups)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
 DE_by_scran <- function(ref_data, data, groups) {
   oracle_calls <- call_DA_scran(ref_data, groups)
   calls <- call_DA_scran(data, groups)
@@ -24,6 +42,18 @@ DE_by_scran <- function(ref_data, data, groups) {
 calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
   if(method == "scran") {
     DE_calls <- DE_by_scran(ref_data, data, groups)
+    oracle_calls <- DE_calls$oracle_calls
+    calls <- DE_calls$calls
+  } else if(method == "edgeR") {
+    DE_calls <- DE_by_edgeR(ref_data, data, groups)
+    oracle_calls <- DE_calls$oracle_calls
+    calls <- DE_calls$calls
+  } else if(method == "wilcox" | method == "DESeq2") {
+    DE_calls <- DE_by_Seurat(ref_data, data, groups, method = method)
+    oracle_calls <- DE_calls$oracle_calls
+    calls <- DE_calls$calls
+  } else if(method == "MAST") {
+    DE_calls <- DE_by_MAST(ref_data, data, groups)
     oracle_calls <- DE_calls$oracle_calls
     calls <- DE_calls$calls
   } else {
@@ -51,19 +81,19 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
 n <- 5 # replicate number
 # Note: 10 seems to be about a minimum within-condition cell/sample number for
 # scran marker gene identification
-p <- 10000
+p <- 100
 palette <- generate_highcontrast_palette(p)
 
-# ref_data <- "simulated"
+ref_data <- "simulated"
 # ref_data <- "Morton"
 # ref_data <- "Barlow"
 # ref_data <- "Athanasiadou_ciona"
-ref_data <- "Athanasiadou_yeast"
+# ref_data <- "Athanasiadou_yeast"
 
 k <- 1
-asymmetry <- 0.5
+asymmetry <- 0.8
 sequencing_depth <- 1e5
-proportion_da <- 2/3
+proportion_da <- 0.75
 spike_in <- TRUE
 possible_fold_changes <- NULL
 
@@ -77,7 +107,7 @@ if(iterations == 1) {
   
   if(ref_data == "simulated") {
     # Simulate fresh
-    build_simulated_reference(p = p, log_var = 2, log_noise_var = 2)
+    build_simulated_reference(p = p, log_var = 2, log_noise_var = 1.5)
   }
   sim_data <- simulate_sequence_counts(n = n, p = p, k = k, ref_data = ref_data, asymmetry = asymmetry,
                                        sequencing_depth = sequencing_depth, proportion_da = proportion_da,
@@ -96,7 +126,7 @@ if(iterations == 1) {
                        names_to = "feature",
                        values_to = "abundance")
 
-  plot_stacked_bars(data, palette, save_name = "inset_3.png")
+  # plot_stacked_bars(data, palette, save_name = "inset_3.png")
     
   plot_stacked_bars(data, palette)
   plot_stacked_bars(data, palette, save_name = paste0("01_absolute_",ref_data,".png"))
@@ -185,7 +215,7 @@ if(FALSE) {
 plot_data <- data.frame(delta_mean = c(),
                         rate = c(),
                         rate_type = c(),
-                        corr = c())
+                        method = c())
 
 for(i in 1:iterations) {
   if(ref_data == "simulated") {
@@ -208,36 +238,46 @@ for(i in 1:iterations) {
   delta_mean_v2 <- max(c(m1, m2)) / min(c(m1, m2))
   
   # Discrepancy: true vs. observed
-  rates1 <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups)
-  # Discrepancy: true vs. scran-normalized observed
-  # rates1a <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = "scran")
-  # Discrepancy: true vs. observed w/ partially informative library sizes
-  rates2 <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
-  
-  cat(paste0("Iteration ",i," FPR: ",round(rates1$fpr, 2),"\n"))
+  rates_baseline <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups)
+  rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
   
   plot_data <- rbind(plot_data,
-                     data.frame(delta_mean_v1 = rep(delta_mean_v1, 4), # absolute difference
-                                delta_mean_v2 = rep(delta_mean_v2, 4), # fold change
-                                rate = c(rates1$fpr, rates1$tpr, rates2$fpr, rates2$tpr),
+                     data.frame(delta_mean_v1 = rep(delta_mean_v1, 2), # absolute difference
+                                delta_mean_v2 = rep(delta_mean_v2, 2), # fold change
+                                rate = c(rates_baseline$fpr, rates_baseline$tpr, rates_partial$fpr, rates_partial$tpr),
                                 rate_type = rep(c("fpr", "tpr"), 2),
-                                corr = c(rep("zero", 2), rep("partial", 2))))
-  
+                                method = c(rep("baseline", 2), rep("spike_in", 2))))
+
+  # cat(paste0("Iteration ",i," FPR (baseline): ",round(rates_baseline$fpr, 2),"\n"))
+  # cat(paste0("Iteration ",i," FPR (spike-in): ",round(rates_partial$fpr, 2),"\n"))
+
+  methods <- c("scran", "edgeR", "wilcox", "DESeq2", "MAST")
+  for(method in methods) {
+    rates <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = method)
+    
+    plot_data <- rbind(plot_data,
+                       data.frame(delta_mean_v1 = rep(delta_mean_v1, 2), # absolute difference
+                                  delta_mean_v2 = rep(delta_mean_v2, 2), # fold change
+                                  rate = c(rates$fpr, rates$tpr),
+                                  rate_type = c("fpr", "tpr"),
+                                  method = c(rep(method, 2))))
+    
+    # cat(paste0("Iteration ",i," FPR (",method,"): ",round(rates$fpr, 2),"\n"))
   }
 }
 
 plot_data$rate_type <- as.factor(plot_data$rate_type)
-plot_data$corr <- as.factor(plot_data$corr)
+plot_data$method <- as.factor(plot_data$method)
 
 saveRDS(plot_data, file = file.path("output", paste0("simresults_p",p,"_",ref_data,".rds")))
 
-ggplot(plot_data[plot_data$rate_type == "fpr",], aes(x = abs(delta_mean_v2), y = rate, color = corr)) +
-  geom_point(size = 2) +
-  # geom_smooth(method = "loess") +
-  xlim(1, 10) +
-  xlab("difference in means")
-ggsave(file.path("output", "images", paste0("simresults_p",p,"_",ref_data,".png")),
-       units = "in",
-       dpi = 100,
-       height = 6,
-       width = 8)
+# ggplot(plot_data[plot_data$rate_type == "fpr",], aes(x = abs(delta_mean_v2), y = rate, color = method)) +
+#   geom_point(size = 2) +
+#   # geom_smooth(method = "loess") +
+#   xlim(1, 10) +
+#   xlab("difference in means")
+# ggsave(file.path("output", "images", paste0("simresults_p",p,"_",ref_data,".png")),
+#        units = "in",
+#        dpi = 100,
+#        height = 6,
+#        width = 8)
