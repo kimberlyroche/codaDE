@@ -14,7 +14,7 @@ call_DA_LM(data, feature_idx, call_abundances = TRUE)
 \item{call_abundances}{if TRUE, call DA on abundances; if FALSE, on observed counts}
 }
 \value{
-p-value associated with group coefficient
+p-value for DA for all features
 }
 \description{
 Fit log linear model to null and full models and evaluate differential abundance for a focal gene

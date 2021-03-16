@@ -2,6 +2,7 @@
 #' 
 #' @param data simulated data set
 #' @param groups group (cohort) labels
+#' @return binary calls for all genes as pseudo-pvalues (0 = DE, 1 = not DE)
 #' @import SingleCellExperiment
 #' @import scran
 #' @import scater
@@ -53,8 +54,8 @@ call_DA_scran <- function(data, groups) {
   markers <- findMarkers(sce, test.type = "wilcox") # t-test by default
   filter_vector <- markers[[1]][,1:3]$FDR < 0.05
   sig_genes <- rownames(markers[[1]])[filter_vector]
-  calls <- logical(n_genes)
-  calls[which(rownames(count_table) %in% sig_genes)] <- TRUE
+  calls <- rep(1, n_genes)
+  calls[which(rownames(count_table) %in% sig_genes)] <- 0
   return(calls)
 }
 
@@ -95,7 +96,7 @@ call_DA_NB <- function(data, groups, feature_idx) {
 #' @param data simulated data set
 #' @param feature_idx index of gene to test for differential abundance
 #' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
-#' @return p-value associated with group coefficient
+#' @return p-value for DA for all features
 #' @import lmPerm
 #' @export
 call_DA_LM <- function(data, feature_idx, call_abundances = TRUE) {
@@ -114,52 +115,25 @@ call_DA_LM <- function(data, feature_idx, call_abundances = TRUE) {
 #' This evaluates expression on all features of the count matrix together
 #'
 #' @param data simulated data set
-#' @param call_abundances if TRUE, call DA on abundances; if FALSE, on observed counts
+#' @param groups group (cohort) labels
 #' @param normalization_method if NULL, uses library size normalization; other options include "TMM" and "scran"
-#' @return p-value associated with group coefficient
+#' @return p-value for DA for all features
 #' @import edgeR
-#' @import SingleCellExperiment
-#' @import scran
 #' @export
-call_DA_edgeR <- function(data, call_abundances = TRUE, normalization_method = NULL) {
+call_DA_edgeR <- function(data, groups, normalization_method = NULL) {
   # DGEList expects samples as columns
   if(!is.null(normalization_method)) {
     if(normalization_method == "TMM") {
-      if(call_abundances) {
-        dge_obj <- DGEList(counts = t(data$abundances), group = factor(data$groups))
-      } else {
-        dge_obj <- DGEList(counts = t(data$observed_counts), group = factor(data$groups))
-      }
+      dge_obj <- DGEList(counts = t(data), group = factor(groups))
       dge_obj <- calcNormFactors(dge_obj, method = "TMM")
-    } else if(normalization_method == "scran") {
-      # First, get the data into a SingleCellExperiment (Bioconductor) object
-      if(call_abundances) {
-        y <- t(data$abundances)
-      } else {
-        y <- t(data$observed_counts)
-      }
-      # These labels may not be strictly necessary but it's probably not bad form
-      rownames(y) <- paste0("gene_", 1:nrow(y))
-      y <- as.matrix(y)
-      cell_metadata <- data.frame(condition = data$groups)
-      rownames(cell_metadata) <- paste0("cell_", 1:ncol(y))
-      sce <- SingleCellExperiment(assays = list(counts = y),
-                                  colData = cell_metadata)
-      clust.sce <- quickCluster(sce)
-      sce <- suppressWarnings(scran::computeSumFactors(sce, cluster = clust.sce))
-      dge_obj <- convertTo(sce, type = "edgeR")
     } else {
       stop("Unknown normalization method!")
     }
   } else {
-    if(call_abundances) {
-      dge_obj <- DGEList(counts = t(data$abundances), group = factor(data$groups))
-    } else {
-      dge_obj <- DGEList(counts = t(data$observed_counts), group = factor(data$groups))
-    }
+    dge_obj <- DGEList(counts = t(data), group = factor(groups))
     dge_obj <- calcNormFactors(dge_obj, method = "none") # library size normalization-only
   }
-  design <- model.matrix(~ data$groups)
+  design <- model.matrix(~ groups)
   dge_obj <- estimateDisp(dge_obj, design)
   # LRT recommended for single-cell data
   fit <- glmFit(dge_obj, design)
@@ -171,6 +145,94 @@ call_DA_edgeR <- function(data, call_abundances = TRUE, normalization_method = N
   # lrt <- glmQLFTest(fit, coef=2)
   # pval <- lrt@.Data[[17]]$PValue
   return(pval)
+}
+
+#' Evaluate differential abundance with Wilcox rank sum test or DESeq2 (via Seurat)
+#' This evaluates expression on all features of the count matrix together
+#'
+#' @param data simulated data set
+#' @param groups group (cohort) labels
+#' @param method options include "wilcox" and "DESeq2"
+#' @return p-value for DA for all features
+#' @import Seurat
+#' @import DESeq2
+#' @export
+call_DA_Seurat <- function(data, groups, method = "DESeq2") {
+  count_table <- t(data)
+  n_genes <- nrow(count_table)
+  n_samples_condition <- ncol(count_table)/2
+  
+  rownames(count_table) <- paste0("gene", 1:n_genes)
+  colnames(count_table) <- paste0("cell", 1:(n_samples_condition*2))
+
+  # Create Seurat object manually:
+  # https://learn.gencore.bio.nyu.edu/single-cell-rnaseq/loading-your-own-data-in-seurat-reanalyze-a-different-dataset/
+  seurat_obj <- CreateSeuratObject(counts = count_table, project = "simulation", min.cells = 1, min.features = 10)
+  DefaultAssay(seurat_obj) <- "RNA"
+  
+  # Note: Some kind of implicit filtering seems to happen here. Need to figure that out.
+  markers <- FindMarkers(seurat_obj,
+                         ident.1 = colnames(count_table)[groups == 0],
+                         ident.2 = colnames(count_table)[groups == 1],
+                         test.use = method,
+                         assay = "RNA")
+  # Adjusted p-values are Bonferroni corrected
+  sig_genes <- rownames(markers)[markers$p_val_adj < 0.05]
+  calls <- rep(1, n_genes)
+  calls[which(rownames(count_table) %in% sig_genes)] <- 0
+  return(calls)
+}
+
+#' Evaluate differential abundance with Wilcox rank sum test or DESeq2 (via Seurat)
+#' This evaluates expression on all features of the count matrix together
+#'
+#' @param data simulated data set
+#' @param groups group (cohort) labels
+#' @return p-value for DA for all features
+#' @import SingleCellExperiment
+#' @import MAST
+#' @import data.table
+#' @export
+call_DA_MAST <- function(data, groups) {
+  count_table <- t(data)
+  n_genes <- nrow(count_table)
+  n_samples_condition <- ncol(count_table)/2
+
+  cell_metadata <- data.frame(condition = as.factor(groups))
+  levels(cell_metadata$condition) <- c("untreated", "treated")
+  
+  rownames(cell_metadata) <- colnames(count_table)
+  rownames(count_table) <- paste0("gene", 1:n_genes)
+  colnames(count_table) <- paste0("cell", 1:(n_samples_condition*2))
+  sce <- SingleCellExperiment(assays = list(counts = count_table),
+                              colData = cell_metadata)
+  sce <- logNormCounts(sce)
+  sca = SceToSingleCellAssay(sce)
+  
+  # GLM version 1
+  zlmCond <- zlm(~ condition, sca = sca, exprs_value = 'logcounts')
+  
+  # GLM version 2 -- model out number of genes detected
+  # This probably shouldn't be a factor in our simulations?
+  # cngeneson <- colSums(assay(sca) > 0)
+  # colData(sca)$cngeneson <- scale(cngeneson)
+  # zlmCond <- zlm(~ condition + cngeneson, sca, exprs_value = 'logcounts')
+  
+  summaryCond <- summary(zlmCond, doLRT = 'conditiontreated') 
+  summaryDt <- summaryCond$datatable
+  fcHurdle <- merge(summaryDt[contrast=='conditiontreated' & component=='H',.(primerid, `Pr(>Chisq)`)], # hurdle P values
+                    summaryDt[contrast=='conditiontreated' & component=='logFC', .(primerid, coef, ci.hi, ci.lo)], by='primerid') # logFC coefficients
+  fcHurdle[,fdr:=p.adjust(`Pr(>Chisq)`, 'fdr')]
+
+  # Use typical MAST thresholds
+  FCTHRESHOLD <- log2(1.5)
+  fcHurdleSig <- merge(fcHurdle[fdr<.05 & abs(coef)>FCTHRESHOLD], as.data.table(mcols(sca)), by='primerid')
+  setorder(fcHurdleSig, fdr)
+  
+  sig_genes <- fcHurdleSig$primerid
+  calls <- rep(1, n_genes)
+  calls[which(rownames(count_table) %in% sig_genes)] <- 0
+  return(calls)
 }
 
 #' Get additive logratios from the data set

@@ -5,17 +5,17 @@
 \title{Evaluate differential abundance with edgeR
 This evaluates expression on all features of the count matrix together}
 \usage{
-call_DA_edgeR(data, call_abundances = TRUE, normalization_method = NULL)
+call_DA_edgeR(data, groups, normalization_method = NULL)
 }
 \arguments{
 \item{data}{simulated data set}
 
-\item{call_abundances}{if TRUE, call DA on abundances; if FALSE, on observed counts}
+\item{groups}{group (cohort) labels}
 
 \item{normalization_method}{if NULL, uses library size normalization; other options include "TMM" and "scran"}
 }
 \value{
-p-value associated with group coefficient
+p-value for DA for all features
 }
 \description{
 Evaluate differential abundance with edgeR
