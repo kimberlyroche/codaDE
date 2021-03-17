@@ -97,7 +97,7 @@ proportion_da <- 0.75
 spike_in <- TRUE
 possible_fold_changes <- NULL
 
-iterations <- 200
+iterations <- 20
 
 # ------------------------------------------------------------------------------------------------------------
 #   Single-simulation visualizations
