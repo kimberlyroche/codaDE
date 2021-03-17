@@ -4,6 +4,7 @@
 library(tidyverse)
 library(gridExtra)
 library(codaDE)
+library(uuid)
 
 # ------------------------------------------------------------------------------------------------------------
 #   Functions
@@ -269,7 +270,7 @@ for(i in 1:iterations) {
 plot_data$rate_type <- as.factor(plot_data$rate_type)
 plot_data$method <- as.factor(plot_data$method)
 
-saveRDS(plot_data, file = file.path("output", paste0("simresults_p",p,"_",ref_data,".rds")))
+saveRDS(plot_data, file = file.path("output", paste0("simresults_p",p,"_",ref_data,"_",UUIDgenerate(),".rds")))
 
 # ggplot(plot_data[plot_data$rate_type == "fpr",], aes(x = abs(delta_mean_v2), y = rate, color = method)) +
 #   geom_point(size = 2) +
