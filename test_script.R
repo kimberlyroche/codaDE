@@ -82,7 +82,7 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
 n <- 5 # replicate number
 # Note: 10 seems to be about a minimum within-condition cell/sample number for
 # scran marker gene identification
-p <- 100
+p <- 10000
 palette <- generate_highcontrast_palette(p)
 
 ref_data <- "simulated"
@@ -98,7 +98,7 @@ proportion_da <- 0.75
 spike_in <- TRUE
 possible_fold_changes <- NULL
 
-iterations <- 10
+iterations <- 200
 
 # ------------------------------------------------------------------------------------------------------------
 #   Single-simulation visualizations
