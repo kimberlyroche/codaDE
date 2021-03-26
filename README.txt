@@ -6,8 +6,8 @@ To submit job arrays of simulations/DE evaluations use:
 # Update to R/3.6.1
 module add R/3.6.1-gcb03
 module add gcc/7.3.0-gcb01
-#module add jpeg/6b-fasrc02
-#module add libpng/1.5.21-fasrc01
+module add libpng/1.5.21-fasrc01
+# module add jpeg/6b-fasrc02
 
 ---------- 2021-03-16
 
@@ -67,7 +67,7 @@ R package RANN
 	(I also added the /bin and /lib directories to the PATH and LD_LIBRARY_PATH respectively but I don't
 	know if this was necessary.)
 
-After this most dependencies fall into place except `spatstat`, which needs to be install as < v2. I used
+After this most dependencies fall into place except `spatstat`, which needs to be installed as < v2. I used
 spatstat_1.64-1.
 
 Then installed Seurat_3.2.3 (since Seurat 4 is not compatible with R 3.6.1).

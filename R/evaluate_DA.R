@@ -6,6 +6,7 @@
 #' @import SingleCellExperiment
 #' @import scran
 #' @import scater
+#' @importFrom S4Vectors metadata
 #' @export
 call_DA_scran <- function(data, groups) {
   # data <- sim_data$observed_counts1[,1:100]
@@ -35,8 +36,9 @@ call_DA_scran <- function(data, groups) {
   # Cluster from docs: https://rdrr.io/bioc/scran/man/getClusteredPCs.html
   sce <- suppressWarnings(scater::runPCA(sce))
   output <- getClusteredPCs(reducedDim(sce))
-  
+
   npcs <- metadata(output)$chosen # number of "informative dimensions"
+
   reducedDim(sce, "PCAsub") <- reducedDim(sce, "PCA")[,1:npcs,drop=FALSE]
   
   # Build a graph based on this truncated dimensionality reduction
@@ -192,6 +194,7 @@ call_DA_Seurat <- function(data, groups, method = "DESeq2") {
 #' @import SingleCellExperiment
 #' @import MAST
 #' @import data.table
+#' @importFrom S4Vectors mcols
 #' @export
 call_DA_MAST <- function(data, groups) {
   count_table <- t(data)
@@ -207,7 +210,7 @@ call_DA_MAST <- function(data, groups) {
   sce <- SingleCellExperiment(assays = list(counts = count_table),
                               colData = cell_metadata)
   sce <- logNormCounts(sce)
-  sca = SceToSingleCellAssay(sce)
+  sca <- SceToSingleCellAssay(sce)
   
   # GLM version 1
   zlmCond <- zlm(~ condition, sca = sca, exprs_value = 'logcounts')
