@@ -1,11 +1,13 @@
 #' Generate simulated differential expression for two conditions
 #'
 #' @param p number of features (genes, taxa) to simulate
+#' @param log_mean log mean for condition 1
 #' @param log_var log variance for condition 1
-#' @return log_noise_var log variance for noise component added to condition 1
+#' @param log_noise_var log variance for noise component added to condition 1
 #' to give condition 2
+#' @return NULL
 #' @export
-build_simulated_reference <- function(p = 1000, log_var = 2, log_noise_var = 1) {
+build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 2, log_noise_var = 1) {
   log_counts1 <- rnorm(p, 0, log_var)
   log_counts2 <- log_counts1 + rnorm(p, 0, log_noise_var)
   counts1 <- exp(log_counts1)
@@ -16,7 +18,7 @@ build_simulated_reference <- function(p = 1000, log_var = 2, log_noise_var = 1) 
 
 #' Generate differential expression reference for Barlow et al. (2020) 16S data
 #'
-#' @return named list of observed counts in conditions 1 and 2
+#' @return NULL
 #' @export
 build_Barlow_reference <- function() {
   file_dir <- file.path("data", "Barlow_2020")
@@ -92,7 +94,7 @@ build_Barlow_reference <- function() {
 
 #' Generate differential expression reference for Morton et al. (2019) 16S data
 #'
-#' @return named list of observed counts in conditions 1 and 2
+#' @return NULL
 #' @export
 build_Morton_reference <- function() {
   # TBD - move bipartite graph code
