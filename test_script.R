@@ -1,6 +1,11 @@
 # 2021-02-27
 # This is a constantly-edited test script for generating simulated data sets and evaluating their properties.
 
+if(R.version$major == 4) {
+  cat("Updating lib paths...\n")
+  .libPaths(c("/gpfs/fs1/data/mukherjeelab/roche/Rlibs", .libPaths()[2]))
+}
+
 library(tidyverse)
 library(gridExtra)
 library(codaDE)
@@ -79,10 +84,10 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
 #   Simulation parameters
 # ------------------------------------------------------------------------------------------------------------
 
-n <- 5 # replicate number
+n <- 10 # replicate number
 # Note: 10 seems to be about a minimum within-condition cell/sample number for
 # scran marker gene identification
-p <- 10000
+p <- 1000
 palette <- generate_highcontrast_palette(p)
 
 ref_data <- "simulated"
@@ -98,7 +103,7 @@ proportion_da <- 0.75
 spike_in <- TRUE
 possible_fold_changes <- NULL
 
-iterations <- 200
+iterations <- 20
 
 # ------------------------------------------------------------------------------------------------------------
 #   Single-simulation visualizations
