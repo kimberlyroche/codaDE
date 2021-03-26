@@ -6,9 +6,6 @@
 \usage{
 build_Barlow_reference()
 }
-\value{
-named list of observed counts in conditions 1 and 2
-}
 \description{
 Generate differential expression reference for Barlow et al. (2020) 16S data
 }

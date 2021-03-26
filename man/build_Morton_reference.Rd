@@ -6,9 +6,6 @@
 \usage{
 build_Morton_reference()
 }
-\value{
-named list of observed counts in conditions 1 and 2
-}
 \description{
 Generate differential expression reference for Morton et al. (2019) 16S data
 }

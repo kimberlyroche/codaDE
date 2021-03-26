@@ -1,7 +1,7 @@
 # 2021-02-27
 # This is a constantly-edited test script for generating simulated data sets and evaluating their properties.
 
-if(R.version$major == 4) {
+if(R.version$major == 4 & Sys.info()[[1]] != "Windows") {
   cat("Updating lib paths...\n")
   .libPaths(c("/gpfs/fs1/data/mukherjeelab/roche/Rlibs", .libPaths()[2]))
 }
@@ -87,14 +87,24 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
 n <- 10 # replicate number
 # Note: 10 seems to be about a minimum within-condition cell/sample number for
 # scran marker gene identification
-p <- 1000
-palette <- generate_highcontrast_palette(p)
 
-ref_data <- "simulated"
+# ref_data <- "simulated_bulk"
+ref_data <- "simulated_16S"
+# ref_data <- "simulated_sc"
 # ref_data <- "Morton"
 # ref_data <- "Barlow"
 # ref_data <- "Athanasiadou_ciona"
 # ref_data <- "Athanasiadou_yeast"
+
+if(ref_data %in% c("simulated_bulk", "Athanasiadou_ciona", "Athanasiadou_yeast")) {
+  p <- 15000
+} else if(ref_data %in% c("simulated_16S", "Morton", "Barlow")) {
+  p <- 1000
+} else if(ref_data %in% c("simulated_sc")) {
+  p <- 5000
+}
+
+palette <- generate_highcontrast_palette(p)
 
 k <- 1
 asymmetry <- 0.8
@@ -224,9 +234,12 @@ plot_data <- data.frame(delta_mean = c(),
                         method = c())
 
 for(i in 1:iterations) {
-  if(ref_data == "simulated") {
-    # Simulate fresh
-    build_simulated_reference(p = p, log_var = 2, log_noise_var = 2)
+  if(ref_data == "simulated_bulk") {
+    build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 1, save_name = ref_data)
+  } else if(ref_data == "simulated_16S") {
+    build_simulated_reference(p = p, log_mean = -1, log_var = 3, log_noise_var = 2, save_name = ref_data)
+  } else if(ref_data == "simulated_sc") {
+    build_simulated_reference(p = p, log_mean = -1, log_var = 2, log_noise_var = 1, save_name = ref_data)
   }
   sim_data <- simulate_sequence_counts(n = n, p = p, k = k, ref_data = ref_data, asymmetry = asymmetry,
                                        sequencing_depth = sequencing_depth, proportion_da = proportion_da,
@@ -245,19 +258,23 @@ for(i in 1:iterations) {
   
   # Discrepancy: true vs. observed
   rates_baseline <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups)
-  rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
-  
   plot_data <- rbind(plot_data,
-                     data.frame(delta_mean_v1 = rep(delta_mean_v1, 2), # absolute difference
-                                delta_mean_v2 = rep(delta_mean_v2, 2), # fold change
-                                rate = c(rates_baseline$fpr, rates_baseline$tpr, rates_partial$fpr, rates_partial$tpr),
-                                rate_type = rep(c("fpr", "tpr"), 2),
-                                method = c(rep("baseline", 2), rep("spike_in", 2))))
-
-  # cat(paste0("Iteration ",i," FPR (baseline): ",round(rates_baseline$fpr, 2),"\n"))
-  # cat(paste0("Iteration ",i," FPR (spike-in): ",round(rates_partial$fpr, 2),"\n"))
-
-  methods <- c("scran", "edgeR", "wilcox", "DESeq2", "MAST")
+                     data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
+                                delta_mean_v2 = rep(delta_mean_v2, 2),
+                                rate = c(rates_baseline$fpr, rates_baseline$tpr),
+                                rate_type = c("fpr", "tpr"),
+                                method = rep("baseline", 2)))
+  
+  # rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
+  # plot_data <- rbind(plot_data,
+  #                    data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
+  #                               delta_mean_v2 = rep(delta_mean_v2, 2),
+  #                               rate = c(rates_partial$fpr, rates_partial$tpr),
+  #                               rate_type = c("fpr", "tpr"),
+  #                               method = rep("spike_in", 2)))
+  
+  # methods <- c("scran", "edgeR", "wilcox", "DESeq2", "MAST")
+  methods <- c("DESeq2")
   for(method in methods) {
     rates <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = method)
     

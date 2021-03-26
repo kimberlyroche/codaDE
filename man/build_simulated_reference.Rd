@@ -4,16 +4,25 @@
 \alias{build_simulated_reference}
 \title{Generate simulated differential expression for two conditions}
 \usage{
-build_simulated_reference(p = 1000, log_var = 2, log_noise_var = 1)
+build_simulated_reference(
+  p = 1000,
+  log_mean = 0,
+  log_var = 2,
+  log_noise_var = 1,
+  save_name = NULL
+)
 }
 \arguments{
 \item{p}{number of features (genes, taxa) to simulate}
 
+\item{log_mean}{log mean for condition 1}
+
 \item{log_var}{log variance for condition 1}
-}
-\value{
-log_noise_var log variance for noise component added to condition 1
-to give condition 2
+
+\item{log_noise_var}{log variance for noise component added to condition 1
+to give condition 2}
+
+\item{save_name}{optional tag to append to saved data file}
 }
 \description{
 Generate simulated differential expression for two conditions
