@@ -88,20 +88,24 @@ n <- 10 # replicate number
 # Note: 10 seems to be about a minimum within-condition cell/sample number for
 # scran marker gene identification
 
-# ref_data <- "simulated_bulk"
-ref_data <- "simulated_16S"
+ref_data <- "simulated_bulk"
+# ref_data <- "simulated_16S"
 # ref_data <- "simulated_sc"
 # ref_data <- "Morton"
 # ref_data <- "Barlow"
 # ref_data <- "Athanasiadou_ciona"
 # ref_data <- "Athanasiadou_yeast"
 
-if(ref_data %in% c("simulated_bulk", "Athanasiadou_ciona", "Athanasiadou_yeast")) {
-  p <- 15000
-} else if(ref_data %in% c("simulated_16S", "Morton", "Barlow")) {
-  p <- 1000
-} else if(ref_data %in% c("simulated_sc")) {
-  p <- 5000
+p <- 15000
+
+if(!exists("p")) {
+  if(ref_data %in% c("simulated_bulk", "Athanasiadou_ciona", "Athanasiadou_yeast")) {
+    p <- 15000
+  } else if(ref_data %in% c("simulated_16S", "Morton", "Barlow")) {
+    p <- 1000
+  } else if(ref_data %in% c("simulated_sc")) {
+    p <- 5000
+  }
 }
 
 palette <- generate_highcontrast_palette(p)
@@ -265,16 +269,16 @@ for(i in 1:iterations) {
                                 rate_type = c("fpr", "tpr"),
                                 method = rep("baseline", 2)))
   
-  # rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
-  # plot_data <- rbind(plot_data,
-  #                    data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
-  #                               delta_mean_v2 = rep(delta_mean_v2, 2),
-  #                               rate = c(rates_partial$fpr, rates_partial$tpr),
-  #                               rate_type = c("fpr", "tpr"),
-  #                               method = rep("spike_in", 2)))
+  rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
+  plot_data <- rbind(plot_data,
+                     data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
+                                delta_mean_v2 = rep(delta_mean_v2, 2),
+                                rate = c(rates_partial$fpr, rates_partial$tpr),
+                                rate_type = c("fpr", "tpr"),
+                                method = rep("spike_in", 2)))
   
   # methods <- c("scran", "edgeR", "wilcox", "DESeq2", "MAST")
-  methods <- c("DESeq2")
+  methods <- c("DESeq2", "scran", "MAST")
   for(method in methods) {
     rates <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = method)
     
