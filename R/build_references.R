@@ -10,7 +10,7 @@
 #' @export
 build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 2,
                                       log_noise_var = 1, save_name = NULL) {
-  log_counts1 <- rnorm(p, 0, log_var)
+  log_counts1 <- rnorm(p, log_mean, log_var)
   log_counts2 <- log_counts1 + rnorm(p, 0, log_noise_var)
   counts1 <- exp(log_counts1)
   counts2 <- exp(log_counts2)
