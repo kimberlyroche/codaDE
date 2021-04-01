@@ -73,7 +73,6 @@ resample_counts <- function(proportions, library_sizes) {
 #' @param k number of distinct cell types
 #' @param ref_data specifies the reference data set to use ("Morton", "Athanasiadou_ciona", "simulated"; case-sensitive)
 #' @param asymmetry proportion of baselines to draw from condition 1
-#' @param sequencing_depth average total nUMI to simulate
 #' @param proportion_da proportion of differentially abundant genes
 #' @param spike_in simulate a control spike in with low dispersion
 #' @param possible_fold_changes if specified, a distribution of possible fold changes available for differential abundance simulation
@@ -86,7 +85,7 @@ resample_counts <- function(proportions, library_sizes) {
 #' @import LaplacesDemon
 #' @export
 simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athanasidou_ciona", asymmetry = 0.5,
-                                     sequencing_depth = 1e5, proportion_da = 0.1,
+                                     proportion_da = 0.1,
                                      spike_in = FALSE, possible_fold_changes = NULL) {
 
   # We'll sample out of GTEx protein-coding gene estimates
@@ -251,21 +250,26 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
   }
 
   realized_total_counts <- rowSums(abundances)
-  scale_down_factor <- sequencing_depth / mean(realized_total_counts)
-  scaled_real_counts <- round(scale_down_factor*realized_total_counts)
+  # scale_down_factor <- sequencing_depth / mean(realized_total_counts)
+  # scaled_real_counts <- round(scale_down_factor*realized_total_counts)
   
-  # No correlation in true / observed library sizes
-  library_sizes.observed_counts1 <- rnbinom(n*2, mu = sequencing_depth, size = 10)
+  # On average, no correlation in true / observed library sizes
+  # library_sizes.observed_counts1 <- rnbinom(n*2, mu = realized_total_counts, size = 0.1)
   # Modest correlation true / observed library sizes
-  library_sizes.observed_counts2 <- rnbinom(n*2, mu = scaled_real_counts, size = 10)
-  # Very strong correlation in true / observed library sizes
-  library_sizes.observed_counts3 <- rnbinom(n*2, mu = scaled_real_counts, size = 100)
+  # library_sizes.observed_counts2 <- rnbinom(n*2, mu = realized_total_counts, size = 50)
+  # # Very strong correlation in true / observed library sizes
+  # library_sizes.observed_counts3 <- rnbinom(n*2, mu = realized_total_counts, size = 100)
 
+  library_sizes.observed_counts1 <- sample(realized_total_counts)
+  library_sizes.observed_counts2 <- realized_total_counts
+  shuffle_idx <- sample(1:(n*2), size = n)
+  library_sizes.observed_counts2[shuffle_idx] <- library_sizes.observed_counts2[sample(shuffle_idx)]
+  
   # transform to proportions
   sampled_proportions <- apply(abundances, 1, function(x) x/sum(x))
   observed_counts1 <- resample_counts(sampled_proportions, library_sizes.observed_counts1)
   observed_counts2 <- resample_counts(sampled_proportions, library_sizes.observed_counts2)
-  observed_counts3 <- resample_counts(sampled_proportions, library_sizes.observed_counts3)
+  # observed_counts3 <- resample_counts(sampled_proportions, library_sizes.observed_counts3)
   
   # Quick visualization
   # par(mfrow = c(1, 2))
@@ -279,7 +283,7 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
               abundances = abundances,
               observed_counts1 = observed_counts1,
               observed_counts2 = observed_counts2,
-              observed_counts3 = observed_counts3,
+              # observed_counts3 = observed_counts3,
               groups = groups,
               da_assignment = which(da_assignment == TRUE)))
 }

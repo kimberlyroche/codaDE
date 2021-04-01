@@ -23,6 +23,7 @@ plot_stacked_bars <- function(data, palette = NULL, save_name = NULL) {
   p <- ggplot(data, aes(fill = feature, y = abundance, x = sample)) + 
     geom_bar(position = "stack", stat = "identity") +
     scale_fill_manual(values = palette) +
+    theme_bw() +
     theme(legend.position = "none")
   show(p)
   if(!is.null(save_name)) {

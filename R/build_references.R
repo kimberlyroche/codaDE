@@ -79,7 +79,7 @@ build_Barlow_reference <- function() {
   counts <- t(counts)
   
   saveRDS(list(counts = counts, groups = groups, tax = tax),
-         file = file.path(file_dir, "absolute_Barlow.rds"))
+         file = file.path("data", "absolute_Barlow.rds"))
   
   # Build DE model
   counts1 <- counts[,groups == "control" & days == 10]
