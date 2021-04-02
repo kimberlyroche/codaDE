@@ -231,7 +231,9 @@ if(FALSE) {
 #   Run lots of simulations, calculate FPR
 # ------------------------------------------------------------------------------------------------------------
 
-plot_data <- data.frame(delta_mean = c(),
+plot_data <- data.frame(delta_mean_v1 = c(),
+                        delta_mean_v2 = c(),
+                        cor_totals = c(),
                         rate = c(),
                         rate_type = c(),
                         method = c())
@@ -261,11 +263,16 @@ for(i in 1:iterations) {
   delta_mean_v1 <- max(c(m1, m2)) - min(c(m1, m2))
   delta_mean_v2 <- max(c(m1, m2)) / min(c(m1, m2))
   
+  totals <- rowSums(sim_data$abundances)
+  totals1 <- rowSums(sim_data$observed_counts1)
+  totals2 <- rowSums(sim_data$observed_counts2)
+  
   # Discrepancy: true vs. observed
   rates_baseline <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups)
   plot_data <- rbind(plot_data,
                      data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
                                 delta_mean_v2 = rep(delta_mean_v2, 2),
+                                cor_totals = cor(totals, totals1),
                                 rate = c(rates_baseline$fpr, rates_baseline$tpr),
                                 rate_type = c("fpr", "tpr"),
                                 method = rep("baseline", 2)))
@@ -274,6 +281,7 @@ for(i in 1:iterations) {
   plot_data <- rbind(plot_data,
                      data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
                                 delta_mean_v2 = rep(delta_mean_v2, 2),
+                                cor_totals = cor(totals, totals2),
                                 rate = c(rates_partial$fpr, rates_partial$tpr),
                                 rate_type = c("fpr", "tpr"),
                                 method = rep("spike_in", 2)))
@@ -286,6 +294,7 @@ for(i in 1:iterations) {
     plot_data <- rbind(plot_data,
                        data.frame(delta_mean_v1 = rep(delta_mean_v1, 2), # absolute difference
                                   delta_mean_v2 = rep(delta_mean_v2, 2), # fold change
+                                  cor_totals = cor(totals, totals1),
                                   rate = c(rates$fpr, rates$tpr),
                                   rate_type = c("fpr", "tpr"),
                                   method = c(rep(method, 2))))
