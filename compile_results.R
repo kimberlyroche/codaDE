@@ -5,7 +5,7 @@ if(R.version$major == 4) {
 
 library(stringr)
 
-file.dir <- "p15000"
+file.dir <- "p100"
 
 # Generalize to take a `p` argument
 # files <- list.files(pattern = "simresults_p5000_simulated_*", path = "output")

@@ -239,9 +239,10 @@ plot_data <- data.frame(delta_mean_v1 = c(),
                         method = c())
 
 for(i in 1:iterations) {
-  cat("--------------- ITERATION",i,"\n")
+  cat("------------ STARTING ITERATION",i,"\n")
   if(ref_data == "simulated_bulk") {
-    build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 1, save_name = ref_data)
+    # build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 1, save_name = ref_data)
+    build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 2, save_name = ref_data)
   } else if(ref_data == "simulated_16S") {
     build_simulated_reference(p = p, log_mean = -1, log_var = 3, log_noise_var = 2, save_name = ref_data)
   } else if(ref_data == "simulated_sc") {
