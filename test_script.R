@@ -96,7 +96,7 @@ ref_data <- "simulated_bulk"
 # ref_data <- "Athanasiadou_ciona"
 # ref_data <- "Athanasiadou_yeast"
 
-p <- 15000
+p <- 100
 
 if(!exists("p")) {
   if(ref_data %in% c("simulated_bulk", "Athanasiadou_ciona", "Athanasiadou_yeast")) {
@@ -112,7 +112,6 @@ palette <- generate_highcontrast_palette(p)
 
 k <- 1
 asymmetry <- 0.8
-sequencing_depth <- 1e5
 proportion_da <- 0.75
 spike_in <- TRUE
 possible_fold_changes <- NULL
@@ -130,7 +129,7 @@ if(iterations == 1) {
     build_simulated_reference(p = p, log_var = 2, log_noise_var = 1.5)
   }
   sim_data <- simulate_sequence_counts(n = n, p = p, k = k, ref_data = ref_data, asymmetry = asymmetry,
-                                       sequencing_depth = sequencing_depth, proportion_da = proportion_da,
+                                       proportion_da = proportion_da,
                                        spike_in = spike_in, possible_fold_changes = possible_fold_changes)
   m1 <- mean(rowSums(sim_data$abundances[1:n,]))
   m2 <- mean(rowSums(sim_data$abundances[(n+1):(n*2),]))
@@ -209,7 +208,7 @@ if(FALSE) {
       cat("Iteration",i,"\n")
     }
     sim_data <- simulate_sequence_counts(n = n, p = p, k = k, ref_data = ref_data, asymmetry = asymmetry,
-                                         sequencing_depth = sequencing_depth, proportion_da = proportion_da,
+                                         proportion_da = proportion_da,
                                          spike_in = spike_in, possible_fold_changes = possible_fold_changes)
     totals <- rowSums(sim_data$abundances)
     t1 <- mean(totals[1:n])
@@ -232,12 +231,15 @@ if(FALSE) {
 #   Run lots of simulations, calculate FPR
 # ------------------------------------------------------------------------------------------------------------
 
-plot_data <- data.frame(delta_mean = c(),
+plot_data <- data.frame(delta_mean_v1 = c(),
+                        delta_mean_v2 = c(),
+                        cor_totals = c(),
                         rate = c(),
                         rate_type = c(),
                         method = c())
 
 for(i in 1:iterations) {
+  cat("--------------- ITERATION",i,"\n")
   if(ref_data == "simulated_bulk") {
     build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 1, save_name = ref_data)
   } else if(ref_data == "simulated_16S") {
@@ -246,7 +248,7 @@ for(i in 1:iterations) {
     build_simulated_reference(p = p, log_mean = -1, log_var = 2, log_noise_var = 1, save_name = ref_data)
   }
   sim_data <- simulate_sequence_counts(n = n, p = p, k = k, ref_data = ref_data, asymmetry = asymmetry,
-                                       sequencing_depth = sequencing_depth, proportion_da = proportion_da,
+                                       proportion_da = proportion_da,
                                        spike_in = spike_in, possible_fold_changes = possible_fold_changes)
 
   # Call differential expression/abundance
@@ -260,11 +262,16 @@ for(i in 1:iterations) {
   delta_mean_v1 <- max(c(m1, m2)) - min(c(m1, m2))
   delta_mean_v2 <- max(c(m1, m2)) / min(c(m1, m2))
   
+  totals <- rowSums(sim_data$abundances)
+  totals1 <- rowSums(sim_data$observed_counts1)
+  totals2 <- rowSums(sim_data$observed_counts2)
+  
   # Discrepancy: true vs. observed
   rates_baseline <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups)
   plot_data <- rbind(plot_data,
                      data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
                                 delta_mean_v2 = rep(delta_mean_v2, 2),
+                                cor_totals = cor(totals, totals1),
                                 rate = c(rates_baseline$fpr, rates_baseline$tpr),
                                 rate_type = c("fpr", "tpr"),
                                 method = rep("baseline", 2)))
@@ -273,6 +280,7 @@ for(i in 1:iterations) {
   plot_data <- rbind(plot_data,
                      data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
                                 delta_mean_v2 = rep(delta_mean_v2, 2),
+                                cor_totals = cor(totals, totals2),
                                 rate = c(rates_partial$fpr, rates_partial$tpr),
                                 rate_type = c("fpr", "tpr"),
                                 method = rep("spike_in", 2)))
@@ -285,6 +293,7 @@ for(i in 1:iterations) {
     plot_data <- rbind(plot_data,
                        data.frame(delta_mean_v1 = rep(delta_mean_v1, 2), # absolute difference
                                   delta_mean_v2 = rep(delta_mean_v2, 2), # fold change
+                                  cor_totals = cor(totals, totals1),
                                   rate = c(rates$fpr, rates$tpr),
                                   rate_type = c("fpr", "tpr"),
                                   method = c(rep(method, 2))))
