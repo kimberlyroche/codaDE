@@ -5,7 +5,7 @@ library(pROC)
 
 setwd("C:/Users/kimbe/Documents/codaDE")
 
-p <- 5000
+p <- 1000
 
 data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds")))
 
@@ -16,7 +16,7 @@ data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds"
 #   ROC curve version
 # ------------------------------------------------------------------------------
 
-spikeins <- FALSE
+spikeins <- TRUE
 
 if(spikeins) {
   plot_data <- data %>%

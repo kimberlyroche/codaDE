@@ -261,9 +261,18 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
   # library_sizes.observed_counts3 <- rnbinom(n*2, mu = realized_total_counts, size = 100)
 
   library_sizes.observed_counts1 <- sample(realized_total_counts)
-  library_sizes.observed_counts2 <- realized_total_counts
-  shuffle_idx <- sample(1:(n*2), size = n)
-  library_sizes.observed_counts2[shuffle_idx] <- library_sizes.observed_counts2[sample(shuffle_idx)]
+  # library_sizes.observed_counts2 <- realized_total_counts
+  # shuffle_idx <- sample(1:(n*2), size = n)
+  # library_sizes.observed_counts2[shuffle_idx] <- library_sizes.observed_counts2[sample(shuffle_idx)]
+  library_sizes.observed_counts2 <- abs(rnorm(n*2, mean = realized_total_counts, sd = sd(realized_total_counts)*2))
+  
+  # ggplot(data = data.frame(x = rep(1:(n*2), 2),
+  #                          totals = c(realized_total_counts, library_sizes.observed_counts2),
+  #                          type = c(rep("A", n*2), rep("B", n*2))),
+  #        aes(x = x, y = totals, color = type)) +
+  #   geom_point(size = 3, alpha = 0.5)
+  # 
+  # cor(realized_total_counts, library_sizes.observed_counts2)
   
   # transform to proportions
   sampled_proportions <- apply(abundances, 1, function(x) x/sum(x))
