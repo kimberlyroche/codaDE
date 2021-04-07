@@ -7,13 +7,10 @@
 simulate_sequence_counts(
   n = 500,
   p = 1000,
-  k = 1,
   ref_data = "Athanasidou_ciona",
   asymmetry = 0.5,
-  sequencing_depth = 1e+05,
   proportion_da = 0.1,
-  spike_in = FALSE,
-  possible_fold_changes = NULL
+  spike_in = FALSE
 )
 }
 \arguments{
@@ -21,19 +18,13 @@ simulate_sequence_counts(
 
 \item{p}{number of features (i.e. genes or bacterial taxa)}
 
-\item{k}{number of distinct cell types}
-
 \item{ref_data}{specifies the reference data set to use ("Morton", "Athanasiadou_ciona", "simulated"; case-sensitive)}
 
 \item{asymmetry}{proportion of baselines to draw from condition 1}
 
-\item{sequencing_depth}{average total nUMI to simulate}
-
 \item{proportion_da}{proportion of differentially abundant genes}
 
 \item{spike_in}{simulate a control spike in with low dispersion}
-
-\item{possible_fold_changes}{if specified, a distribution of possible fold changes available for differential abundance simulation}
 }
 \value{
 named list of true abundances, observed abundances, and group assignments

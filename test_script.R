@@ -45,6 +45,12 @@ DE_by_scran <- function(ref_data, data, groups) {
   return(list(oracle_calls = oracle_calls, calls = calls))
 }
 
+DE_by_ALDEx2 <- function(ref_data, data, groups) {
+  oracle_calls <- call_DA_ALDEx2(ref_data, groups)
+  calls <- call_DA_ALDEx2(data, groups)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
 calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
   if(method == "scran") {
     DE_calls <- DE_by_scran(ref_data, data, groups)
@@ -60,6 +66,10 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
     calls <- DE_calls$calls
   } else if(method == "MAST") {
     DE_calls <- DE_by_MAST(ref_data, data, groups)
+    oracle_calls <- DE_calls$oracle_calls
+    calls <- DE_calls$calls
+  } else if(method == "ALDEx2") {
+    DE_calls <- DE_by_ALDEx2(ref_data, data, groups)
     oracle_calls <- DE_calls$oracle_calls
     calls <- DE_calls$calls
   } else {
@@ -110,11 +120,9 @@ if(!exists("p")) {
 
 palette <- generate_highcontrast_palette(p)
 
-k <- 1
 asymmetry <- 0.8
 proportion_da <- 0.75
 spike_in <- TRUE
-possible_fold_changes <- NULL
 
 iterations <- 20
 
@@ -248,10 +256,13 @@ for(i in 1:iterations) {
   } else if(ref_data == "simulated_sc") {
     build_simulated_reference(p = p, log_mean = -1, log_var = 2, log_noise_var = 1, save_name = ref_data)
   }
-  sim_data <- simulate_sequence_counts(n = n, p = p, k = k, ref_data = ref_data, asymmetry = asymmetry,
+  sim_data <- simulate_sequence_counts(n = n, p = p, ref_data = ref_data,
+                                       asymmetry = asymmetry,
                                        proportion_da = proportion_da,
-                                       spike_in = spike_in, possible_fold_changes = possible_fold_changes)
+                                       spike_in = spike_in)
 
+
+  
   # Call differential expression/abundance
   
   # if(i %% 10 == 0) {
@@ -266,6 +277,9 @@ for(i in 1:iterations) {
   totals <- rowSums(sim_data$abundances)
   totals1 <- rowSums(sim_data$observed_counts1)
   totals2 <- rowSums(sim_data$observed_counts2)
+  
+  rates_baseline <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = "ALDEx2")
+  
   
   # Discrepancy: true vs. observed
   rates_baseline <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups)
@@ -287,7 +301,8 @@ for(i in 1:iterations) {
                                 method = rep("spike_in", 2)))
   
   # methods <- c("scran", "edgeR", "wilcox", "DESeq2", "MAST")
-  methods <- c("DESeq2", "scran", "MAST")
+  # methods <- c("DESeq2", "scran", "MAST")
+  methods <- c("ALDEx2")
   for(method in methods) {
     rates <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = method)
     

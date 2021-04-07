@@ -66,16 +66,28 @@ resample_counts <- function(proportions, library_sizes) {
   t(observed_counts)
 }
 
+# Utility function to spike-in a one-count to prevent any fully unobserved taxa
+# Counts should be samples x features
+spike_in_ones <- function(counts) {
+  all_zeros <- which(colSums(counts) == 0)
+  n <- nrow(counts)/2
+  for(idx in all_zeros) {
+    one_idx <- sample(1:n, size = 1)
+    counts[one_idx,idx] <- 1
+    one_idx <- sample((n+1):(n*2), size = 1)
+    counts[one_idx,idx] <- 1
+  }
+  return(counts)
+}
+
 #' Simulate UMI count single-cell RNA-seq data
 #'
 #' @param n number of samples per group
 #' @param p number of features (i.e. genes or bacterial taxa)
-#' @param k number of distinct cell types
 #' @param ref_data specifies the reference data set to use ("Morton", "Athanasiadou_ciona", "simulated"; case-sensitive)
 #' @param asymmetry proportion of baselines to draw from condition 1
 #' @param proportion_da proportion of differentially abundant genes
 #' @param spike_in simulate a control spike in with low dispersion
-#' @param possible_fold_changes if specified, a distribution of possible fold changes available for differential abundance simulation
 #' @return named list of true abundances, observed abundances, and group assignments
 #' @details Library size correlation can be specified as 0, 1, or 2, indicating no correlation, modest correlation, or very strong
 #' correlation with true abundances.
@@ -84,60 +96,13 @@ resample_counts <- function(proportions, library_sizes) {
 #' with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
 #' @import LaplacesDemon
 #' @export
-simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athanasidou_ciona", asymmetry = 0.5,
+simulate_sequence_counts <- function(n = 500,
+                                     p = 1000,
+                                     ref_data = "Athanasidou_ciona",
+                                     asymmetry = 0.5,
                                      proportion_da = 0.1,
-                                     spike_in = FALSE, possible_fold_changes = NULL) {
+                                     spike_in = FALSE) {
 
-  # We'll sample out of GTEx protein-coding gene estimates
-  # GTEx_estimates_baseline <- readRDS("data/empirical_mu_size.rds")
-  #
-  # if(microbial) {
-  #   estimate_pairs <- readRDS("data/empirical_mu_size_pairs_16S.rds")
-  #   estimate_pairs <- cbind(estimate_pairs[,3:4], estimate_pairs[,1:2])
-  #   k <- 1
-  #   p <- 1000 # SV count
-  # } else {
-  #   estimate_pairs <- readRDS("data/empirical_mu_size_pairs.rds")
-  #   p <- 20000 # gene count
-  # }
-  # # Change zero-mean to 1, still rare
-  # estimate_pairs[estimate_pairs[,1] == 0,1] <- min(estimate_pairs[estimate_pairs[,1] > 0,1])
-  # estimate_pairs[estimate_pairs[,3] == 0,3] <- min(estimate_pairs[estimate_pairs[,3] > 0,3])
-  # # Fix unestimable (very low) dispersions
-  # estimate_pairs[is.na(estimate_pairs[,2]),2] <- 100
-  # estimate_pairs[is.na(estimate_pairs[,4]),4] <- 100
-  # 
-  # n_da <- round(p * proportion_da)
-  # n_not_da <- p - n_da
-  # if(!is.null(possible_fold_changes)) {
-  #   da_assignment <- as.logical(rbinom(p, size = 1, prob = proportion_da))
-  #   # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
-  #   all_params <- unname(estimate_pairs[sample(1:nrow(estimate_pairs), size = p, replace = TRUE),])
-  #   all_params <- cbind(all_params, all_params) # before-after are identical but...
-  #   da_factors <- sample(c(1/possible_fold_changes, possible_fold_changes), size = p, replace = TRUE)
-  #   for(pp in 1:p) {
-  #     if(da_assignment[pp]) {
-  #       all_params[pp,3] <- all_params[pp,3]*da_factors[pp]
-  #       # Dispersion unchanged
-  #     }
-  #   }
-  # } else {
-  #   da_assignment <- c(rep(FALSE, n_not_da), rep(TRUE, n_da))
-  #   # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
-  #   non_da_params <- unname(estimate_pairs[sample(1:nrow(estimate_pairs), size = n_not_da, replace = TRUE),1:2])
-  #   non_da_params <- cbind(non_da_params, non_da_params) # before-after are identical
-  #   # Randomly draw in a similar way for the differential set
-  #   # Require a fold change in means that's < 1/2 or > 2
-  #   ratio_means <- estimate_pairs[,3] / estimate_pairs[,1]
-  #   thresholded_genes <- which(ratio_means <= 0.5 | ratio_means >= 2)
-  #   da_params <- unname(estimate_pairs[sample(thresholded_genes, size = n_da, replace = TRUE),])
-  #   all_params <- rbind(non_da_params, da_params)
-  # }
-  #
-  # Clean up NAs
-  # all_params[is.na(all_params[,2]),2] <- 1
-  # all_params[is.na(all_params[,4]),4] <- 1
-  
   ref_file <- file.path("data", paste0("DE_reference_",ref_data,".rds"))
   cat("Using reference file:",ref_file,"\n")
   data_obj <- readRDS(ref_file)
@@ -148,85 +113,31 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
   n_da <- round(p * proportion_da)
   n_not_da <- p - n_da
 
-  if(!is.null(possible_fold_changes)) {
-    # I think this is broken -- worth a look
-    # sampled_features <- sample(1:length(data_obj$cond1), size = p, replace = TRUE)
-    # all_params <- matrix(NA, p, 2)
-    # for(i in 1:length(sampled_features)) {
-    #   all_params[i,] <- c(data_obj$cond1[sampled_features[i]], 1)
-    # }
-    # all_params <- cbind(all_params, all_params) # before-after are identical but...
-    # 
-    # da_assignment <- as.logical(rbinom(p, size = 1, prob = proportion_da))
-    # # Randomly draw mean-dispersions from across tissues in the empirical sample for non-differential genes
-    # da_factors <- sample(c(1/possible_fold_changes, possible_fold_changes), size = p, replace = TRUE)
-    # for(pp in 1:p) {
-    #   if(da_assignment[pp]) {
-    #     all_params[pp,3] <- all_params[pp,3]*da_factors[pp]
-    #     # Dispersion unchanged
-    #   }
-    # }
-  } else {
-    # differential_baselines <- data_obj$differential_distribution[,1]
-    # breaks <- quantile(differential_baselines, probs = seq(from = 0, to = 1, length.out = 5))
-    # # Fix for R's cut function being kind of shitty
-    # breaks[[1]] <- -Inf
-    # breaks[[length(breaks)]] <- Inf
-    # 
-    # da_sample <- sample(1:nrow(all_params), size = n_da)
-    # da_assignment <- logical(p)
-    # da_assignment[da_sample] <- TRUE
-    # 
-    # for(baseline_idx in da_sample) {
-    #   baseline_mu <- all_params[baseline_idx,1]
-    #   baseline_size <- all_params[baseline_idx,2]
-    #   
-    #   binned_expression <- cut(c(baseline_mu, differential_baselines), breaks = breaks)
-    #   baseline_mu_binned <- binned_expression[1]
-    #   binned_expression <- binned_expression[2:length(binned_expression)]
-    #   similar_mus <- which(baseline_mu_binned == binned_expression)
-    #   
-    #   differential_idx <- sample(similar_mus, size = 1)
-    #   differential_mu <- differential_distribution[differential_idx,3]
-    #   differential_size <- differential_distribution[differential_idx,4]
-    #   
-    #   all_params[baseline_idx,3:4] <- c(differential_mu, differential_size)
-    #   
-    #   # Visually validate a "difference"
-    #   # expr1 <- rnbinom(100, mu = baseline_mu, size = baseline_size)
-    #   # expr2 <- rnbinom(100, mu = differential_mu, size = differential_size)
-    #   # plot(c(expr1, expr2))
-    # }
-    
-    # Assume symmetric sampling
-    # if(p %% 2 != 0) { p <- p + 1 }
-    
-    p1 <- round(asymmetry*p)
-    p2 <- p - p1
-    
-    # baseline_features <- sample(1:length(data_obj$cond1), size = p, replace = TRUE)
-    # baseline_features1 <- baseline_features[1:(p/2)]
-    # baseline_features2 <- baseline_features[(p/2 + 1):p]
-    baseline_features1 <- sample(1:length(data_obj$cond1), size = p1, replace = TRUE)
-    baseline_features2 <- sample(1:length(data_obj$cond2), size = p2, replace = TRUE)
-    baseline_counts <- c(data_obj$cond1[baseline_features1], data_obj$cond2[baseline_features2])
-    treatment_counts <- c(data_obj$cond2[baseline_features1], data_obj$cond1[baseline_features2])
-    
-    da_sample <- sample(1:p, size = n_da)
-    da_assignment <- logical(p)
-    da_assignment[da_sample] <- TRUE
-    
-    all_params <- matrix(1, p, 4)
-    all_params[,c(1,3)] <- baseline_counts
-    all_params[,c(2,4)] <- 1000 # fixed dispersion for now
-    all_params[da_assignment,3] <- treatment_counts[da_assignment]
-    
-    # Visually validate a "difference"
-    # idx <- sample(da_sample, size = 1)
-    # expr1 <- rnbinom(100, mu = all_params[idx,1], size = all_params[idx,2])
-    # expr2 <- rnbinom(100, mu = all_params[idx,3], size = all_params[idx,4])
-    # plot(c(expr1, expr2))
-  }
+  p1 <- round(asymmetry*p)
+  p2 <- p - p1
+  
+  # baseline_features <- sample(1:length(data_obj$cond1), size = p, replace = TRUE)
+  # baseline_features1 <- baseline_features[1:(p/2)]
+  # baseline_features2 <- baseline_features[(p/2 + 1):p]
+  baseline_features1 <- sample(1:length(data_obj$cond1), size = p1, replace = TRUE)
+  baseline_features2 <- sample(1:length(data_obj$cond2), size = p2, replace = TRUE)
+  baseline_counts <- c(data_obj$cond1[baseline_features1], data_obj$cond2[baseline_features2])
+  treatment_counts <- c(data_obj$cond2[baseline_features1], data_obj$cond1[baseline_features2])
+  
+  da_sample <- sample(1:p, size = n_da)
+  da_assignment <- logical(p)
+  da_assignment[da_sample] <- TRUE
+  
+  all_params <- matrix(1, p, 4)
+  all_params[,c(1,3)] <- baseline_counts
+  all_params[,c(2,4)] <- 1000 # fixed dispersion for now
+  all_params[da_assignment,3] <- treatment_counts[da_assignment]
+  
+  # Visually validate a "difference"
+  # idx <- sample(da_sample, size = 1)
+  # expr1 <- rnbinom(100, mu = all_params[idx,1], size = all_params[idx,2])
+  # expr2 <- rnbinom(100, mu = all_params[idx,3], size = all_params[idx,4])
+  # plot(c(expr1, expr2))
   
   # Assign control vs. treatment groups
   groups <- c(rep(0, n), rep(1, n))
@@ -249,6 +160,11 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
     abundances <- cbind(abundances, rnbinom(n*2, mu = spike_in_mean, size = 100))
   }
 
+  # If there are any fully-zero taxa, spike-in a random 1-count in each condition
+  # This is so these taxa don't get summarily filtered out by some of the DA
+  # calling methods. It basically helps with matching p-value output to indices.
+  abundances <- spike_in_ones(abundances)
+  
   realized_total_counts <- rowSums(abundances)
   # scale_down_factor <- sequencing_depth / mean(realized_total_counts)
   # scaled_real_counts <- round(scale_down_factor*realized_total_counts)
@@ -279,6 +195,10 @@ simulate_sequence_counts <- function(n = 500, p = 1000, k = 1, ref_data = "Athan
   observed_counts1 <- resample_counts(sampled_proportions, library_sizes.observed_counts1)
   observed_counts2 <- resample_counts(sampled_proportions, library_sizes.observed_counts2)
   # observed_counts3 <- resample_counts(sampled_proportions, library_sizes.observed_counts3)
+  
+  # Repeat spike-in of ones
+  observed_counts1 <- spike_in_ones(observed_counts1)
+  observed_counts2 <- spike_in_ones(observed_counts2)
   
   # Quick visualization
   # par(mfrow = c(1, 2))

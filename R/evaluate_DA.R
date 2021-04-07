@@ -238,6 +238,32 @@ call_DA_MAST <- function(data, groups) {
   return(calls)
 }
 
+#' Evaluate differential abundance with Welch's t-test using ALDEx2 (w/ iqlr)
+#' This evaluates expression on all features of the count matrix together
+#'
+#' @param data simulated data set
+#' @param groups group (cohort) labels
+#' @return p-value for DA for all features
+#' @import ALDEx2
+#' @export
+call_DA_ALDEx2 <- function(data, groups) {
+  count_table <- t(data)
+  n_genes <- nrow(count_table)
+  n_samples_condition <- ncol(count_table)/2
+  
+  res <- aldex(count_table, groups, denom = "iqlr")
+
+  # Interpreting the output:
+  # we.ep - Expected P value of Welch's t test
+  # we.eBH - Expected Benjamini-Hochberg corrected P value of Welch's t test
+  # wi.ep - Expected P value of Wilcoxon rank test
+  # wi.eBH - Expected Benjamini-Hochberg corrected P value of Wilcoxon test
+  # kw.ep - Expected P value of Kruskal-Wallace test
+  # kw.eBH - Expected Benjamini-Hochberg corrected P value of Kruskal-Wallace test
+  
+  return(res$we.eBH)
+}
+
 #' Get additive logratios from the data set
 #'
 #' @param data simulated data set
