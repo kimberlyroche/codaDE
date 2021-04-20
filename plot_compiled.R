@@ -13,18 +13,21 @@ setwd("C:/Users/kimbe/Documents/codaDE")
 #   geom_point(size = 10) +
 #   scale_color_manual(values = palette)
 
-palette <- c("#46A06B", "#B95D6E", "#EF82BB", "#755A7F", "#E3C012")
+# Previous
+# palette <- c("#46A06B", "#B95D6E", "#EF82BB", "#755A7F", "#E3C012")
+
+palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
 
 # ------------------------------------------------------------------------------
 #   ROC curve(ish) version
 # ------------------------------------------------------------------------------
 
-p <- 15000
+p <- 100
 data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds")))
 
 plot_data <- data %>%
   select(delta_mean_v2, rate, rate_type, method) %>%
-  filter(method != "spike_in") %>%
+  filter(!(method %in% c("spike_in", "ALDEx2"))) %>%
   pivot_wider(names_from = rate_type, values_from = rate)
 plot_data$method <- factor(plot_data$method)
 levels(plot_data$method) <- c("NB GLM", "DESeq2", "MAST", "scran")
@@ -75,32 +78,35 @@ if(partial_plot) {
          width = 3)
   
   # ROC-like plots for NB GLM and NB GLM on partially faithful totals
-  # p <- 100
-  # data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds")))
-  # 
-  # plot_data <- data %>%
-  #   select(delta_mean_v2, rate, rate_type, method, cor_totals) %>%
-  #   filter(method %in% c("baseline", "spike_in")) %>%
-  #   pivot_wider(names_from = rate_type, values_from = rate)
-  # plot_data$method <- factor(plot_data$method)
-  # levels(plot_data$method) <- c("NB GLM", "NB GLM (partial totals)")
-  # 
-  # binary_palette <- palette[c(1,5)]
-  # 
-  # ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
-  #   geom_point(size = 2, alpha = 0.5) +
-  #   scale_color_manual(values = binary_palette) +
-  #   # xlim(c(0,1)) +
-  #   # ylim(c(0,1)) +
-  #   xlim(c(0,0.75)) +
-  #   ylim(c(0.25,1)) +
-  #   xlab("FPR") +
-  #   ylab("TPR") +
-  #   facet_wrap(. ~ method)
-  # ggsave(file.path("output", "images", paste0("DE_p",p,"_all_models_partial.png")),
-  #        units = "in",
-  #        height = 2.5,
-  #        width = 5)
+  data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds")))
+
+  plot_data <- data %>%
+    select(delta_mean_v2, rate, rate_type, method, cor_totals) %>%
+    # filter(method %in% c("baseline", "spike_in", "ALDEx2")) %>%
+    filter(method %in% c("baseline", "ALDEx2")) %>%
+    pivot_wider(names_from = rate_type, values_from = rate)
+  plot_data$method <- factor(plot_data$method)
+  # levels(plot_data$method) <- c("NB GLM", "NB GLM (partial totals)", "ALDEx2")
+  levels(plot_data$method) <- c("NB GLM", "ALDEx2")
+
+  # binary_palette <- palette[c(1,5,6)]
+  binary_palette <- palette[c(1,6)]
+
+  ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
+    geom_point(size = 2, alpha = 0.5) +
+    scale_color_manual(values = binary_palette) +
+    # xlim(c(0,1)) +
+    # ylim(c(0,1)) +
+    xlim(c(0,0.75)) +
+    ylim(c(0.25,1)) +
+    xlab("FPR") +
+    ylab("TPR") +
+    facet_wrap(. ~ method) +
+    theme(legend.position = "none")
+  ggsave(file.path("output", "images", "partial_total_performance_wALDEx2.png"),
+         units = "in",
+         height = 2.5,
+         width = 5)
 }
 
 # ------------------------------------------------------------------------------

@@ -15,66 +15,91 @@ library(uuid)
 #   Functions
 # ------------------------------------------------------------------------------------------------------------
 
-DE_by_NB <- function(ref_data, data, groups) {
-  oracle_calls <- sapply(1:p, function(idx) { call_DA_NB(ref_data, groups, idx) } )
+DE_by_NB <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- sapply(1:p, function(idx) { call_DA_NB(ref_data, groups, idx) } )
+  }
   calls <- sapply(1:p, function(idx) { call_DA_NB(data, groups, idx) } )
   return(list(oracle_calls = oracle_calls, calls = calls))
 }
 
-DE_by_edgeR <- function(ref_data, data, groups) {
-  oracle_calls <- call_DA_edgeR(ref_data, groups)
+DE_by_edgeR <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_edgeR(ref_data, groups)
+  }
   calls <- call_DA_edgeR(data, groups)
   return(list(oracle_calls = oracle_calls, calls = calls))
 }
 
-DE_by_Seurat <- function(ref_data, data, groups, method) {
-  oracle_calls <- call_DA_Seurat(ref_data, groups, method = method)
+DE_by_Seurat <- function(ref_data, data, groups, method, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_Seurat(ref_data, groups, method = method)
+  }
   calls <- call_DA_Seurat(data, groups, method = method)
   return(list(oracle_calls = oracle_calls, calls = calls))
 }
 
-DE_by_MAST <- function(ref_data, data, groups) {
-  oracle_calls <- call_DA_MAST(ref_data, groups)
+DE_by_MAST <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_MAST(ref_data, groups)
+  }
   calls <- call_DA_MAST(data, groups)
   return(list(oracle_calls = oracle_calls, calls = calls))
 }
 
-DE_by_scran <- function(ref_data, data, groups) {
-  oracle_calls <- call_DA_scran(ref_data, groups)
+DE_by_scran <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_scran(ref_data, groups)
+  }
   calls <- call_DA_scran(data, groups)
   return(list(oracle_calls = oracle_calls, calls = calls))
 }
 
-DE_by_ALDEx2 <- function(ref_data, data, groups) {
-  oracle_calls <- call_DA_ALDEx2(ref_data, groups)
+DE_by_ALDEx2 <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_ALDEx2(ref_data, groups)
+  }
   calls <- call_DA_ALDEx2(data, groups)
   return(list(oracle_calls = oracle_calls, calls = calls))
 }
 
-calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
+calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB",
+                                oracle_calls = NULL) {
   if(method == "scran") {
-    DE_calls <- DE_by_scran(ref_data, data, groups)
-    oracle_calls <- DE_calls$oracle_calls
+    DE_calls <- DE_by_scran(ref_data, data, groups, oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls
+    }
     calls <- DE_calls$calls
   } else if(method == "edgeR") {
-    DE_calls <- DE_by_edgeR(ref_data, data, groups)
-    oracle_calls <- DE_calls$oracle_calls
+    DE_calls <- DE_by_edgeR(ref_data, data, groups, oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls
+    }
     calls <- DE_calls$calls
   } else if(method == "wilcox" | method == "DESeq2") {
-    DE_calls <- DE_by_Seurat(ref_data, data, groups, method = method)
-    oracle_calls <- DE_calls$oracle_calls
+    DE_calls <- DE_by_Seurat(ref_data, data, groups, method = method, oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls
+    }
     calls <- DE_calls$calls
   } else if(method == "MAST") {
-    DE_calls <- DE_by_MAST(ref_data, data, groups)
-    oracle_calls <- DE_calls$oracle_calls
+    DE_calls <- DE_by_MAST(ref_data, data, groups, oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls
+    }
     calls <- DE_calls$calls
   } else if(method == "ALDEx2") {
-    DE_calls <- DE_by_ALDEx2(ref_data, data, groups)
-    oracle_calls <- DE_calls$oracle_calls
+    DE_calls <- DE_by_ALDEx2(ref_data, data, groups, oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls
+    }
     calls <- DE_calls$calls
   } else {
-    DE_calls <- DE_by_NB(ref_data, data, groups)
-    oracle_calls <- DE_calls$oracle_calls
+    DE_calls <- DE_by_NB(ref_data, data, groups, oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls
+    }
     calls <- DE_calls$calls
   }
 
@@ -87,7 +112,7 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NB") {
   TN <- sum(!de & !sim_de)
   FN <- sum(!de & sim_de)
 
-  return(list(tpr = TP/(TP+FN), fpr = FP/(FP+TN)))  
+  return(list(tpr = TP/(TP+FN), fpr = FP/(FP+TN), oracle_calls = oracle_calls))  
 }
 
 # ------------------------------------------------------------------------------------------------------------
@@ -261,8 +286,6 @@ for(i in 1:iterations) {
                                        proportion_da = proportion_da,
                                        spike_in = spike_in)
 
-
-  
   # Call differential expression/abundance
   
   # if(i %% 10 == 0) {
@@ -278,11 +301,11 @@ for(i in 1:iterations) {
   totals1 <- rowSums(sim_data$observed_counts1)
   totals2 <- rowSums(sim_data$observed_counts2)
   
-  rates_baseline <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = "ALDEx2")
-  
-  
   # Discrepancy: true vs. observed
+  # NB model first
   rates_baseline <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups)
+  # Save the oracle calls as our gold standard for this simulated data set
+  oracle_calls <- rates_baseline$oracle_calls
   plot_data <- rbind(plot_data,
                      data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
                                 delta_mean_v2 = rep(delta_mean_v2, 2),
@@ -291,20 +314,23 @@ for(i in 1:iterations) {
                                 rate_type = c("fpr", "tpr"),
                                 method = rep("baseline", 2)))
   
-  rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
-  plot_data <- rbind(plot_data,
-                     data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
-                                delta_mean_v2 = rep(delta_mean_v2, 2),
-                                cor_totals = cor(totals, totals2),
-                                rate = c(rates_partial$fpr, rates_partial$tpr),
-                                rate_type = c("fpr", "tpr"),
-                                method = rep("spike_in", 2)))
+  # rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
+  # plot_data <- rbind(plot_data,
+  #                    data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
+  #                               delta_mean_v2 = rep(delta_mean_v2, 2),
+  #                               cor_totals = cor(totals, totals2),
+  #                               rate = c(rates_partial$fpr, rates_partial$tpr),
+  #                               rate_type = c("fpr", "tpr"),
+  #                               method = rep("spike_in", 2)))
   
   # methods <- c("scran", "edgeR", "wilcox", "DESeq2", "MAST")
-  # methods <- c("DESeq2", "scran", "MAST")
-  methods <- c("ALDEx2")
+  methods <- c("DESeq2", "scran", "MAST", "ALDEx2")
   for(method in methods) {
-    rates <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = method)
+    rates <- calc_DE_discrepancy(sim_data$abundances[,1:p],
+                                 sim_data$observed_counts1[,1:p],
+                                 sim_data$groups,
+                                 method = method,
+                                 oracle_calls = oracle_calls)
     
     plot_data <- rbind(plot_data,
                        data.frame(delta_mean_v1 = rep(delta_mean_v1, 2), # absolute difference
