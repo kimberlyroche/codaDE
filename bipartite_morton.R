@@ -1,7 +1,9 @@
+library(codaDE)
+
 # Run the internals of build_Morton_reference before running this
 
 # Morton
-labels <- subjects
+# labels <- subjects
 
 # Athanasiadou
 labels <- groups
