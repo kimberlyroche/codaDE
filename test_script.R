@@ -278,9 +278,6 @@ for(i in 1:iterations) {
   totals1 <- rowSums(sim_data$observed_counts1)
   totals2 <- rowSums(sim_data$observed_counts2)
   
-  rates_baseline <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = "ALDEx2")
-  
-  
   # Discrepancy: true vs. observed
   rates_baseline <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups)
   plot_data <- rbind(plot_data,
@@ -301,8 +298,7 @@ for(i in 1:iterations) {
                                 method = rep("spike_in", 2)))
   
   # methods <- c("scran", "edgeR", "wilcox", "DESeq2", "MAST")
-  # methods <- c("DESeq2", "scran", "MAST")
-  methods <- c("ALDEx2")
+  methods <- c("DESeq2", "scran", "MAST", "ALDEx2")
   for(method in methods) {
     rates <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts1[,1:p], sim_data$groups, method = method)
     
