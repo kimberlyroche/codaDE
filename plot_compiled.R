@@ -22,7 +22,7 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
 #   ROC curve(ish) version
 # ------------------------------------------------------------------------------
 
-p <- 100
+p <- 1000
 data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds")))
 
 plot_data <- data %>%
@@ -83,14 +83,14 @@ if(partial_plot) {
   plot_data <- data %>%
     select(delta_mean_v2, rate, rate_type, method, cor_totals) %>%
     # filter(method %in% c("baseline", "spike_in", "ALDEx2")) %>%
-    filter(method %in% c("baseline", "ALDEx2")) %>%
+    filter(method %in% c("ALDEx2", "DESeq2")) %>%
     pivot_wider(names_from = rate_type, values_from = rate)
   plot_data$method <- factor(plot_data$method)
   # levels(plot_data$method) <- c("NB GLM", "NB GLM (partial totals)", "ALDEx2")
-  levels(plot_data$method) <- c("NB GLM", "ALDEx2")
+  levels(plot_data$method) <- c("ALDEx2", "DESeq2")
 
   # binary_palette <- palette[c(1,5,6)]
-  binary_palette <- palette[c(1,6)]
+  binary_palette <- palette[c(6,2)]
 
   ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
     geom_point(size = 2, alpha = 0.5) +
@@ -98,12 +98,14 @@ if(partial_plot) {
     # xlim(c(0,1)) +
     # ylim(c(0,1)) +
     xlim(c(0,0.75)) +
-    ylim(c(0.25,1)) +
+    ylim(c(0,1)) +
     xlab("FPR") +
     ylab("TPR") +
     facet_wrap(. ~ method) +
     theme(legend.position = "none")
-  ggsave(file.path("output", "images", "partial_total_performance_wALDEx2.png"),
+  ggsave(file.path("output",
+                   "images",
+                   paste0("partial_total_performance_wALDEx2_p",p,".png")),
          units = "in",
          height = 2.5,
          width = 5)
