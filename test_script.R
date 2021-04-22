@@ -314,17 +314,16 @@ for(i in 1:iterations) {
                                 rate_type = c("fpr", "tpr"),
                                 method = rep("baseline", 2)))
   
-  # rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
-  # plot_data <- rbind(plot_data,
-  #                    data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
-  #                               delta_mean_v2 = rep(delta_mean_v2, 2),
-  #                               cor_totals = cor(totals, totals2),
-  #                               rate = c(rates_partial$fpr, rates_partial$tpr),
-  #                               rate_type = c("fpr", "tpr"),
-  #                               method = rep("spike_in", 2)))
-  
-  # methods <- c("scran", "edgeR", "wilcox", "DESeq2", "MAST")
-  methods <- c("DESeq2", "scran", "MAST", "ALDEx2")
+  rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
+  plot_data <- rbind(plot_data,
+                     data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
+                                delta_mean_v2 = rep(delta_mean_v2, 2),
+                                cor_totals = cor(totals, totals2),
+                                rate = c(rates_partial$fpr, rates_partial$tpr),
+                                rate_type = c("fpr", "tpr"),
+                                method = rep("spike_in", 2)))
+
+  methods <- c("DESeq2", "scran", "MAST", "ALDEx2", "edgeR_TMM")
   for(method in methods) {
     rates <- calc_DE_discrepancy(sim_data$abundances[,1:p],
                                  sim_data$observed_counts1[,1:p],
