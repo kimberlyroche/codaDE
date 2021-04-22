@@ -5,10 +5,10 @@ if(R.version$major == 4) {
 
 library(stringr)
 
-file.dir <- "p100"
+file.dir <- "p15000"
 
 # Generalize to take a `p` argument
-# files <- list.files(pattern = "simresults_p5000_simulated_*", path = "output")
+# files <- list.files(pattern = "simresults_p100_simulated_*", path = "output")
 files <- list.files(path = file.path("output", file.dir), pattern = paste0("simresults_", file.dir, "_simulated_bulk_\\w{8}-.*"))
 results_all <- NULL
 for(file in files) {
