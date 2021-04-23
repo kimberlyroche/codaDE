@@ -2,6 +2,7 @@ library(tidyverse)
 library(codaDE)
 library(ggROC)
 library(pROC)
+library(gridExtra)
 
 setwd("C:/Users/kimbe/Documents/codaDE")
 
@@ -26,60 +27,73 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
 # Note: There are edgeR results in here but I think they are wrong. (They
 # perfectly resemble the NB GLM results.)
 
-use_validation <- FALSE
-method_list <- c("baseline", "DESeq2", "MAST", "scran")
 p <- 100
 data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds")))
 
-if(use_validation) {
-  method_list <- c("baseline", "DESeq2", "MAST", "scran", "ALDEx2")
-  validation <- readRDS(file.path("output", "Barlow_validation_results.rds"))
-  validation <- validation %>%
-    filter(method %in% method_list)
-}
-
 plot_data <- data %>%
   select(delta_mean_v2, rate, rate_type, method) %>%
-  filter(method %in% method_list) %>%
+  filter(method %in% c("baseline", "DESeq2", "MAST", "scran")) %>%
   pivot_wider(names_from = rate_type, values_from = rate)
 plot_data$method <- factor(plot_data$method)
-if(!use_validation) {
-  # Replace with nice printable names
-  levels(plot_data$method) <- c("NB GLM", "DESeq2", "MAST", "scran")
-}
+levels(plot_data$method) <- c("NB GLM", "DESeq2", "MAST", "scran")
 
-alpha <- 0.5
-if(use_validation) {
-  alpha <- 0.05
-  pl <- ggplot(plot_data, aes(x = fpr, y = tpr)) +
-    geom_point(size = 2, alpha = alpha) +
-    geom_point(data = validation, aes(x = fpr, y = tpr), size = 2, color = "red")
-} else {
-  pl <- ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
-    geom_point(size = 2, alpha = alpha) +
-    scale_color_manual(values = palette)
-}
-pl <- pl +
+ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
+  geom_point(size = 2, alpha = 0.5) +
+  scale_color_manual(values = palette) +
   xlim(c(0,0.75)) +
   ylim(c(0.25,1)) +
   xlab("FPR") +
   ylab("TPR") +
   facet_wrap(. ~ method) +
   theme(legend.position = "none")
-show(pl)
 
-save_filename <- paste0("DE_p",p,"_all_models.png")
-height <- 5
-width <- 5
-if(use_validation) {
-  save_filename <- paste0("DE_p",p,"_all_models_validation.png")
-  width <- 8
-}
-ggsave(file.path("output", "images", save_filename <- save_filename),
+ggsave(file.path("output", "images", paste0("DE_p",p,"_all_models.png")),
        plot = pl,
        units = "in",
-       height = height,
-       width = width)
+       height = 5,
+       width = 5)
+
+# ------------------------------------------------------------------------------
+#   ROC curves with validation results superimposed
+# ------------------------------------------------------------------------------
+
+# Note: There are edgeR results in here but I think they are wrong. (They
+# perfectly resemble the NB GLM results.)
+
+p <- 100
+data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds")))
+method_list <- c("baseline", "DESeq2", "MAST", "scran", "ALDEx2")
+method_labels <- c("NB GLM", "DESeq2", "MAST", "scran", "ALDEx2")
+
+validation <- readRDS(file.path("output", "Barlow_validation_results.rds"))
+validation <- validation %>%
+  filter(method %in% method_list)
+
+plot_data <- data %>%
+  select(delta_mean_v2, rate, rate_type, method) %>%
+  filter(method %in% method_list) %>%
+  pivot_wider(names_from = rate_type, values_from = rate)
+plot_data$method <- factor(plot_data$method)
+
+plot_list <- list()
+for(i in 1:length(method_list)) {
+  method <- method_list[[i]]
+  pl <- ggplot(plot_data[plot_data$method == method,], aes(x = fpr, y = tpr)) +
+    geom_density_2d(color = "black", size = 1, alpha = 0.5) +
+    geom_point(data = validation[validation$method == method,],
+               aes(x = fpr, y = tpr), size = 3, color = "red") +
+    xlim(c(0,0.75)) +
+    ylim(c(0.25,1)) +
+    labs(title = method_labels[i], x = "FPR", y = "TPR")
+  plot_list[[i]] <- pl
+}
+
+pl <- grid.arrange(grobs = plot_list, ncol = 3)
+ggsave(file.path("output", "images", paste0("DE_p",p,"_all_models_validation.png")),
+       plot = pl,
+       units = "in",
+       height = 5,
+       width = 8)
 
 # ------------------------------------------------------------------------------
 #   Partial abundance version (with NB GLM only) TBD w/ data
