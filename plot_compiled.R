@@ -14,6 +14,7 @@ setwd("C:/Users/kimbe/Documents/codaDE")
 #   scale_color_manual(values = palette)
 
 # Previous
+# palette <- generate_highcontrast_palette(7)
 # palette <- c("#46A06B", "#B95D6E", "#EF82BB", "#755A7F", "#E3C012")
 
 palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
@@ -22,31 +23,63 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
 #   ROC curve(ish) version
 # ------------------------------------------------------------------------------
 
-p <- 1000
+# Note: There are edgeR results in here but I think they are wrong. (They
+# perfectly resemble the NB GLM results.)
+
+use_validation <- FALSE
+method_list <- c("baseline", "DESeq2", "MAST", "scran")
+p <- 100
 data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds")))
+
+if(use_validation) {
+  method_list <- c("baseline", "DESeq2", "MAST", "scran", "ALDEx2")
+  validation <- readRDS(file.path("output", "Barlow_validation_results.rds"))
+  validation <- validation %>%
+    filter(method %in% method_list)
+}
 
 plot_data <- data %>%
   select(delta_mean_v2, rate, rate_type, method) %>%
-  filter(!(method %in% c("spike_in", "ALDEx2"))) %>%
+  filter(method %in% method_list) %>%
   pivot_wider(names_from = rate_type, values_from = rate)
 plot_data$method <- factor(plot_data$method)
-levels(plot_data$method) <- c("NB GLM", "DESeq2", "MAST", "scran")
+if(!use_validation) {
+  # Replace with nice printable names
+  levels(plot_data$method) <- c("NB GLM", "DESeq2", "MAST", "scran")
+}
 
-ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) + # plot an ROC curve
-  geom_point(size = 2, alpha = 0.5) +
-  scale_color_manual(values = palette) +
-  # xlim(c(0,1)) +
-  # ylim(c(0,1)) +
+alpha <- 0.5
+if(use_validation) {
+  alpha <- 0.05
+  pl <- ggplot(plot_data, aes(x = fpr, y = tpr)) +
+    geom_point(size = 2, alpha = alpha) +
+    geom_point(data = validation, aes(x = fpr, y = tpr), size = 2, color = "red")
+} else {
+  pl <- ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
+    geom_point(size = 2, alpha = alpha) +
+    scale_color_manual(values = palette)
+}
+pl <- pl +
   xlim(c(0,0.75)) +
   ylim(c(0.25,1)) +
   xlab("FPR") +
   ylab("TPR") +
   facet_wrap(. ~ method) +
   theme(legend.position = "none")
-ggsave(file.path("output", "images", save_filename <- paste0("DE_p",p,"_all_models.png")),
+show(pl)
+
+save_filename <- paste0("DE_p",p,"_all_models.png")
+height <- 5
+width <- 5
+if(use_validation) {
+  save_filename <- paste0("DE_p",p,"_all_models_validation.png")
+  width <- 8
+}
+ggsave(file.path("output", "images", save_filename <- save_filename),
+       plot = pl,
        units = "in",
-       height = 5,
-       width = 5)
+       height = height,
+       width = width)
 
 # ------------------------------------------------------------------------------
 #   Partial abundance version (with NB GLM only) TBD w/ data
@@ -69,6 +102,8 @@ if(partial_plot) {
     plot_data <- rbind(plot_data,
                        data.frame(cor_totals = cor_totals, delta_fpr = delta_fpr))
   }
+  plot_data <- plot_data %>%
+    filter(cor_totals >= 0)
   ggplot(plot_data, aes(x = cor_totals, y = delta_fpr)) +
     geom_point(size = 1) +
     geom_smooth(method = "lm", color = "#888888", alpha = 0.3)
