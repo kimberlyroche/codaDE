@@ -5,19 +5,42 @@
 #' @param log_var log variance for condition 1
 #' @param log_noise_var log variance for noise component added to condition 1
 #' to give condition 2
+#' @param base_correlation this is the base correlation (in log space) simulated
+#' across features
+#' @param concentration concentration parameter for sampling the correlation 
+#' across feature; if base_correlation = 0 and concentration = LARGE, features
+#' are effectively independent
 #' @param save_name optional tag to append to saved data file
 #' @return NULL
+#' @import matrixsampling
+#' @import MASS
 #' @export
 build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 2,
-                                      log_noise_var = 1, save_name = NULL) {
-  log_counts1 <- rnorm(p, log_mean, log_var)
-  log_counts2 <- log_counts1 + rnorm(p, 0, log_noise_var)
+                                      log_noise_var = 1, base_correlation = 0,
+                                      concentration = 1e6, save_name = NULL) {
+  if(base_correlation < -1 | base_correlation > 1) {
+    stop("Invalid base correlation specified!")
+  }
+  if(concentration < p + 2) {
+    stop("Invalid concentration specified!")
+  }
+  # log_counts1 <- rnorm(p, log_mean, log_var)
+  # log_counts2 <- log_counts1 + rnorm(p, 0, log_noise_var)
+
+  scale_mat <- matrix(base_correlation, p, p)
+  diag(scale_mat) <- 1
+  nu <- p + 10
+  K <- cov2cor(rinvwishart(1, concentration, scale_mat)[,,1])
+  
+  log_counts1 <- mvrnorm(1, rep(log_mean, p), K*(log_var^2))
+  log_counts2 <- mvrnorm(1, log_counts1, K*(log_noise_var^2))
+
   counts1 <- exp(log_counts1)
   counts2 <- exp(log_counts2)
   save_file <- ifelse(is.null(save_name),
                       "DE_reference_simulated.rds",
                       paste0("DE_reference_",save_name,".rds"))
-  saveRDS(list(cond1 = counts1, cond2 = counts2),
+  saveRDS(list(cond1 = counts1, cond2 = counts2, correlation_matrix = K),
           file = file.path("data", save_file))
 }
 

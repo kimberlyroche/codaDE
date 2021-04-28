@@ -27,7 +27,7 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
 # Note: There are edgeR results in here but I think they are wrong. (They
 # perfectly resemble the NB GLM results.)
 
-p <- 100
+p <- 15000
 data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds")))
 
 plot_data <- data %>%
@@ -44,14 +44,13 @@ ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
   ylim(c(0.25,1)) +
   xlab("FPR") +
   ylab("TPR") +
-  facet_wrap(. ~ method) +
+  facet_wrap(. ~ method, ncol = 4) +
   theme(legend.position = "none")
 
 ggsave(file.path("output", "images", paste0("DE_p",p,"_all_models.png")),
-       plot = pl,
        units = "in",
-       height = 5,
-       width = 5)
+       height = 3,
+       width = 10)
 
 # ------------------------------------------------------------------------------
 #   ROC curves with validation results superimposed

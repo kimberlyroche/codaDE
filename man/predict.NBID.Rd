@@ -5,7 +5,7 @@
 \title{Attempt to recreate the observed counts for a given gene from the fitted model (giving a means to eyeball
 model goodness-of-fit)}
 \usage{
-predict.NBID(theta, other_params)
+\method{predict}{NBID}(theta, other_params)
 }
 \arguments{
 \item{theta}{vector of parameters (see details)}

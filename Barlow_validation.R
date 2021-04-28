@@ -53,6 +53,7 @@ labels <- c(rep("control", length(ctrl_idx)), rep("keto", length(keto_idx)))
 groups <- labels
 groups[groups == "control"] <- 0
 groups[groups == "keto"] <- 1
+groups <- as.numeric(groups)
 
 # Remove unobserved taxa
 absolute_missing <- colSums(absolute_counts) == 0
@@ -87,7 +88,29 @@ relative_df <- pivot_longer(as.data.frame(relative_df), !sample, names_to = "tax
 ggplot(relative_df, aes(x = log(relative_counts + 1))) +
   geom_histogram()
 
-# now rows are samples (103), columns are taxa (141)
+# Histograms between conditions
+plot_df <- data.frame(count = rowSums(absolute_counts[groups == 0,]),
+                      sample = paste0("control", 1:sum(groups == 0)),
+                      condition = "control diet")
+plot_df <- rbind(plot_df,
+                 data.frame(count = rowSums(absolute_counts[groups == 1,]),
+                            sample = paste0("keto", 1:sum(groups == 1)),
+                            condition = "ketogenic diet"))
+plot_df
+ggplot(plot_df, aes(x = sample, y = count, fill = factor(condition))) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("#43C59E", "#7B7CA7")) +
+  labs(x = "sample index", y = "reconstructed total abundance", fill = "condition") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+ggsave(file.path("output",
+                 "images",
+                 paste0("Barlow_totals.png")),
+       units = "in",
+       height = 3,
+       width = 5)
+
+# rows are samples (103), columns are taxa (141)
 
 # ------------------------------------------------------------------------------
 #   Apply NB GLM to absolute counts to get baseline DE
