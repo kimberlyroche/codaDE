@@ -131,7 +131,7 @@ ref_data <- "simulated_bulk"
 # ref_data <- "Athanasiadou_ciona"
 # ref_data <- "Athanasiadou_yeast"
 
-p <- 100
+p <- 1000
 
 if(!exists("p")) {
   if(ref_data %in% c("simulated_bulk", "Athanasiadou_ciona", "Athanasiadou_yeast")) {
@@ -145,7 +145,7 @@ if(!exists("p")) {
 
 palette <- generate_highcontrast_palette(p)
 
-asymmetry <- 0.8
+asymmetry <- 1
 proportion_da <- 0.75
 spike_in <- TRUE
 
@@ -275,7 +275,10 @@ for(i in 1:iterations) {
   cat("------------ STARTING ITERATION",i,"\n")
   if(ref_data == "simulated_bulk") {
     # build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 1, save_name = ref_data)
-    build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 2, save_name = ref_data)
+    ref_mat <- matrix(0.5, p, p)
+    diag(ref_mat) <- 1
+    build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 2,
+                              base_correlation = ref_mat, concentration = p + 10, save_name = ref_data)
   } else if(ref_data == "simulated_16S") {
     build_simulated_reference(p = p, log_mean = -1, log_var = 3, log_noise_var = 2, save_name = ref_data)
   } else if(ref_data == "simulated_sc") {
@@ -291,9 +294,11 @@ for(i in 1:iterations) {
   # if(i %% 10 == 0) {
   #   cat("Iteration",i,"\n")
   # }
-  
-  m1 <- mean(rowSums(sim_data$abundances[1:n,]))
-  m2 <- mean(rowSums(sim_data$abundances[(n+1):(n*2),]))
+
+  r1 <- rowSums(sim_data$abundances[1:n,])
+  r2 <- rowSums(sim_data$abundances[(n+1):(n*2),])
+  m1 <- mean(r1)
+  m2 <- mean(r2)
   delta_mean_v1 <- max(c(m1, m2)) - min(c(m1, m2))
   delta_mean_v2 <- max(c(m1, m2)) / min(c(m1, m2))
   

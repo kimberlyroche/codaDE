@@ -9,7 +9,7 @@ build_simulated_reference(
   log_mean = 0,
   log_var = 2,
   log_noise_var = 1,
-  base_correlation = 0,
+  base_correlation = NULL,
   concentration = 1e+06,
   save_name = NULL
 )
@@ -24,11 +24,11 @@ build_simulated_reference(
 \item{log_noise_var}{log variance for noise component added to condition 1
 to give condition 2}
 
-\item{base_correlation}{this is the base correlation (in log space) simulated
-across features}
+\item{base_correlation}{this is the base correlation matrix for simulated
+features in log space}
 
 \item{concentration}{concentration parameter for sampling the correlation 
-across feature; if base_correlation = 0 and concentration = LARGE, features
+across feature; if base_correlation is NULL and concentration = LARGE, features
 are effectively independent}
 
 \item{save_name}{optional tag to append to saved data file}
