@@ -131,7 +131,7 @@ ref_data <- "simulated_bulk"
 # ref_data <- "Athanasiadou_ciona"
 # ref_data <- "Athanasiadou_yeast"
 
-p <- 15000
+p <- 100
 
 if(!exists("p")) {
   if(ref_data %in% c("simulated_bulk", "Athanasiadou_ciona", "Athanasiadou_yeast")) {
