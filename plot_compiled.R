@@ -27,8 +27,9 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
 # Note: There are edgeR results in here but I think they are wrong. (They
 # perfectly resemble the NB GLM results.)
 
-p <- 15000
-data <- readRDS(file.path("output", paste0("simresults_p",p,"_simulated_all.rds")))
+p <- 100
+corrp <- 1
+data <- readRDS(file.path("output", paste0("simresults_p",p,"_corrp",corrp,"_all.rds")))
 
 plot_data <- data %>%
   select(delta_mean_v2, rate, rate_type, method) %>%
@@ -47,7 +48,7 @@ ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
   facet_wrap(. ~ method, ncol = 4) +
   theme(legend.position = "none")
 
-ggsave(file.path("output", "images", paste0("DE_p",p,"_all_models.png")),
+ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_all_models.png")),
        units = "in",
        height = 3,
        width = 10)
