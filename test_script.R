@@ -149,6 +149,15 @@ asymmetry <- 1
 proportion_da <- 0.75
 spike_in <- TRUE
 
+# Correlated features case
+# base_correlation <- matrix(0.5, p, p)
+# diag(base_correlation) <- 1
+# concentration <- p + 100
+
+# Uncorrelated features case
+base_correlation <- diag(p)
+concentration <- 1e6
+
 iterations <- 20
 
 # ------------------------------------------------------------------------------------------------------------
@@ -158,7 +167,12 @@ iterations <- 20
 if(iterations == 1) {
   
   # Simulate fresh
-  data_obj <- build_simulated_reference(p = p, log_mean = 1, log_var = 2, log_noise_var = 2)
+  data_obj <- build_simulated_reference(p = p,
+                                        log_mean = 1,
+                                        log_var = 2,
+                                        log_noise_var = 2,
+                                        base_correlation = base_correlation,
+                                        concentration = concentration)
   sim_data <- simulate_sequence_counts(n = n,
                                        p = p,
                                        data_obj = data_obj,
@@ -238,7 +252,12 @@ if(iterations == 1) {
 
 if(FALSE) {
   fcs <- numeric(iterations)
-  data_obj <- build_simulated_reference(p = p, log_mean = 1, log_var = 2, log_noise_var = 2)
+  data_obj <- build_simulated_reference(p = p,
+                                        log_mean = 1,
+                                        log_var = 2,
+                                        log_noise_var = 2,
+                                        base_correlation = base_correlation,
+                                        concentration = concentration)
   for(i in 1:iterations) {
     if(i %% 100 == 0) {
       cat("Iteration",i,"\n")
@@ -287,7 +306,12 @@ for(i in 1:iterations) {
   # } else if(ref_data == "simulated_sc") {
   #   build_simulated_reference(p = p, log_mean = -1, log_var = 2, log_noise_var = 1, save_name = ref_data)
   # }
-  data_obj <- build_simulated_reference(p = p, log_mean = 1, log_var = 2, log_noise_var = 2)
+  data_obj <- build_simulated_reference(p = p,
+                                        log_mean = 1,
+                                        log_var = 2,
+                                        log_noise_var = 2,
+                                        base_correlation = base_correlation,
+                                        concentration = concentration)
   sim_data <- simulate_sequence_counts(n = n,
                                        p = p,
                                        data_obj = data_obj,
