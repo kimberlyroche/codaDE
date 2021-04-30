@@ -5,19 +5,41 @@
 #' @param log_var log variance for condition 1
 #' @param log_noise_var log variance for noise component added to condition 1
 #' to give condition 2
+#' @param base_correlation this is the base correlation matrix for simulated
+#' features in log space
+#' @param concentration concentration parameter for sampling the correlation 
+#' across feature; if base_correlation is NULL and concentration = LARGE, features
+#' are effectively independent
 #' @param save_name optional tag to append to saved data file
 #' @return NULL
+#' @import matrixsampling
+#' @import MASS
 #' @export
 build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 2,
-                                      log_noise_var = 1, save_name = NULL) {
-  log_counts1 <- rnorm(p, log_mean, log_var)
-  log_counts2 <- log_counts1 + rnorm(p, 0, log_noise_var)
+                                      log_noise_var = 1, base_correlation = NULL,
+                                      concentration = 1e6, save_name = NULL) {
+  if(is.null(base_correlation)) {
+    base_correlation <- diag(p)
+  }
+  if(concentration < p + 2) {
+    stop("Invalid concentration specified!")
+  }
+  # log_counts1 <- rnorm(p, log_mean, log_var)
+  # log_counts2 <- log_counts1 + rnorm(p, 0, log_noise_var)
+  K <- cov2cor(rinvwishart(1, concentration, base_correlation)[,,1])
+  
+  log_counts1 <- mvrnorm(1, rep(log_mean, p), diag(p)*(log_var^2))
+  log_perturbation <- mvrnorm(1, rep(0, p), K*(log_noise_var^2))
+  log_counts2 <- log_counts1 + log_perturbation
+
   counts1 <- exp(log_counts1)
   counts2 <- exp(log_counts2)
   save_file <- ifelse(is.null(save_name),
                       "DE_reference_simulated.rds",
                       paste0("DE_reference_",save_name,".rds"))
-  saveRDS(list(cond1 = counts1, cond2 = counts2),
+  saveRDS(list(log_cond1 = log_counts1, log_cond2 = log_counts2,
+               cond1 = counts1, cond2 = counts2,
+               log_perturbation = log_perturbation, correlation_matrix = K),
           file = file.path("data", save_file))
 }
 

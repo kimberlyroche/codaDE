@@ -209,6 +209,8 @@ simulate_sequence_counts <- function(n = 500,
   # lines((n+1):(2*n), observed_counts[(n+1):(2*n),idx], type = "p", col = "red")
 
   return(list(spike_in = spike_in,
+              baseline_counts = baseline_counts,
+              treatment_counts = treatment_counts,
               abundances = abundances,
               observed_counts1 = observed_counts1,
               observed_counts2 = observed_counts2,

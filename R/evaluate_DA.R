@@ -162,10 +162,9 @@ call_DA_edgeR <- function(data, groups, normalization_method = NULL) {
 call_DA_Seurat <- function(data, groups, method = "DESeq2") {
   count_table <- t(data)
   n_genes <- nrow(count_table)
-  n_samples_condition <- ncol(count_table)/2
-  
+
   rownames(count_table) <- paste0("gene", 1:n_genes)
-  colnames(count_table) <- paste0("cell", 1:(n_samples_condition*2))
+  colnames(count_table) <- paste0("cell", 1:ncol(count_table))
 
   # Create Seurat object manually:
   # https://learn.gencore.bio.nyu.edu/single-cell-rnaseq/loading-your-own-data-in-seurat-reanalyze-a-different-dataset/
