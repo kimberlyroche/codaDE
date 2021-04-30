@@ -17,7 +17,7 @@ change_A <- c()
 change_B <- c()
 for(i in 1:iter) {
   # sim data
-  build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 1,
+  data_obj <- build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 1,
                             base_correlation = A, concentration = p + 100)
   # ref_file <- file.path("data", paste0("DE_reference_simulated.rds"))
   # data_obj <- readRDS(ref_file)

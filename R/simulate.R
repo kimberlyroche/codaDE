@@ -84,7 +84,10 @@ spike_in_ones <- function(counts) {
 #'
 #' @param n number of samples per group
 #' @param p number of features (i.e. genes or bacterial taxa)
-#' @param ref_data specifies the reference data set to use ("Morton", "Athanasiadou_ciona", "simulated"; case-sensitive)
+#' @param ref_data_name optional: specifies the reference data set to use
+#' ("Morton", "Athanasiadou_ciona", "simulated"; case-sensitive)
+#' @param data_obj reference data set object; if non-null, this takes precedence
+#' over ref_data_name
 #' @param asymmetry proportion of baselines to draw from condition 1
 #' @param proportion_da proportion of differentially abundant genes
 #' @param spike_in simulate a control spike in with low dispersion
@@ -98,14 +101,19 @@ spike_in_ones <- function(counts) {
 #' @export
 simulate_sequence_counts <- function(n = 500,
                                      p = 1000,
-                                     ref_data = "Athanasidou_ciona",
+                                     ref_data_name = "Athanasidou_ciona",
+                                     data_obj = NULL,
                                      asymmetry = 0.5,
                                      proportion_da = 0.1,
                                      spike_in = FALSE) {
-
-  ref_file <- file.path("data", paste0("DE_reference_",ref_data,".rds"))
-  cat("Using reference file:",ref_file,"\n")
-  data_obj <- readRDS(ref_file)
+  if(is.null(ref_data_name) & is.null(data_obj)) {
+    stop("One of ref_data_name and ref_data must be specified!")
+  }
+  if(is.null(data_obj)) {
+    ref_file <- file.path("data", paste0("DE_reference_",ref_data_name,".rds"))
+    cat("Using reference file:",ref_file,"\n")
+    data_obj <- readRDS(ref_file)
+  }
   # counts <- data_obj$counts
   # baseline_distribution <- data_obj$baseline_distribution
   # differential_distribution <- data_obj$differential_distribution

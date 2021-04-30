@@ -34,13 +34,21 @@ build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 2,
 
   counts1 <- exp(log_counts1)
   counts2 <- exp(log_counts2)
-  save_file <- ifelse(is.null(save_name),
-                      "DE_reference_simulated.rds",
-                      paste0("DE_reference_",save_name,".rds"))
-  saveRDS(list(log_cond1 = log_counts1, log_cond2 = log_counts2,
-               cond1 = counts1, cond2 = counts2,
-               log_perturbation = log_perturbation, correlation_matrix = K),
-          file = file.path("data", save_file))
+  
+  sim_obj <- list(log_cond1 = log_counts1, log_cond2 = log_counts2,
+                  cond1 = counts1, cond2 = counts2,
+                  log_perturbation = log_perturbation, correlation_matrix = K)
+  
+  if(is.null(save_name)) {
+    return(sim_obj)
+  } else {
+    # save_file <- ifelse(is.null(save_name),
+    #                     "DE_reference_simulated.rds",
+    #                     paste0("DE_reference_",save_name,".rds"))
+    save_file <- paste0("DE_reference_",save_name,".rds")
+    saveRDS(sim_obj,
+            file = file.path("data", save_file))
+  }
 }
 
 #' Generate differential expression reference for Barlow et al. (2020) 16S data
