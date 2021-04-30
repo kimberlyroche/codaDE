@@ -123,7 +123,7 @@ n <- 10 # replicate number
 # Note: 10 seems to be about a minimum within-condition cell/sample number for
 # scran marker gene identification
 
-ref_data <- "simulated_bulk"
+# ref_data <- "simulated_bulk"
 # ref_data <- "simulated_16S"
 # ref_data <- "simulated_sc"
 # ref_data <- "Morton"
@@ -157,13 +157,15 @@ iterations <- 20
 
 if(iterations == 1) {
   
-  if(ref_data == "simulated") {
-    # Simulate fresh
-    build_simulated_reference(p = p, log_var = 2, log_noise_var = 1.5)
-  }
-  sim_data <- simulate_sequence_counts(n = n, p = p, k = k, ref_data = ref_data, asymmetry = asymmetry,
+  # Simulate fresh
+  data_obj <- build_simulated_reference(p = p, log_mean = 1, log_var = 2, log_noise_var = 2)
+  sim_data <- simulate_sequence_counts(n = n,
+                                       p = p,
+                                       data_obj = data_obj,
+                                       asymmetry = asymmetry,
                                        proportion_da = proportion_da,
-                                       spike_in = spike_in, possible_fold_changes = possible_fold_changes)
+                                       spike_in = spike_in)
+  
   m1 <- mean(rowSums(sim_data$abundances[1:n,]))
   m2 <- mean(rowSums(sim_data$abundances[(n+1):(n*2),]))
   fc <- max(c(m1, m2)) / min(c(m1, m2))
@@ -236,13 +238,18 @@ if(iterations == 1) {
 
 if(FALSE) {
   fcs <- numeric(iterations)
+  data_obj <- build_simulated_reference(p = p, log_mean = 1, log_var = 2, log_noise_var = 2)
   for(i in 1:iterations) {
     if(i %% 100 == 0) {
       cat("Iteration",i,"\n")
     }
-    sim_data <- simulate_sequence_counts(n = n, p = p, k = k, ref_data = ref_data, asymmetry = asymmetry,
+    # Resample the same data
+    sim_data <- simulate_sequence_counts(n = n,
+                                         p = p,
+                                         data_obj = data_obj,
+                                         asymmetry = asymmetry,
                                          proportion_da = proportion_da,
-                                         spike_in = spike_in, possible_fold_changes = possible_fold_changes)
+                                         spike_in = spike_in)
     totals <- rowSums(sim_data$abundances)
     t1 <- mean(totals[1:n])
     t2 <- mean(totals[(n+1):(n*2)])
@@ -273,18 +280,17 @@ plot_data <- data.frame(delta_mean_v1 = c(),
 
 for(i in 1:iterations) {
   cat("------------ STARTING ITERATION",i,"\n")
-  if(ref_data == "simulated_bulk") {
-    # build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 1, save_name = ref_data)
-    ref_mat <- matrix(0.5, p, p)
-    diag(ref_mat) <- 1
-    build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 2,
-                              base_correlation = ref_mat, concentration = p + 10, save_name = ref_data)
-  } else if(ref_data == "simulated_16S") {
-    build_simulated_reference(p = p, log_mean = -1, log_var = 3, log_noise_var = 2, save_name = ref_data)
-  } else if(ref_data == "simulated_sc") {
-    build_simulated_reference(p = p, log_mean = -1, log_var = 2, log_noise_var = 1, save_name = ref_data)
-  }
-  sim_data <- simulate_sequence_counts(n = n, p = p, ref_data = ref_data,
+  # if(ref_data == "simulated_bulk") {
+  #   build_simulated_reference(p = p, log_mean = 0, log_var = 2, log_noise_var = 2, save_name = ref_data)
+  # } else if(ref_data == "simulated_16S") {
+  #   build_simulated_reference(p = p, log_mean = -1, log_var = 3, log_noise_var = 2, save_name = ref_data)
+  # } else if(ref_data == "simulated_sc") {
+  #   build_simulated_reference(p = p, log_mean = -1, log_var = 2, log_noise_var = 1, save_name = ref_data)
+  # }
+  data_obj <- build_simulated_reference(p = p, log_mean = 1, log_var = 2, log_noise_var = 2)
+  sim_data <- simulate_sequence_counts(n = n,
+                                       p = p,
+                                       data_obj = data_obj,
                                        asymmetry = asymmetry,
                                        proportion_da = proportion_da,
                                        spike_in = spike_in)
