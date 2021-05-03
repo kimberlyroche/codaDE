@@ -7,7 +7,8 @@
 simulate_sequence_counts(
   n = 500,
   p = 1000,
-  ref_data = "Athanasidou_ciona",
+  ref_data_name = "Athanasidou_ciona",
+  data_obj = NULL,
   asymmetry = 0.5,
   proportion_da = 0.1,
   spike_in = FALSE
@@ -18,7 +19,11 @@ simulate_sequence_counts(
 
 \item{p}{number of features (i.e. genes or bacterial taxa)}
 
-\item{ref_data}{specifies the reference data set to use ("Morton", "Athanasiadou_ciona", "simulated"; case-sensitive)}
+\item{ref_data_name}{optional: specifies the reference data set to use
+("Morton", "Athanasiadou_ciona", "simulated"; case-sensitive)}
+
+\item{data_obj}{reference data set object; if non-null, this takes precedence
+over ref_data_name}
 
 \item{asymmetry}{proportion of baselines to draw from condition 1}
 
