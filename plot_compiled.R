@@ -27,31 +27,35 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
 # Note: There are edgeR results in here but I think they are wrong. (They
 # perfectly resemble the NB GLM results.)
 
-p <- 100
-corrp <- 1
-data <- readRDS(file.path("output", paste0("simresults_p",p,"_corrp",corrp,"_all.rds")))
+p_all <- c(100, 1000, 5000)
+corrp_all <- c(0, 0.5, 1)
+for(p in p_all) {
+  for(corrp in corrp_all) {
+    data <- readRDS(file.path("output", paste0("simresults_p",p,"_corrp",corrp,"_all.rds")))
 
-plot_data <- data %>%
-  select(delta_mean_v2, rate, rate_type, method) %>%
-  filter(method %in% c("baseline", "DESeq2", "MAST", "scran")) %>%
-  pivot_wider(names_from = rate_type, values_from = rate)
-plot_data$method <- factor(plot_data$method)
-levels(plot_data$method) <- c("NB GLM", "DESeq2", "MAST", "scran")
-
-ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
-  geom_point(size = 2, alpha = 0.5) +
-  scale_color_manual(values = palette) +
-  xlim(c(0,0.75)) +
-  ylim(c(0.25,1)) +
-  xlab("FPR") +
-  ylab("TPR") +
-  facet_wrap(. ~ method, ncol = 4) +
-  theme(legend.position = "none")
-
-ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_all_models.png")),
-       units = "in",
-       height = 3,
-       width = 10)
+    plot_data <- data %>%
+      select(delta_mean_v1, delta_mean_v2, rate, rate_type, method) %>%
+      filter(method %in% c("baseline", "DESeq2", "MAST", "scran")) %>%
+      pivot_wider(names_from = rate_type, values_from = rate)
+    plot_data$method <- factor(plot_data$method)
+    levels(plot_data$method) <- c("NB GLM", "DESeq2", "MAST", "scran")
+    
+    ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
+      geom_point(size = 2, alpha = 0.5) +
+      scale_color_manual(values = palette) +
+      xlim(c(0,0.75)) +
+      ylim(c(0.25,1)) +
+      xlab("FPR") +
+      ylab("TPR") +
+      facet_wrap(. ~ method, ncol = 4) +
+      theme(legend.position = "none")
+    
+    ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_all_models.png")),
+           units = "in",
+           height = 3,
+           width = 10)
+  }
+}
 
 # ------------------------------------------------------------------------------
 #   ROC curves with validation results superimposed
