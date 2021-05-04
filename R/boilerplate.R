@@ -11,16 +11,26 @@ generate_highcontrast_palette <- function(S) {
 
 #' Generate a color palette suitable for stacked bar plots given a feature number (S)
 #'
-#' @param data a data.frame with (named) columns for feature, sample, and abundance
+#' @param data matrix of abundances or observed counts (samples x features)
 #' @param palette a color palette
 #' @param save_name optional name to save plot under
 #' @import RColorBrewer
 #' @export
 plot_stacked_bars <- function(data, palette = NULL, save_name = NULL) {
+  data <- as.data.frame(t(data))
+  # data is now taxa x samples
+  n_samples <- ncol(data)
+  data <- cbind(1:nrow(data), data)
+  colnames(data) <- c("feature", 1:n_samples)
+  data_long <- pivot_longer(data, !feature, names_to = "sample", values_to = "abundance")
+  data_long$feature <- factor(data_long$feature)
+  data_long$sample <- factor(data_long$sample, levels = 1:n_samples)
+  
   if(is.null(palette)) {
-    palette <- generate_highcontrast_palette(length(unique(data$feature)))
+    palette <- generate_highcontrast_palette(length(unique(data_long$feature)))
   }
-  p <- ggplot(data, aes(fill = feature, y = abundance, x = sample)) + 
+  
+  p <- ggplot(data_long, aes(fill = feature, y = abundance, x = sample)) + 
     geom_bar(position = "stack", stat = "identity") +
     scale_fill_manual(values = palette) +
     theme_bw() +

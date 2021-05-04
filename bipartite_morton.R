@@ -43,9 +43,9 @@ expr2 <- subject_features[subset_idx,2]
 # plot_bipartite_graph(log(expr1 + pseudocount), log(expr2 + pseudocount))
 
 # Stacked bar plots probably better exemplify the real story
-data <- data.frame(abundance = c(expr1, expr2),
-                   feature = rep(1:length(expr1), 2),
-                   sample = c(rep("A", length(expr1)), rep("B", length(expr2))))
-data$feature <- as.factor(data$feature)
-data$sample <- as.factor(data$sample)
-plot_stacked_bars(data)
+# data <- data.frame(abundance = c(expr1, expr2),
+#                    feature = rep(1:length(expr1), 2),
+#                    sample = c(rep("A", length(expr1)), rep("B", length(expr2))))
+# data$feature <- as.factor(data$feature)
+# data$sample <- as.factor(data$sample)
+# plot_stacked_bars(data)

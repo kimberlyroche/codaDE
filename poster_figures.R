@@ -5,16 +5,6 @@ library(codaDE)
 #   Figure 2 - Simulated absolute vs. observed abundances
 # ------------------------------------------------------------------------------
 
-wrangle_data_long <- function(data) {
-  # data is now taxa x samples
-  data <- cbind(1:nrow(data), data)
-  colnames(data) <- c("feature", 1:(ncol(data)-1))
-  data_long <- pivot_longer(data, !feature, names_to = "sample", values_to = "abundance")
-  data_long$feature <- factor(data_long$feature)
-  data_long$sample <- factor(data_long$sample, levels = 1:10)
-  return(data_long)
-}
-
 # Stacked bar plots
 
 sim_data <- simulate_sequence_counts(n = 5, p = 100, k = 1, ref_data = "simulated_bulk",
@@ -23,18 +13,14 @@ sim_data <- simulate_sequence_counts(n = 5, p = 100, k = 1, ref_data = "simulate
 
 palette <- generate_highcontrast_palette(ncol(sim_data$abundances))
 
-counts_long <- wrangle_data_long(as.data.frame(t(sim_data$abundances)))
-
-plot_stacked_bars(counts_long, palette = palette, save_name = NULL)
+plot_stacked_bars(sim_data$abundances, palette = palette, save_name = NULL)
 ggsave(file.path("output", "images", "poster_F2a.png"),
        units = "in",
        dpi = 300,
        height = 6,
        width = 6)
 
-counts_long <- wrangle_data_long(as.data.frame(t(sim_data$observed_counts1)))
-
-plot_stacked_bars(counts_long, palette = palette, save_name = NULL)
+plot_stacked_bars(sim_data$observed_counts1, palette = palette, save_name = NULL)
 ggsave(file.path("output", "images", "poster_F2b.png"),
        units = "in",
        dpi = 300,
