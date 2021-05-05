@@ -170,17 +170,21 @@ spike_in <- FALSE
 #   Run lots of simulations, calculate FPR
 # ------------------------------------------------------------------------------------------------------------
 
-plot_data <- data.frame(delta_mean_v1 = c(),
+plot_data <- data.frame(uuid = c(),
+                        delta_mean_v1 = c(),
                         delta_mean_v2 = c(),
-                        cor_totals = c(),
+                        # cor_totals = c(),
+                        gap_totals = c(),
                         rate = c(),
                         rate_type = c(),
-                        method = c())
+                        method = c(),
+                        partial_info = c())
 
 for(i in 1:iterations) {
 
   cat("------------ STARTING ITERATION",i,"\n")
 
+  uuid <- UUIDgenerate()
   data_obj <- build_simulated_reference(p = p,
                                         log_mean = 1,
                                         log_var = 2,
@@ -193,6 +197,7 @@ for(i in 1:iterations) {
                                        asymmetry = asymmetry,
                                        proportion_da = proportion_da,
                                        spike_in = spike_in)
+  saveRDS(sim_data, file = file.path("output", output_dir, paste0(uuid, ".rds")))
 
   # Call differential expression/abundance
   
@@ -200,12 +205,14 @@ for(i in 1:iterations) {
   r2 <- rowSums(sim_data$abundances[(n+1):(n*2),])
   m1 <- mean(r1)
   m2 <- mean(r2)
-  delta_mean_v1 <- max(c(m1, m2)) - min(c(m1, m2))
-  delta_mean_v2 <- max(c(m1, m2)) / min(c(m1, m2))
+  delta_mean_v1 <- max(c(m1, m2)) - min(c(m1, m2)) # absolute difference
+  delta_mean_v2 <- max(c(m1, m2)) / min(c(m1, m2)) # absolute fold change
   
   totals <- rowSums(sim_data$abundances)
   totals1 <- rowSums(sim_data$observed_counts1)
   totals2 <- rowSums(sim_data$observed_counts2)
+  gap_totals <- abs(mean(totals2[1:n] - totals2[(n+1):(n*2)])) /
+    abs(mean(totals[1:n] - totals[(n+1):(n*2)]))
   
   # Discrepancy: true vs. observed
   # NB model first
@@ -213,23 +220,32 @@ for(i in 1:iterations) {
   # Save the oracle calls as our gold standard for this simulated data set
   oracle_calls <- rates_baseline$oracle_calls
   plot_data <- rbind(plot_data,
-                     data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
+                     data.frame(uuid = uuid,
+                                delta_mean_v1 = rep(delta_mean_v1, 2),
                                 delta_mean_v2 = rep(delta_mean_v2, 2),
-                                cor_totals = cor(totals, totals1),
+                                # cor_totals = cor(totals, totals1),
+                                gap_totals = 0,
                                 rate = c(rates_baseline$fpr, rates_baseline$tpr),
                                 rate_type = c("fpr", "tpr"),
-                                method = rep("baseline", 2)))
+                                method = rep("baseline", 2),
+                                partial_info = FALSE))
   
-  rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p], sim_data$observed_counts2[,1:p], sim_data$groups)
+  rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p],
+                                       sim_data$observed_counts2[,1:p],
+                                       sim_data$groups)
   plot_data <- rbind(plot_data,
-                     data.frame(delta_mean_v1 = rep(delta_mean_v1, 2),
+                     data.frame(uuid = uuid,
+                                delta_mean_v1 = rep(delta_mean_v1, 2),
                                 delta_mean_v2 = rep(delta_mean_v2, 2),
-                                cor_totals = cor(totals, totals2),
+                                # cor_totals = cor(totals, totals2),
+                                gap_totals = gap_totals,
                                 rate = c(rates_partial$fpr, rates_partial$tpr),
                                 rate_type = c("fpr", "tpr"),
-                                method = rep("spike_in", 2)))
+                                method = rep("baseline", 2),
+                                partial_info = TRUE))
 
-  methods <- c("DESeq2", "scran", "MAST", "ALDEx2", "edgeR_TMM")
+  # methods <- c("DESeq2", "scran", "MAST", "ALDEx2", "edgeR_TMM")
+  methods <- c("DESeq2")
   for(method in methods) {
     rates <- calc_DE_discrepancy(sim_data$abundances[,1:p],
                                  sim_data$observed_counts1[,1:p],
@@ -238,12 +254,34 @@ for(i in 1:iterations) {
                                  oracle_calls = oracle_calls)
     
     plot_data <- rbind(plot_data,
-                       data.frame(delta_mean_v1 = rep(delta_mean_v1, 2), # absolute difference
+                       data.frame(uuid = uuid,
+                                  delta_mean_v1 = rep(delta_mean_v1, 2), # absolute difference
                                   delta_mean_v2 = rep(delta_mean_v2, 2), # fold change
-                                  cor_totals = cor(totals, totals1),
+                                  # cor_totals = cor(totals, totals1),
+                                  gap_totals = 0,
                                   rate = c(rates$fpr, rates$tpr),
                                   rate_type = c("fpr", "tpr"),
-                                  method = c(rep(method, 2))))
+                                  method = c(rep(method, 2)),
+                                  partial_info = FALSE))
+    
+    if(method == "DESeq2") {
+      rates_partial <- calc_DE_discrepancy(sim_data$abundances[,1:p],
+                                   sim_data$observed_counts2[,1:p],
+                                   sim_data$groups,
+                                   method = method,
+                                   oracle_calls = oracle_calls)
+      
+      plot_data <- rbind(plot_data,
+                         data.frame(uuid = uuid,
+                                    delta_mean_v1 = rep(delta_mean_v1, 2), # absolute difference
+                                    delta_mean_v2 = rep(delta_mean_v2, 2), # fold change
+                                    # cor_totals = cor(totals, totals1),
+                                    gap_totals = gap_totals,
+                                    rate = c(rates_partial$fpr, rates_partial$tpr),
+                                    rate_type = c("fpr", "tpr"),
+                                    method = c(rep(method, 2)),
+                                    partial_info = TRUE))
+    }
     
   }
 }
@@ -251,4 +289,7 @@ for(i in 1:iterations) {
 plot_data$rate_type <- as.factor(plot_data$rate_type)
 plot_data$method <- as.factor(plot_data$method)
 
-saveRDS(plot_data, file = file.path("output", output_dir, paste0("simresults_p",p,"_simulated_",UUIDgenerate(),".rds")))
+# saveRDS(plot_data, file = file.path("output", output_dir, paste0("simresults_p",p,"_simulated_",UUIDgenerate(),".rds")))
+saveRDS(plot_data, file = file.path("output", output_dir, paste0("simresults_p",p,"_simulated_all.rds")))
+
+View(plot_data)

@@ -188,7 +188,11 @@ simulate_sequence_counts <- function(n = 500,
   # library_sizes.observed_counts2 <- realized_total_counts
   # shuffle_idx <- sample(1:(n*2), size = n)
   # library_sizes.observed_counts2[shuffle_idx] <- library_sizes.observed_counts2[sample(shuffle_idx)]
-  library_sizes.observed_counts2 <- abs(rnorm(n*2, mean = realized_total_counts, sd = sd(realized_total_counts)*2))
+  # library_sizes.observed_counts2 <- abs(rnorm(n*2, mean = realized_total_counts, sd = sd(realized_total_counts)*2))
+  
+  # Let's try a little less variation
+  library_sizes.observed_counts2 <- rnorm(n*2, mean = realized_total_counts, sd = sd(realized_total_counts))
+  library_sizes.observed_counts2 <- sapply(library_sizes.observed_counts2, function(x) max(x, 1000))
   
   # ggplot(data = data.frame(x = rep(1:(n*2), 2),
   #                          totals = c(realized_total_counts, library_sizes.observed_counts2),

@@ -20,8 +20,19 @@ setwd("C:/Users/kimbe/Documents/codaDE")
 
 palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
 
+eliminate_outliers <- function(df) {
+  # Eliminate outlier simulations as above
+  # These are ones with very small or very large differences between 
+  #   conditions
+  log_diff <- log(df$delta_mean_v2)
+  mean_log_diff <- mean(log_diff)
+  limit <- 3*sd(log_diff)
+  idx_retain <- which(log_diff > mean_log_diff - limit & log_diff < mean_log_diff + limit)
+  df[idx_retain,]
+}
+
 # ------------------------------------------------------------------------------
-#   ROC curve(ish) version
+#   TPR x FPR plots
 # ------------------------------------------------------------------------------
 
 # Note: There are edgeR results in here but I think they are wrong. (They
@@ -30,68 +41,150 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
 p_all <- c(100, 1000, 5000)
 corrp_all <- c(0, 0.5)
 lfc_data <- data.frame(lfc = c(), p = c(), corrp = c())
-scran_data <- NULL
 for(p in p_all) {
   for(corrp in corrp_all) {
     data <- readRDS(file.path("output", paste0("simresults_p",p,"_corrp",corrp,"_all.rds")))
 
     plot_data <- data %>%
       select(delta_mean_v1, delta_mean_v2, rate, rate_type, method) %>%
-      filter(method %in% c("baseline", "DESeq2", "MAST", "scran")) %>%
+      filter(method %in% c("baseline", "DESeq2", "MAST", "scran", "ALDEx2")) %>%
       pivot_wider(names_from = rate_type, values_from = rate)
-    plot_data$method <- factor(plot_data$method)
-    levels(plot_data$method) <- c("NB GLM", "DESeq2", "MAST", "scran")
-
-    # Eliminate outlier simulations
-    # These are ones with very small or very large differences between 
-    #   conditions
-    log_diff <- log(plot_data$delta_mean_v2)
-    mean_log_diff <- mean(log_diff)
-    limit <- 3*sd(log_diff)
-    idx_retain <- which(log_diff > mean_log_diff - limit & log_diff < mean_log_diff + limit)
-    plot_data <- plot_data[idx_retain,]
+    # Assign factor order...
+    plot_data$method <- factor(plot_data$method, levels = c("baseline",
+                                                            "MAST",
+                                                            "DESeq2",
+                                                            "scran",
+                                                            "ALDEx2"))
+    # ...then rename
+    levels(plot_data$method) <- c("NB GLM",
+                                  "MAST",
+                                  "DESeq2",
+                                  "scran",
+                                  "ALDEx2")
+    
+    
+    plot_data <- eliminate_outliers(plot_data)
     
     lfc_data <- rbind(lfc_data,
                       data.frame(lfc = log_diff, p = p, corrp = corrp))
     
-    if(is.null(scran_data)) {
-      scran_data <- cbind(plot_data[plot_data$method == "scran",], p = p, corrp = corrp)
-    } else {
-      scran_data <- rbind(scran_data,
-                          cbind(plot_data[plot_data$method == "scran",], p = p, corrp = corrp))
+    ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
+      geom_point(size = 1, alpha = 0.5) +
+      scale_color_manual(values = palette) +
+      xlim(c(0,0.75)) +
+      ylim(c(0.25,1)) +
+      xlab("FPR") +
+      ylab("TPR") +
+      facet_wrap(. ~ method, ncol = 5) +
+      theme(legend.position = "none") +
+      theme(strip.text.x = element_text(size = 10))
+    ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_all_models.png")),
+           units = "in",
+           height = 2.5,
+           width = 10)
+
+    if(p == 5000 & corrp == 0.5) {
+      ggplot(plot_data, aes(x = fpr, y = tpr, color = log(delta_mean_v2))) +
+        geom_point(size = 1, alpha = 0.5) +
+        scale_color_gradient2(low = "blue", mid = "#BBBBBB", high = "red", midpoint = mean_log_diff) +
+        xlim(c(0,0.75)) +
+        ylim(c(0.25,1)) +
+        xlab("FPR") +
+        ylab("TPR") +
+        labs(color = "Log\nfold\nchange") +
+        facet_wrap(. ~ method, ncol = 5) +
+        theme(strip.text.x = element_text(size = 10))
+      ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_all_models_LFC.png")),
+             units = "in",
+             height = 2.5,
+             width = 10.5)
+      
+      
     }
-    
-    # ggplot(plot_data, aes(x = fpr, y = tpr, color = method)) +
-    #   geom_point(size = 2, alpha = 0.5) +
-    #   scale_color_manual(values = palette) +
-    #   xlim(c(0,0.75)) +
-    #   ylim(c(0.25,1)) +
-    #   xlab("FPR") +
-    #   ylab("TPR") +
-    #   facet_wrap(. ~ method, ncol = 4) +
-    #   theme(legend.position = "none")
-    # ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_all_models.png")),
-    #        units = "in",
-    #        height = 3,
-    #        width = 10)
-    # 
-    # if(p == 5000 & corrp == 0.5) {
-    #   ggplot(plot_data[plot_data$method != "scran",], aes(x = fpr, y = tpr, color = log(delta_mean_v2))) +
-    #     geom_point(size = 2, alpha = 0.5) +
-    #     scale_color_gradient2(low = "blue", mid = "#BBBBBB", high = "red", midpoint = mean_log_diff) +
-    #     xlim(c(0,0.75)) +
-    #     ylim(c(0.25,1)) +
-    #     xlab("FPR") +
-    #     ylab("TPR") +
-    #     facet_wrap(. ~ method, ncol = 4) +
-    #     theme(legend.position = "none")
-    #   ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_all_models_LFC.png")),
-    #          units = "in",
-    #          height = 3,
-    #          width = 7)
-    # }
   }
 }
+
+# ------------------------------------------------------------------------------
+#   TPR x FPR with baseline + spike-in
+# ------------------------------------------------------------------------------
+
+p <- 100 # 5000
+corrp <- 0 # 0.5
+data <- readRDS(file.path("output", paste0("simresults_p",p,"_corrp",corrp,"_all.rds")))
+
+plot_data <- data %>%
+  select(delta_mean_v1, delta_mean_v2, rate, rate_type, method) %>%
+  filter(method %in% c("baseline", "spike_in")) %>%
+  pivot_wider(names_from = rate_type, values_from = rate)
+# Assign factor order...
+plot_data$method <- factor(plot_data$method, levels = c("baseline",
+                                                        "spike_in"))
+# ...then rename
+levels(plot_data$method) <- c("NB GLM", "NB GLM + spike-in")
+
+plot_data <- eliminate_outliers(plot_data)
+
+ggplot(plot_data, aes(x = fpr, y = tpr, color = log(delta_mean_v2))) +
+  geom_point(size = 1, alpha = 0.5) +
+  scale_color_gradient2(low = "blue", mid = "#BBBBBB", high = "red", midpoint = mean_log_diff) +
+  xlim(c(0,0.75)) +
+  ylim(c(0.25,1)) +
+  xlab("FPR") +
+  ylab("TPR") +
+  labs(color = "Log\nfold\nchange") +
+  facet_wrap(. ~ method, ncol = 5) +
+  theme(strip.text.x = element_text(size = 10))
+ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_spikein_LFC.png")),
+       units = "in",
+       height = 2.5,
+       width = 5.5)
+
+# ------------------------------------------------------------------------------
+#   TPR x FPR with baseline + spike-in (LOCALLY GENERATED DATA)
+# ------------------------------------------------------------------------------
+
+output_dir <- "p100_corrp0"
+data <- readRDS(file.path("output", output_dir, paste0("simresults_p",p,"_corrp",corrp,"_all.rds")))
+
+plot_data <- data %>%
+  select(delta_mean_v1, delta_mean_v2, rate, rate_type, method, partial_info) %>%
+  pivot_wider(names_from = rate_type, values_from = rate)
+# Assign factor order...
+plot_data$method <- factor(plot_data$method, levels = c("baseline",
+                                                        "scran"))
+# ...then rename
+levels(plot_data$method) <- c("NB GLM", "scran")
+
+ggplot(plot_data[plot_data$partial_info == FALSE,], aes(x = fpr, y = tpr, color = log(delta_mean_v2))) +
+  geom_point(size = 2, alpha = 0.5) +
+  scale_color_gradient2(low = "blue", mid = "#BBBBBB", high = "red", midpoint = mean_log_diff) +
+  xlim(c(0,0.75)) +
+  ylim(c(0.25,1)) +
+  xlab("FPR") +
+  ylab("TPR") +
+  labs(color = "Log\nfold\nchange") +
+  facet_wrap(. ~ method, ncol = 5) +
+  theme(strip.text.x = element_text(size = 10))
+ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_spikein_LFC.png")),
+       units = "in",
+       height = 2.5,
+       width = 5.5)
+
+# What's up with the unrescuable cases for the NB GLM
+# failures <- data %>%
+#   filter(method == "baseline" & rate_type == "fpr" & rate > 0.3 & partial_info == TRUE) %>%
+#   select(uuid, cor_totals, rate_type, rate)
+# 
+# idx <- sample(1:nrow(failures), size = 1)
+# sim_data <- readRDS(file.path("output", output_dir, paste0(failures$uuid[idx], ".rds")))
+# failures$cor_totals[idx]
+# plot_stacked_bars(sim_data$abundances)
+# plot_stacked_bars(sim_data$observed_counts1)
+# plot_stacked_bars(sim_data$observed_counts2)
+
+# ------------------------------------------------------------------------------
+#   LFC distributions
+# ------------------------------------------------------------------------------
 
 lfc_data <- lfc_data %>%
   distinct(lfc, p, corrp)
@@ -138,23 +231,6 @@ ggsave(file.path("output", "images", "LFC_histogram_uncorrelated_vs_correlated.p
        height = 4,
        width = 5)
 
-# Plot scran performance colored by LFC
-case.labs <- c("scran, 100 features", "scran, 5000 features")
-names(case.labs) <- c("100", "5000")
-ggplot(scran_data[scran_data$p %in% c(100, 5000),], aes(x = fpr, y = tpr, color = log(delta_mean_v2))) +
-  geom_point(size = 2, alpha = 0.5) +
-  scale_color_gradient2(low = "blue", mid = "#BBBBBB", high = "red", midpoint = mean_log_diff) +
-  xlim(c(0,0.75)) +
-  ylim(c(0.25,1)) +
-  xlab("FPR") +
-  ylab("TPR") +
-  facet_wrap(. ~ p, ncol = 4, labeller = labeller(p = case.labs)) +
-  theme(legend.position = "none")
-ggsave(file.path("output", "images", paste0("DE_scran_LFC.png")),
-       units = "in",
-       height = 3,
-       width = 5.5)
-
 # ------------------------------------------------------------------------------
 #   ROC curves with validation results superimposed
 # ------------------------------------------------------------------------------
@@ -200,81 +276,81 @@ ggsave(file.path("output", "images", paste0("DE_scran_LFC.png")),
 # ------------------------------------------------------------------------------
 #   Improvement due to partial total abundance info
 # ------------------------------------------------------------------------------
-
-p <- 100
-corrp_all <- c(0, 0.5)
-for(corrp in corrp_all) {
-  data <- readRDS(file.path("output", paste0("simresults_p",p,"_corrp",corrp,"_all.rds")))
-  data <- data %>%
-    filter(method %in% c("baseline", "spike_in")) %>%
-    filter(rate_type == "fpr") %>%
-    filter(delta_mean_v2 > 2)
-  
-  plot_data <- data.frame(cor_totals = c(), delta_fpr = c())
-  for(i in seq(from = 1, to = (nrow(data)-1), by = 2)) {
-    delta_fpr <- data$rate[i+1] - data$rate[i]
-    cor_totals <- data$cor_totals[i+1]
-    plot_data <- rbind(plot_data,
-                       data.frame(cor_totals = cor_totals, delta_fpr = delta_fpr))
-  }
-  plot_data <- plot_data %>%
-    filter(cor_totals >= 0)
-  ggplot(plot_data, aes(x = cor_totals, y = delta_fpr)) +
-    geom_point(size = 1) +
-    geom_smooth(method = "lm", color = "#888888", alpha = 0.3) +
-    labs(x = "correlation true/observed totals",
-         y = "change in FPR (w/ correlated totals)")
-  ggsave(file.path("output",
-                   "images",
-                   paste0("partial_total_performance_",p,"_corrp",corrp,".png")),
-         units = "in",
-         height = 3,
-         width = 3)
-}
+# 
+# p <- 100
+# corrp_all <- c(0, 0.5)
+# for(corrp in corrp_all) {
+#   data <- readRDS(file.path("output", paste0("simresults_p",p,"_corrp",corrp,"_all.rds")))
+#   data <- data %>%
+#     filter(method %in% c("baseline", "spike_in")) %>%
+#     filter(rate_type == "fpr") %>%
+#     filter(delta_mean_v2 > 2)
+#   
+#   plot_data <- data.frame(cor_totals = c(), delta_fpr = c())
+#   for(i in seq(from = 1, to = (nrow(data)-1), by = 2)) {
+#     delta_fpr <- data$rate[i+1] - data$rate[i]
+#     cor_totals <- data$cor_totals[i+1]
+#     plot_data <- rbind(plot_data,
+#                        data.frame(cor_totals = cor_totals, delta_fpr = delta_fpr))
+#   }
+#   plot_data <- plot_data %>%
+#     filter(cor_totals >= 0)
+#   ggplot(plot_data, aes(x = cor_totals, y = delta_fpr)) +
+#     geom_point(size = 1) +
+#     geom_smooth(method = "lm", color = "#888888", alpha = 0.3) +
+#     labs(x = "correlation true/observed totals",
+#          y = "change in FPR (w/ correlated totals)")
+#   ggsave(file.path("output",
+#                    "images",
+#                    paste0("partial_total_performance_",p,"_corrp",corrp,".png")),
+#          units = "in",
+#          height = 3,
+#          width = 3)
+# }
 
 # ------------------------------------------------------------------------------
 #   ALDEx2 vs. DESeq2
 # ------------------------------------------------------------------------------
 
-aldex2_data <- cbind(readRDS(file.path("output", paste0("simresults_p100_corrp0_all.rds"))),
-                     setting = "p100_corrp0")
-aldex2_data <- rbind(aldex2_data,
-                     cbind(readRDS(file.path("output", paste0("simresults_p5000_corrp0_all.rds"))),
-                           setting = "p5000_corrp0"))
-aldex2_data <- rbind(aldex2_data,
-                     cbind(readRDS(file.path("output", paste0("simresults_p5000_corrp0.5_all.rds"))),
-                           setting = "p5000_corrp0.5"))
-
-aldex2_data <- aldex2_data %>%
-  filter(method == "ALDEx2") %>%
-  pivot_wider(names_from = rate_type, values_from = rate)
-
-log_diff <- log(aldex2_data$delta_mean_v2)
-mean_log_diff <- mean(log_diff)
-limit <- 3*sd(log_diff)
-idx_retain <- which(log_diff > mean_log_diff - limit & log_diff < mean_log_diff + limit)
-aldex2_data <- aldex2_data[idx_retain,]
-
-# unary_palette <- palette[6]
-
-case.labs <- c("ALDEx2, 100 uncorrelated feat.", "ALDEx2, 5000 uncorrelated feat.", "ALDEx2, 5000 correlated feat.")
-names(case.labs) <- c("p100_corrp0", "p5000_corrp0", "p5000_corrp0.5")
-
-ggplot(aldex2_data, aes(x = fpr, y = tpr, color = log(delta_mean_v2))) +
-  geom_point(size = 2, alpha = 0.5) +
-  scale_color_gradient2(low = "blue", mid = "#BBBBBB", high = "red", midpoint = mean_log_diff) +
-  xlim(c(0,0.75)) +
-  ylim(c(0,1)) +
-  xlab("FPR") +
-  ylab("TPR") +
-  facet_wrap(. ~ setting, labeller = labeller(setting = case.labs)) +
-  theme(legend.position = "none")
-ggsave(file.path("output",
-                 "images",
-                 "ALDEx2_performance_LFC.png"),
-       units = "in",
-       height = 3,
-       width = 7)
+# aldex2_data <- cbind(readRDS(file.path("output", paste0("simresults_p100_corrp0_all.rds"))),
+#                      setting = "p100_corrp0")
+# aldex2_data <- rbind(aldex2_data,
+#                      cbind(readRDS(file.path("output", paste0("simresults_p5000_corrp0_all.rds"))),
+#                            setting = "p5000_corrp0"))
+# aldex2_data <- rbind(aldex2_data,
+#                      cbind(readRDS(file.path("output", paste0("simresults_p5000_corrp0.5_all.rds"))),
+#                            setting = "p5000_corrp0.5"))
+# 
+# aldex2_data <- aldex2_data %>%
+#   filter(method == "ALDEx2") %>%
+#   pivot_wider(names_from = rate_type, values_from = rate)
+# 
+# log_diff <- log(aldex2_data$delta_mean_v2)
+# mean_log_diff <- mean(log_diff)
+# limit <- 3*sd(log_diff)
+# idx_retain <- which(log_diff > mean_log_diff - limit & log_diff < mean_log_diff + limit)
+# aldex2_data <- aldex2_data[idx_retain,]
+# 
+# # unary_palette <- palette[6]
+# 
+# case.labs <- c("ALDEx2, 100 uncorrelated feat.", "ALDEx2, 5000 uncorrelated feat.", "ALDEx2, 5000 correlated feat.")
+# names(case.labs) <- c("p100_corrp0", "p5000_corrp0", "p5000_corrp0.5")
+# 
+# ggplot(aldex2_data, aes(x = fpr, y = tpr, color = log(delta_mean_v2))) +
+#   geom_point(size = 2, alpha = 0.5) +
+#   scale_color_gradient2(low = "blue", mid = "#BBBBBB", high = "red", midpoint = mean_log_diff) +
+#   xlim(c(0,0.75)) +
+#   ylim(c(0,1)) +
+#   xlab("FPR") +
+#   ylab("TPR") +
+#   facet_wrap(. ~ setting, labeller = labeller(setting = case.labs)) +
+#   theme(legend.position = "none")
+# ggsave(file.path("output",
+#                  "images",
+#                  "ALDEx2_performance_LFC.png"),
+#        units = "in",
+#        height = 3,
+#        width = 7)
 
 # ------------------------------------------------------------------------------
 #   DESeq2 performance (FPR) as a function of log fold difference in means
