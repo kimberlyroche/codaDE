@@ -144,43 +144,174 @@ ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_spikein_LF
 # ------------------------------------------------------------------------------
 
 output_dir <- "p100_corrp0"
-data <- readRDS(file.path("output", output_dir, paste0("simresults_p",p,"_corrp",corrp,"_all.rds")))
+n <- 10
+data <- readRDS(file.path("output", output_dir, paste0("simresults_p100_simulated_all.rds")))
 
 plot_data <- data %>%
-  select(delta_mean_v1, delta_mean_v2, rate, rate_type, method, partial_info) %>%
+  select(uuid, delta_mean_v1, delta_mean_v2, rate, rate_type, method, partial_info, gap_totals) %>%
   pivot_wider(names_from = rate_type, values_from = rate)
 # Assign factor order...
 plot_data$method <- factor(plot_data$method, levels = c("baseline",
-                                                        "scran"))
+                                                        "DESeq2"))
 # ...then rename
-levels(plot_data$method) <- c("NB GLM", "scran")
+levels(plot_data$method) <- c("NB GLM", "DESeq2")
 
-ggplot(plot_data[plot_data$partial_info == FALSE,], aes(x = fpr, y = tpr, color = log(delta_mean_v2))) +
-  geom_point(size = 2, alpha = 0.5) +
-  scale_color_gradient2(low = "blue", mid = "#BBBBBB", high = "red", midpoint = mean_log_diff) +
-  xlim(c(0,0.75)) +
-  ylim(c(0.25,1)) +
-  xlab("FPR") +
-  ylab("TPR") +
-  labs(color = "Log\nfold\nchange") +
-  facet_wrap(. ~ method, ncol = 5) +
-  theme(strip.text.x = element_text(size = 10))
-ggsave(file.path("output", "images", paste0("DE_p",p,"_corrp",corrp,"_spikein_LFC.png")),
-       units = "in",
-       height = 2.5,
-       width = 5.5)
+plot_data <- eliminate_outliers(plot_data)
 
-# What's up with the unrescuable cases for the NB GLM
-# failures <- data %>%
-#   filter(method == "baseline" & rate_type == "fpr" & rate > 0.3 & partial_info == TRUE) %>%
-#   select(uuid, cor_totals, rate_type, rate)
-# 
-# idx <- sample(1:nrow(failures), size = 1)
-# sim_data <- readRDS(file.path("output", output_dir, paste0(failures$uuid[idx], ".rds")))
-# failures$cor_totals[idx]
-# plot_stacked_bars(sim_data$abundances)
-# plot_stacked_bars(sim_data$observed_counts1)
-# plot_stacked_bars(sim_data$observed_counts2)
+# Add deltas in totals for 2nd set of observed counts (the partial info ones!)
+plot_data$delta_mean_v1_partial <- numeric(nrow(plot_data))
+plot_data$delta_mean_v2_partial <- numeric(nrow(plot_data))
+uuids <- plot_data %>% distinct(uuid) %>% pull(uuid)
+for(uuid in uuids) {
+  sim_data <- readRDS(file.path("output", output_dir, paste0(uuid, ".rds")))
+  r1 <- rowSums(sim_data$observed_counts2[1:n,])
+  r2 <- rowSums(sim_data$observed_counts2[(n+1):(n*2),])
+  m1 <- mean(r1)
+  m2 <- mean(r2)
+  delta_mean_v1 <- max(c(m1, m2)) - min(c(m1, m2)) # absolute difference
+  delta_mean_v2 <- max(c(m1, m2)) / min(c(m1, m2)) # absolute fold change
+  plot_data[plot_data$uuid == uuid,]$delta_mean_v1_partial <- delta_mean_v1
+  plot_data[plot_data$uuid == uuid,]$delta_mean_v2_partial <- delta_mean_v2
+}
+
+for(method in levels(plot_data$method)) {
+  sub_plot_data <- plot_data[plot_data$method == method,]
+  save_name <- paste0("performance_",
+                      ifelse(method == "NB GLM", "NBGLM", method))
+  
+  partial_data <- sub_plot_data[sub_plot_data$partial_info == TRUE,]
+  baseline_data <- sub_plot_data[sub_plot_data$partial_info == FALSE,]
+  
+  # Baseline data
+  ggplot(baseline_data, aes(x = fpr, y = tpr, color = log(delta_mean_v2))) +
+    geom_point(size = 2, alpha = 0.66) +
+    scale_color_gradient2(low = "navy", mid = "#cccccc", high = "red",
+                          midpoint = mean(log(baseline_data$delta_mean_v2))) +
+    xlim(c(0,0.75)) +
+    ylim(c(0.25,1)) +
+    xlab("FPR") +
+    ylab("TPR") +
+    labs(color = "Log\nfold\nchange",
+         title = paste0(method, " on observed counts"))
+  ggsave(file.path("output", "images", paste0(save_name, "_baseline.png")),
+         units = "in",
+         height = 4,
+         width = 5)
+  # Partial info-augmented data
+  partial_data$gap_restored <- partial_data$delta_mean_v2_partial / 
+    partial_data$delta_mean_v2
+  ggplot(partial_data, aes(x = fpr, y = tpr, color = gap_restored)) +
+    geom_point(size = 2, alpha = 0.66) +
+    scale_color_gradient2(low = "#ff8c00", mid = "#cccccc", high = "#2abd4e",
+                          midpoint = mean(partial_data$gap_restored)) +
+    xlim(c(0,0.75)) +
+    ylim(c(0.25,1)) +
+    xlab("FPR") +
+    ylab("TPR") +
+    labs(color = "Percent\ngap\nrestored",
+         title = paste0(method, " on partially informative counts"))
+    ggsave(file.path("output", "images", paste0(save_name, "_partial.png")),
+           units = "in",
+           height = 4,
+           width = 5)
+  
+  # ----------------------------------------------------------------------------
+  #   Plot baseline + partial into w/ discrete LOW/MED/HIGH LFC coloring
+  # ----------------------------------------------------------------------------
+
+  # n_levels <- 3 # cut into factor by tertiles
+  # cuts <- quantile(sub_plot_data$delta_mean_v2,
+  #                  probs = seq(from = 0, to = 1, length.out = n_levels+1))
+  # cuts[1] <- -Inf
+  # cuts[length(cuts)] <- Inf
+  # delta_values <- sub_plot_data$delta_mean_v2
+  # delta_values[sub_plot_data$partial_info == TRUE] <- sub_plot_data[sub_plot_data$partial_info == TRUE,]$delta_mean_v2_partial
+  # lfc_factor <- cut(delta_values, breaks = cuts)
+  # levels(lfc_factor) <- c("low", "med", "high")
+  # palette_lfc <- colorRampPalette(c("navy", "#bbbbbb", "red"))(n_levels)
+  # names(palette_lfc) <- levels(lfc_factor)
+  # sub_plot_data$lfc_factor <- lfc_factor
+  # 
+  # partial_data <- sub_plot_data[sub_plot_data$partial_info == TRUE,]
+  # baseline_data <- sub_plot_data[sub_plot_data$partial_info == FALSE,]
+  # 
+  # # Baseline data
+  # ggplot(baseline_data, aes(x = fpr, y = tpr, color = lfc_factor)) +
+  #   geom_point(size = 2, alpha = 0.66) +
+  #   scale_color_manual(values = palette_lfc) +
+  #   xlim(c(0,0.75)) +
+  #   ylim(c(0.25,1)) +
+  #   xlab("FPR") +
+  #   ylab("TPR") +
+  #   labs(title = paste0(method, " on observed counts")) +
+  #   theme(legend.position = "none")
+  # ggsave(file.path("output", "images", paste0(save_name, "_baseline.png")),
+  #        units = "in",
+  #        height = 4,
+  #        width = 4)
+  # # Partial info-augmented data
+  # ggplot(partial_data, aes(x = fpr, y = tpr, color = lfc_factor)) +
+  #   geom_point(size = 2, alpha = 0.66) +
+  #   scale_color_manual(values = palette_lfc) +
+  #   xlim(c(0,0.75)) +
+  #   ylim(c(0.25,1)) +
+  #   xlab("FPR") +
+  #   ylab("TPR") +
+  #   labs(color = "Log\nfold\nchange",
+  #        title = paste0(method, " on partially informative counts")) +
+  # ggsave(file.path("output", "images", paste0(save_name, "_partial.png")),
+  #        units = "in",
+  #        height = 4,
+  #        width = 5)
+  
+  # ----------------------------------------------------------------------------
+  #   Plot improvement in FPR with increasing gap closed
+  # ----------------------------------------------------------------------------
+  
+  # plot_subset <- sub_plot_data %>%
+  #   filter(partial_info == TRUE)
+  # plot_df <- data.frame(percent_gap_restored = plot_subset$delta_mean_v2_partial /
+  #                         plot_subset$delta_mean_v2,
+  #                       fpr = plot_subset$fpr,
+  #                       gap_orig = plot_subset$delta_mean_v2)
+  # ggplot(plot_df, aes(x = percent_gap_restored, y = fpr, color = log(gap_orig))) +
+  #   geom_smooth(color = "#bbbbbb", alpha = 0.2) +
+  #   geom_point() +
+  #   scale_color_gradient2(low = "navy",
+  #                         mid = "#bbbbbb",
+  #                         high = "red",
+  #                         midpoint = mean(log(plot_df$gap_orig))) +
+  #   xlim(c(min(plot_df$percent_gap_restored), 1)) +
+  #   labs(color = "Log\nfold\nchange",
+  #        x = "% mean FC across conditions restored",
+  #        y = "FPR")
+  # ggsave(file.path("output", "images", paste0(save_name, "_gap-vs-fpr.png")),
+  #        units = "in",
+  #        height = 4,
+  #        width = 5)
+}
+
+# "Improvement" plots - TBD
+# this_method <- "NB GLM"
+this_method <- "DESeq2"
+deltas <- c()
+gaps <- c()
+for(uuid in unique(plot_data$uuid)) {
+  partial_entry <- plot_data[plot_data$uuid == uuid &
+                               plot_data$method == this_method &
+                               plot_data$partial_info == TRUE,]$fpr
+  base_entry <- plot_data[plot_data$uuid == uuid &
+                            plot_data$method == this_method &
+                            plot_data$partial_info == FALSE,]$fpr
+  deltas <- c(deltas, partial_entry - base_entry)
+  gaps <- c(gaps, plot_data[plot_data$uuid == uuid &
+                              plot_data$method == this_method &
+                              plot_data$partial_info == TRUE,]$gap_totals)
+}
+plot_df <- data.frame(gaps = gaps, deltas = deltas)
+ggplot(plot_df, aes(x = gaps, y = deltas)) +
+  geom_point() +
+  geom_smooth(method = "lm")
 
 # ------------------------------------------------------------------------------
 #   LFC distributions
