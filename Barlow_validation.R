@@ -112,14 +112,21 @@ ggsave(file.path("output",
 
 # rows are samples (103), columns are taxa (141)
 
+cat("Approx. fold change in totals:",
+    round(mean(rowSums(absolute_counts[groups == 0,])) /
+            mean(rowSums(absolute_counts[groups == 1,])), 2), "\n")
+
 # ------------------------------------------------------------------------------
 #   Apply NB GLM to absolute counts to get baseline DE
+#
+#   Need to think carefully about how to implement clustering in scran on real
+#   data, which is much noisier than the simulations. (TBD)
 # ------------------------------------------------------------------------------
 
 oracle_calls <- sapply(1:ncol(absolute_counts), function(idx) { call_DA_NB(absolute_counts, groups, idx) } )
 oracle_calls <- oracle_calls < 0.05
 
-call_DA_validation <- function(absolute_counts) {
+call_DA_validation <- function(absolute_counts, relative_counts) {
   # NB GLM
   NB_calls <- sapply(1:ncol(absolute_counts), function(idx) { call_DA_NB(relative_counts, groups, idx) } )
   # DESeq2
@@ -127,17 +134,17 @@ call_DA_validation <- function(absolute_counts) {
   # MAST
   MAST_calls <- call_DA_MAST(relative_counts, groups)
   # scran
-  scran_calls <- call_DA_scran(relative_counts, groups)
+  # scran_calls <- call_DA_scran(relative_counts, groups)
   # ALDEx2
   ALDEx2_calls <- call_DA_ALDEx2(relative_counts, groups)
   return(list(baseline = NB_calls,
               DESeq2 = DESeq2_calls,
               MAST = MAST_calls,
-              scran = scran_calls,
+              # scran = scran_calls,
               ALDEx2 = ALDEx2_calls))
 }
 
-calls_list <- call_DA_validation(absolute_counts)
+calls_list <- call_DA_validation(absolute_counts, relative_counts)
 
 calculate_rates_validation <- function(calls_list) {
   results <- data.frame(tpr = c(),

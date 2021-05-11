@@ -7,7 +7,7 @@
 plot_stacked_bars(data, palette = NULL, save_name = NULL)
 }
 \arguments{
-\item{data}{a data.frame with (named) columns for feature, sample, and abundance}
+\item{data}{matrix of abundances or observed counts (samples x features)}
 
 \item{palette}{a color palette}
 

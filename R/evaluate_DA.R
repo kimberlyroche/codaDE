@@ -13,36 +13,33 @@ call_DA_scran <- function(data, groups) {
   count_table <- t(data)
   # groups <- sim_data$groups
   n_genes <- nrow(count_table)
-  n_samples_condition <- ncol(count_table)/2
   cell_metadata <- data.frame(condition = groups)
   
   rownames(cell_metadata) <- colnames(count_table)
   rownames(count_table) <- paste0("gene", 1:n_genes)
-  colnames(count_table) <- paste0("cell", 1:(n_samples_condition*2))
+  colnames(count_table) <- paste0("cell", 1:ncol(count_table))
   
   sce <- SingleCellExperiment(assays = list(counts = count_table),
                               colData = cell_metadata)
 
   # Note: We'll need to add QC stuff here ultimately.
-  
+
   # Methods below taken from this tutorial:
   # https://bioconductor.org/packages/release/bioc/vignettes/scran/inst/doc/scran.html
-  
   clusters <- suppressWarnings(quickCluster(sce, min.size = 1))
-
   sce <- suppressWarnings(computeSumFactors(sce, clusters = clusters)) # Use a first-pass clustering
   sce <- logNormCounts(sce)
   
   # Cluster from docs: https://rdrr.io/bioc/scran/man/getClusteredPCs.html
   sce <- suppressWarnings(scater::runPCA(sce))
-  output <- getClusteredPCs(reducedDim(sce))
+  output <- suppressWarnings(getClusteredPCs(reducedDim(sce)))
 
   npcs <- metadata(output)$chosen # number of "informative dimensions"
 
   reducedDim(sce, "PCAsub") <- reducedDim(sce, "PCA")[,1:npcs,drop=FALSE]
   
   # Build a graph based on this truncated dimensionality reduction
-  g <- buildSNNGraph(sce, use.dimred = "PCAsub")
+  g <- suppressWarnings(buildSNNGraph(sce, use.dimred = "PCAsub"))
   cluster <- igraph::cluster_walktrap(g)$membership
   
   # Assigning to the 'colLabels' of the 'sce'

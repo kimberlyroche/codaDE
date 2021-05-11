@@ -4,6 +4,8 @@ library(ggROC)
 library(pROC)
 library(gridExtra)
 
+source("ggplot_fix.R")
+
 setwd("C:/Users/kimbe/Documents/codaDE")
 
 # Select global palette for 5 methods
@@ -28,7 +30,9 @@ eliminate_outliers <- function(df) {
   mean_log_diff <- mean(log_diff)
   limit <- 3*sd(log_diff)
   idx_retain <- which(log_diff > mean_log_diff - limit & log_diff < mean_log_diff + limit)
-  df[idx_retain,]
+  return(list(df = df[idx_retain,],
+              log_diff = log_diff,
+              mean_log_diff = mean_log_diff))
 }
 
 # ------------------------------------------------------------------------------
@@ -64,6 +68,9 @@ for(p in p_all) {
     
     
     plot_data <- eliminate_outliers(plot_data)
+    log_diff <- plot_data$log_diff
+    mean_log_diff <- plot_data$mean_log_diff
+    plot_data <- plot_data$df
     
     lfc_data <- rbind(lfc_data,
                       data.frame(lfc = log_diff, p = p, corrp = corrp))
@@ -73,8 +80,8 @@ for(p in p_all) {
       scale_color_manual(values = palette) +
       xlim(c(0,0.75)) +
       ylim(c(0.25,1)) +
-      xlab("FPR") +
-      ylab("TPR") +
+      xlab("1 - specificity") +
+      ylab("sensitivity") +
       facet_wrap(. ~ method, ncol = 5) +
       theme(legend.position = "none") +
       theme(strip.text.x = element_text(size = 10))
@@ -89,8 +96,8 @@ for(p in p_all) {
         scale_color_gradient2(low = "blue", mid = "#BBBBBB", high = "red", midpoint = mean_log_diff) +
         xlim(c(0,0.75)) +
         ylim(c(0.25,1)) +
-        xlab("FPR") +
-        ylab("TPR") +
+        xlab("1 - specificity") +
+        ylab("sensitivity") +
         labs(color = "Log\nfold\nchange") +
         facet_wrap(. ~ method, ncol = 5) +
         theme(strip.text.x = element_text(size = 10))
@@ -123,14 +130,17 @@ plot_data$method <- factor(plot_data$method, levels = c("baseline",
 levels(plot_data$method) <- c("NB GLM", "NB GLM + spike-in")
 
 plot_data <- eliminate_outliers(plot_data)
+log_diff <- plot_data$log_diff
+mean_log_diff <- plot_data$mean_log_diff
+plot_data <- plot_data$df
 
 ggplot(plot_data, aes(x = fpr, y = tpr, color = log(delta_mean_v2))) +
   geom_point(size = 1, alpha = 0.5) +
   scale_color_gradient2(low = "blue", mid = "#BBBBBB", high = "red", midpoint = mean_log_diff) +
   xlim(c(0,0.75)) +
   ylim(c(0.25,1)) +
-  xlab("FPR") +
-  ylab("TPR") +
+  xlab("1 - specificity") +
+  ylab("sensitivity") +
   labs(color = "Log\nfold\nchange") +
   facet_wrap(. ~ method, ncol = 5) +
   theme(strip.text.x = element_text(size = 10))
@@ -157,6 +167,9 @@ plot_data$method <- factor(plot_data$method, levels = c("baseline",
 levels(plot_data$method) <- c("NB GLM", "DESeq2")
 
 plot_data <- eliminate_outliers(plot_data)
+log_diff <- plot_data$log_diff
+mean_log_diff <- plot_data$mean_log_diff
+plot_data <- plot_data$df
 
 # Add deltas in totals for 2nd set of observed counts (the partial info ones!)
 plot_data$delta_mean_v1_partial <- numeric(nrow(plot_data))
@@ -189,10 +202,9 @@ for(method in levels(plot_data$method)) {
                           midpoint = mean(log(baseline_data$delta_mean_v2))) +
     xlim(c(0,0.75)) +
     ylim(c(0.25,1)) +
-    xlab("FPR") +
-    ylab("TPR") +
-    labs(color = "Log\nfold\nchange",
-         title = paste0(method, " on observed counts"))
+    xlab("1 - specificity") +
+    ylab("sensitivity") +
+    labs(color = "Log\nfold\nchange") +
   ggsave(file.path("output", "images", paste0(save_name, "_baseline.png")),
          units = "in",
          height = 4,
@@ -200,16 +212,16 @@ for(method in levels(plot_data$method)) {
   # Partial info-augmented data
   partial_data$gap_restored <- partial_data$delta_mean_v2_partial / 
     partial_data$delta_mean_v2
-  ggplot(partial_data, aes(x = fpr, y = tpr, color = gap_restored)) +
+  subset_partial_df <- partial_data[partial_data$gap_restored <= 1.0,]
+  ggplot(subset_partial_df, aes(x = fpr, y = tpr, color = gap_restored)) +
     geom_point(size = 2, alpha = 0.66) +
     scale_color_gradient2(low = "#ff8c00", mid = "#cccccc", high = "#2abd4e",
-                          midpoint = mean(partial_data$gap_restored)) +
+                          midpoint = mean(subset_partial_df$gap_restored)) +
     xlim(c(0,0.75)) +
     ylim(c(0.25,1)) +
-    xlab("FPR") +
-    ylab("TPR") +
-    labs(color = "Percent\ngap\nrestored",
-         title = paste0(method, " on partially informative counts"))
+    xlab("1 - specificity") +
+    ylab("sensitivity") +
+    labs(color = "Percent\nfold change\nretained") +
     ggsave(file.path("output", "images", paste0(save_name, "_partial.png")),
            units = "in",
            height = 4,
@@ -268,27 +280,27 @@ for(method in levels(plot_data$method)) {
   #   Plot improvement in FPR with increasing gap closed
   # ----------------------------------------------------------------------------
   
-  # plot_subset <- sub_plot_data %>%
-  #   filter(partial_info == TRUE)
-  # plot_df <- data.frame(percent_gap_restored = plot_subset$delta_mean_v2_partial /
-  #                         plot_subset$delta_mean_v2,
-  #                       fpr = plot_subset$fpr,
-  #                       gap_orig = plot_subset$delta_mean_v2)
-  # ggplot(plot_df, aes(x = percent_gap_restored, y = fpr, color = log(gap_orig))) +
-  #   geom_smooth(color = "#bbbbbb", alpha = 0.2) +
-  #   geom_point() +
-  #   scale_color_gradient2(low = "navy",
-  #                         mid = "#bbbbbb",
-  #                         high = "red",
-  #                         midpoint = mean(log(plot_df$gap_orig))) +
-  #   xlim(c(min(plot_df$percent_gap_restored), 1)) +
-  #   labs(color = "Log\nfold\nchange",
-  #        x = "% mean FC across conditions restored",
-  #        y = "FPR")
-  # ggsave(file.path("output", "images", paste0(save_name, "_gap-vs-fpr.png")),
-  #        units = "in",
-  #        height = 4,
-  #        width = 5)
+  plot_subset <- sub_plot_data %>%
+    filter(partial_info == TRUE)
+  plot_df <- data.frame(percent_gap_restored = plot_subset$delta_mean_v2_partial /
+                          plot_subset$delta_mean_v2,
+                        fpr = plot_subset$fpr,
+                        gap_orig = plot_subset$delta_mean_v2)
+  ggplot(plot_df, aes(x = percent_gap_restored, y = fpr, color = log(gap_orig))) +
+    geom_smooth(color = "#bbbbbb", alpha = 0.2) +
+    geom_point() +
+    scale_color_gradient2(low = "navy",
+                          mid = "#bbbbbb",
+                          high = "red",
+                          midpoint = mean(log(plot_df$gap_orig))) +
+    xlim(c(min(plot_df$percent_gap_restored), 1)) +
+    labs(color = "Log\nfold\nchange",
+         x = "Percent fold change retained",
+         y = "1 - specificity")
+  ggsave(file.path("output", "images", paste0(save_name, "_gap-vs-fpr.png")),
+         units = "in",
+         height = 4,
+         width = 5)
 }
 
 # "Improvement" plots - TBD
@@ -368,41 +380,60 @@ ggsave(file.path("output", "images", "LFC_histogram_uncorrelated_vs_correlated.p
 
 # Note: There are edgeR results in here but I think they are wrong. (They
 # perfectly resemble the NB GLM results.)
-# 
-# p <- 100
-# data <- readRDS(file.path("output", paste0("simresults_p",p,"_corrp0.5_all.rds")))
-# method_list <- c("baseline", "DESeq2", "MAST", "scran", "ALDEx2")
-# method_labels <- c("NB GLM", "DESeq2", "MAST", "scran", "ALDEx2")
-# 
-# validation <- readRDS(file.path("output", "Barlow_validation_results.rds"))
-# validation <- validation %>%
-#   filter(method %in% method_list)
-# 
-# plot_data <- data %>%
-#   select(delta_mean_v2, rate, rate_type, method) %>%
-#   filter(method %in% method_list) %>%
-#   pivot_wider(names_from = rate_type, values_from = rate)
-# plot_data$method <- factor(plot_data$method)
-# 
-# plot_list <- list()
-# for(i in 1:length(method_list)) {
-#   method <- method_list[[i]]
-#   pl <- ggplot(plot_data[plot_data$method == method,], aes(x = fpr, y = tpr)) +
-#     geom_density_2d(color = "black", size = 1, alpha = 0.5) +
-#     geom_point(data = validation[validation$method == method,],
-#                aes(x = fpr, y = tpr), size = 3, color = "red") +
-#     xlim(c(0,0.75)) +
-#     ylim(c(0.25,1)) +
-#     labs(title = method_labels[i], x = "FPR", y = "TPR")
-#   plot_list[[i]] <- pl
-# }
-# 
-# pl <- grid.arrange(grobs = plot_list, ncol = 3)
-# ggsave(file.path("output", "images", paste0("DE_p",p,"_all_models_validation.png")),
-#        plot = pl,
-#        units = "in",
-#        height = 5,
-#        width = 8)
+
+dataset <- "Barlow" # Athanasiadou or Barlow
+
+if(dataset == "Athanasiadou") {
+  data <- readRDS(file.path("output", paste0("simresults_p5000_corrp0.5_all.rds")))
+  method_list <- c("baseline", "DESeq2", "MAST", "ALDEx2")
+  data <- data %>%
+    filter(method %in% method_list) %>%
+    filter(delta_mean_v2 < 2)
+  method_labels <- c("NB GLM", "DESeq2", "MAST", "ALDEx2")
+  validation <- readRDS(file.path("output", "Athanasiadou_validation_results.rds"))
+  validation <- validation %>%
+    filter(method %in% method_list)
+  save_name <- "Athanasiadou_validation.png"
+} else {
+  data <- readRDS(file.path("output", paste0("simresults_p100_corrp0.5_all.rds")))
+  method_list <- c("baseline", "DESeq2", "MAST", "ALDEx2")
+  data <- data %>%
+    filter(method %in% method_list) %>%
+    filter(delta_mean_v2 > 3 & delta_mean_v2 < 4)
+  method_labels <- c("NB GLM", "DESeq2", "MAST", "ALDEx2")
+  validation <- readRDS(file.path("output", "Barlow_validation_results.rds"))
+  validation <- validation %>%
+    filter(method %in% method_list)
+  save_name <- "Barlow_validation.png"
+}
+
+plot_data <- data %>%
+  select(delta_mean_v2, rate, rate_type, method) %>%
+  filter(method %in% method_list) %>%
+  pivot_wider(names_from = rate_type, values_from = rate)
+plot_data$method <- factor(plot_data$method)
+
+plot_list <- list()
+for(i in 1:length(method_list)) {
+  method <- method_list[[i]]
+  pl <- ggplot(plot_data[plot_data$method == method,], aes(x = fpr, y = tpr)) +
+    geom_point(alpha = 0.5) +
+    # geom_density_2d(color = "black", size = 0.5, alpha = 0.5) +
+    geom_point(data = validation[validation$method == method,],
+               aes(x = fpr, y = tpr), size = 3, color = "red") +
+    xlim(c(0,0.75)) +
+    ylim(c(0.25,1)) +
+    labs(title = method_labels[i], x = "FPR", y = "TPR")
+  plot_list[[i]] <- pl
+}
+
+pl <- grid.arrange(grobs = plot_list, ncol = 4)
+
+ggsave(file.path("output", "images", save_name),
+       plot = pl,
+       units = "in",
+       height = 2.75,
+       width = 10)
 
 # ------------------------------------------------------------------------------
 #   Improvement due to partial total abundance info

@@ -211,8 +211,17 @@ build_Morton_reference <- function() {
   return(NULL)
 }
 
-# Utility function -- applies the ERCC normalization code from Athanasiadou et al. (2021)
-normalize_Athanasiadou <- function(SI_file, RNA_file, ERCC_annot, groups) {
+#' Utility function that applies the ERCC normalization code from Athanasiadou
+#' et al. (2021)
+#'
+#' @param file_dir base file directory
+#' @param SI_file experiment SI file
+#' @param RNA_file experiment RNA file
+#' @param ERCC_annot experiment ERCC file
+#' @param groups per-sample group labels
+#' @return matrix of rescaled count data
+#' @export
+normalize_Athanasiadou <- function(file_dir, SI_file, RNA_file, ERCC_annot, groups) {
   # Spike-in counts and RNA counts
   YmatSI <- as.matrix(read.table(file = file.path(file_dir, SI_file)))
   YmatRNA <- as.matrix(read.table(file = file.path(file_dir, RNA_file)))
