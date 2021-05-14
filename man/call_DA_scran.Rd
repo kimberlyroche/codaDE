@@ -2,18 +2,18 @@
 % Please edit documentation in R/evaluate_DA.R
 \name{call_DA_scran}
 \alias{call_DA_scran}
-\title{Apply scran normalization and call differentially expressed (marker) genes}
+\title{Evaluate differential abundance with scran}
 \usage{
 call_DA_scran(data, groups)
 }
 \arguments{
-\item{data}{simulated data set}
+\item{data}{simulated data set (samples x features)}
 
 \item{groups}{group (cohort) labels}
 }
 \value{
-binary calls for all genes as pseudo-pvalues (0 = DE, 1 = not DE)
+unadjusted p-values for all features
 }
 \description{
-Apply scran normalization and call differentially expressed (marker) genes
+Evaluate differential abundance with scran
 }

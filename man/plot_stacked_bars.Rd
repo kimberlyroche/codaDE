@@ -2,7 +2,8 @@
 % Please edit documentation in R/boilerplate.R
 \name{plot_stacked_bars}
 \alias{plot_stacked_bars}
-\title{Generate a color palette suitable for stacked bar plots given a feature number (S)}
+\title{Generate a color palette suitable for stacked bar plots given a feature 
+number (S)}
 \usage{
 plot_stacked_bars(data, palette = NULL, save_name = NULL)
 }
@@ -14,5 +15,6 @@ plot_stacked_bars(data, palette = NULL, save_name = NULL)
 \item{save_name}{optional name to save plot under}
 }
 \description{
-Generate a color palette suitable for stacked bar plots given a feature number (S)
+Generate a color palette suitable for stacked bar plots given a feature 
+number (S)
 }

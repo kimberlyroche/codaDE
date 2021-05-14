@@ -5,12 +5,12 @@
 \title{Simulate UMI count single-cell RNA-seq data}
 \usage{
 simulate_sequence_counts(
-  n = 500,
-  p = 1000,
-  ref_data_name = "Athanasidou_ciona",
+  n = 20,
+  p = 100,
+  ref_data_name = "simulated",
   data_obj = NULL,
-  asymmetry = 0.5,
-  proportion_da = 0.1,
+  asymmetry = 1,
+  proportion_da = 0.75,
   spike_in = FALSE
 )
 }
@@ -19,28 +19,23 @@ simulate_sequence_counts(
 
 \item{p}{number of features (i.e. genes or bacterial taxa)}
 
-\item{ref_data_name}{optional: specifies the reference data set to use
-("Morton", "Athanasiadou_ciona", "simulated"; case-sensitive)}
+\item{ref_data_name}{optional name of reference data set to use from among
+"Morton", "Athanasiadou_ciona", "simulated"}
 
-\item{data_obj}{reference data set object; if non-null, this takes precedence
+\item{data_obj}{optional reference data set object; this takes precedence 
 over ref_data_name}
 
-\item{asymmetry}{proportion of baselines to draw from condition 1}
+\item{asymmetry}{proportion of baseline abundances to draw from condition 1}
 
 \item{proportion_da}{proportion of differentially abundant genes}
 
-\item{spike_in}{simulate a control spike in with low dispersion}
+\item{spike_in}{simulate a control feature with low dispersion across 
+conditions; this is indexed as the last feature}
 }
 \value{
-named list of true abundances, observed abundances, and group assignments
+named list of true abundances, observed abundances, and group 
+assignments
 }
 \description{
 Simulate UMI count single-cell RNA-seq data
-}
-\details{
-Library size correlation can be specified as 0, 1, or 2, indicating no correlation, modest correlation, or very strong
-correlation with true abundances.
-
-Samples the mean gene abundances from Halpern et al. (2017) as a references. This gives a data set
-with on average 75% zeros which may still not be representative in terms of sparsity. Need to follow up. (7/22/2020)
 }

@@ -5,9 +5,11 @@
 \title{Utility function that applies the ERCC normalization code from Athanasiadou
 et al. (2021)}
 \usage{
-normalize_Athanasiadou(SI_file, RNA_file, ERCC_annot, groups)
+normalize_Athanasiadou(file_dir, SI_file, RNA_file, ERCC_annot, groups)
 }
 \arguments{
+\item{file_dir}{base file directory}
+
 \item{SI_file}{experiment SI file}
 
 \item{RNA_file}{experiment RNA file}

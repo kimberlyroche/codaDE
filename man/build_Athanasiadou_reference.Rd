@@ -2,7 +2,8 @@
 % Please edit documentation in R/build_references.R
 \name{build_Athanasiadou_reference}
 \alias{build_Athanasiadou_reference}
-\title{Generate differential expression reference for Athanasiadou et al. (2021) bulk RNA-seq data}
+\title{Generate differential expression reference for Athanasiadou et al. (2021) 
+bulk RNA-seq data}
 \usage{
 build_Athanasiadou_reference()
 }
@@ -10,5 +11,6 @@ build_Athanasiadou_reference()
 named list of observed counts in conditions 1 and 2
 }
 \description{
-Generate differential expression reference for Athanasiadou et al. (2021) bulk RNA-seq data
+Generate differential expression reference for Athanasiadou et al. (2021) 
+bulk RNA-seq data
 }

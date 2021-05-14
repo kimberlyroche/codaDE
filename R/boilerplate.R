@@ -1,4 +1,5 @@
-#' Generate a color palette suitable for stacked bar plots given a feature number (S)
+#' Generate a color palette suitable for stacked bar plots given a feature 
+#' number (S)
 #'
 #' @param S number of features (colors to generate)
 #' @return list of hex colors
@@ -9,7 +10,8 @@ generate_highcontrast_palette <- function(S) {
   sample(getPalette(S))
 }
 
-#' Generate a color palette suitable for stacked bar plots given a feature number (S)
+#' Generate a color palette suitable for stacked bar plots given a feature 
+#' number (S)
 #'
 #' @param data matrix of abundances or observed counts (samples x features)
 #' @param palette a color palette
@@ -22,7 +24,10 @@ plot_stacked_bars <- function(data, palette = NULL, save_name = NULL) {
   n_samples <- ncol(data)
   data <- cbind(1:nrow(data), data)
   colnames(data) <- c("feature", 1:n_samples)
-  data_long <- pivot_longer(data, !feature, names_to = "sample", values_to = "abundance")
+  data_long <- pivot_longer(data,
+                            !feature,
+                            names_to = "sample",
+                            values_to = "abundance")
   data_long$feature <- factor(data_long$feature)
   data_long$sample <- factor(data_long$sample, levels = 1:n_samples)
   

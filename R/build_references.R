@@ -58,7 +58,8 @@ build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 2,
 build_Barlow_reference <- function() {
   file_dir <- file.path("data", "Barlow_2020")
   
-  data <- read.table(file.path(file_dir, "Absolute_Abundance_Table.csv"), header = TRUE, sep = ",", stringsAsFactors = FALSE)
+  data <- read.table(file.path(file_dir, "Absolute_Abundance_Table.csv"),
+                     header = TRUE, sep = ",", stringsAsFactors = FALSE)
 
   # Clean up data
   md_labels <- c("Diet", "Site", "Day", "mouse", "Cage")
@@ -88,22 +89,10 @@ build_Barlow_reference <- function() {
 
   groups = factor(labels, levels = c("control", "keto"))
 
-  # # Histograms!
-  # plot_counts <- counts[which(groups == "control"),]
-  # absent_tax_idx <- which(colSums(plot_counts) == 0)
-  # plot_counts <- plot_counts[,-absent_tax_idx]
-  # 
-  # ggplot(data.frame(x = log(c(plot_counts) + 1)), aes(x)) +
-  #   geom_histogram(color = "white")
-  # ggsave("hist_Barlow_orig.png", units = "in", dpi = 100, height = 5, width = 6)
-  # 
-  # ggplot(data.frame(x = log(c(plot_counts)/min(plot_counts[which(plot_counts > 0, arr.ind = TRUE)]) + 1)), aes(x)) +
-  #   geom_histogram(color = "white")
-  # ggsave("hist_Barlow_scaled.png", units = "in", dpi = 100, height = 5, width = 6)
-  # 
-  # The scaling does weird things to this data set. The minimum *observed* (non-zero) abundance is huge
-  # giving a gap between observed and unobserved features that is enormous.
-  # I'm scaling down all the counts by this minimum observed abundance for now. (2/16/2021)
+  # The scaling does weird things to this data set. The minimum *observed* 
+  # (non-zero) abundance is huge giving a gap between observed and unobserved 
+  # features that is enormous. I'm scaling down all the counts by this minimum 
+  # observed abundance for now.
   min_observed <- min(counts[which(counts > 0, arr.ind = TRUE)])
   counts <- counts / min_observed
   counts <- t(counts)
@@ -136,10 +125,13 @@ build_Morton_reference <- function() {
   
   file_dir <- file.path("data", "Morton_2019", "Github")
 
-  otu_table <- read.delim(file.path(file_dir, "oral_trimmed_deblur.txt"), sep = "\t", header = TRUE, stringsAsFactors = FALSE)
-  metadata <- read.delim(file.path(file_dir, "oral_trimmed_metadata.txt"), sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+  otu_table <- read.delim(file.path(file_dir, "oral_trimmed_deblur.txt"),
+                          sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+  metadata <- read.delim(file.path(file_dir, "oral_trimmed_metadata.txt"),
+                         sep = "\t", header = TRUE, stringsAsFactors = FALSE)
 
-  # "flowcount" is calculated this way in the paper (see Python notebook for Fig. 2)
+  # "flowcount" is calculated this way in the paper
+  # (See their Python notebook for Fig. 2)
   flowcount <- (metadata$flow.cell.5min.1 + metadata$flow.cell.5min.2) / 2
   event_labels <- metadata$brushing_event
   subject_labels <- metadata$HostSubject
@@ -160,43 +152,24 @@ build_Morton_reference <- function() {
     counts[,i] <- counts[,i]*flowcount[i]
   }
 
-  # Re-order samples by condition (event before/after) and subject (where most subjects have a morning and evening brushing event)
+  # Re-order samples by condition (event before/after) and subject (where most
+  # subjects have a morning and evening brushing event)
   before_events <- which(event_labels == "before")
-  before_subjects <- paste0(subject_labels[before_events], timepoint_labels[before_events])
+  before_subjects <- paste0(subject_labels[before_events],
+                            timepoint_labels[before_events])
   after_events <- which(event_labels == "after")
-  after_subjects <- paste0(subject_labels[after_events], timepoint_labels[after_events])
+  after_subjects <- paste0(subject_labels[after_events],
+                           timepoint_labels[after_events])
   counts <- counts[,c(before_events, after_events)]
   subjects <- factor(c(before_subjects, after_subjects))
 
-  groups <- factor(c(rep("before", length(before_events)), rep("after", length(after_events))),
+  groups <- factor(c(rep("before", length(before_events)),
+                     rep("after", length(after_events))),
                    levels = c("before", "after"))
 
   # Scale by minimum observed abundance as I did with Barlow et al.
   min_observed <- min(counts[which(counts > 0, arr.ind = TRUE)])
   counts <- counts / min_observed
-  
-  # # Bipartite graph
-  # # features <- sample(1:ncol(counts), size = 5)
-  # plot_data <- data.frame(before_log_count = c(), after_log_count = c(), rank = c())
-  # before_log_counts <- log(unname(counts[,groups == "before"]) + 1)
-  # qq <- c(sum(before_log_counts == 0)/(nrow(before_log_counts)*ncol(before_log_counts)))
-  # qq <- quantile(before_log_counts, probs = seq(from = qq, to = 1, length.out = 5))
-  # breaks <- c(-Inf, qq, Inf)
-  # sampled_subjects <- sample(before_subjects, size = 5)
-  # for(feat in 1:nrow(counts)) {
-  #   for(subj in sampled_subjects) {
-  #     before_val <- log(unname(counts[feat,subjects == subj & groups == "before"]) + 1)
-  #     after_val <- log(unname(counts[feat,subjects == subj & groups == "after"]) + 1)
-  #     rank <- as.numeric(cut(before_val, breaks = breaks))
-  #     plot_data <- rbind(plot_data, data.frame(before_log_count = before_val,
-  #                                              after_log_count = after_val,
-  #                                              rank = rank))
-  #   }
-  # }
-  # plot_data$rank <- as.factor(plot_data$rank)
-  # 
-  # ggplot(plot_data, aes(x = 0, xend = 1, y = before_log_count, yend = after_log_count, color = rank)) +
-  #   geom_segment(size = 1.2, alpha = 0.3)
   
   saveRDS(list(counts = counts, groups = groups, tax = NULL),
           file = file.path("data", "absolute_Morton.rds"))
@@ -221,7 +194,8 @@ build_Morton_reference <- function() {
 #' @param groups per-sample group labels
 #' @return matrix of rescaled count data
 #' @export
-normalize_Athanasiadou <- function(file_dir, SI_file, RNA_file, ERCC_annot, groups) {
+normalize_Athanasiadou <- function(file_dir, SI_file, RNA_file,
+                                   ERCC_annot, groups) {
   # Spike-in counts and RNA counts
   YmatSI <- as.matrix(read.table(file = file.path(file_dir, SI_file)))
   YmatRNA <- as.matrix(read.table(file = file.path(file_dir, RNA_file)))
@@ -248,9 +222,10 @@ normalize_Athanasiadou <- function(file_dir, SI_file, RNA_file, ERCC_annot, grou
   MoleculesPerCell <- Nvec*AttomoleToMoleculesPerCell
   names(MoleculesPerCell) <- names(Nvec)
   
-  # From RMarkdown comments: "Compute spike-in proportions. Choose as the reference spike-in,
-  #   the one with the largest proportion; record its proportion and attomoles; and compute the
-  # library-specific $\nu_j$ calibration factors"
+  # From RMarkdown comments: "Compute spike-in proportions. Choose as the 
+  # reference spike-in, the one with the largest proportion; record its 
+  # proportion and attomoles; and compute the library-specific $\nu_j$ 
+  # calibration factors"
   f.vec <- rowSums(YmatSI)/sum(YmatSI) # fraction of total spike-in
   # Counts accounted for by each spike-in
   INDmax <- which(f.vec == max(f.vec)) # index of spike-in
@@ -262,14 +237,13 @@ normalize_Athanasiadou <- function(file_dir, SI_file, RNA_file, ERCC_annot, grou
   return(Zmat)
 }
 
-#' Generate differential expression reference for Athanasiadou et al. (2021) bulk RNA-seq data
+#' Generate differential expression reference for Athanasiadou et al. (2021) 
+#' bulk RNA-seq data
 #'
 #' @return named list of observed counts in conditions 1 and 2
 #' @export
 build_Athanasiadou_reference <- function() {
   # TBD - allow choice of baseline v. treatment
-  #       move bipartite graph code
-  
   file_dir <- file.path("data", "Athanasiadou_2021", "S1CodeandData")
   
   groups <- as.factor(rep(c("C12", "C20", "C30"), rep(3,3)))
@@ -309,32 +283,6 @@ build_Athanasiadou_reference <- function() {
   # Scale these up to the mean counts in the S. cerevisieae experiment
   scale <- mean_yeast / mean_ciona
   counts <- counts * scale
-  
-  # Bipartite graph
-  # label1 <- "lacz"
-  # label1 <- "camras"
-  # label2 <- "dnfgfr"
-  # plot_data <- data.frame(before_log_count = c(), after_log_count = c(), rank = c())
-  # before_log_counts <- log(unname(counts[,groups == label1]) + 1)
-  # # qq <- c(sum(before_log_counts == 0)/(nrow(before_log_counts)*ncol(before_log_counts)))
-  # # qq <- quantile(before_log_counts, probs = seq(from = qq, to = 1, length.out = 5))
-  # qq <- quantile(before_log_counts, probs = seq(from = 0, to = 1, length.out = 6))
-  # breaks <- c(-Inf, qq[2:(length(qq)-1)], Inf)
-  # sampled_features <- sample(1:nrow(counts), size = 200)
-  # for(feat in sampled_features) {
-  #   for(samp in 1:3) {
-  #     before_val <- log(unname(counts[feat,groups == label1][samp]) + 1)
-  #     after_val <- log(unname(counts[feat,groups == label2][samp]) + 1)
-  #     rank <- as.numeric(cut(before_val, breaks = breaks))
-  #     plot_data <- rbind(plot_data, data.frame(before_log_count = before_val,
-  #                                              after_log_count = after_val,
-  #                                              rank = rank))
-  #   }
-  # }
-  # plot_data$rank <- as.factor(plot_data$rank)
-  # 
-  # ggplot(plot_data, aes(x = 0, xend = 1, y = before_log_count, yend = after_log_count, color = rank)) +
-  #   geom_segment(size = 1.2, alpha = 0.3)
   
   saveRDS(list(counts = counts, groups = groups),
           file = file.path("data", "absolute_Athanasiadou_ciona.rds"))

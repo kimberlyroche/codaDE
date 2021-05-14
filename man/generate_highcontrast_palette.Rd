@@ -2,7 +2,8 @@
 % Please edit documentation in R/boilerplate.R
 \name{generate_highcontrast_palette}
 \alias{generate_highcontrast_palette}
-\title{Generate a color palette suitable for stacked bar plots given a feature number (S)}
+\title{Generate a color palette suitable for stacked bar plots given a feature 
+number (S)}
 \usage{
 generate_highcontrast_palette(S)
 }
@@ -13,5 +14,6 @@ generate_highcontrast_palette(S)
 list of hex colors
 }
 \description{
-Generate a color palette suitable for stacked bar plots given a feature number (S)
+Generate a color palette suitable for stacked bar plots given a feature 
+number (S)
 }

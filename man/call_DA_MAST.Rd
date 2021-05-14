@@ -2,20 +2,18 @@
 % Please edit documentation in R/evaluate_DA.R
 \name{call_DA_MAST}
 \alias{call_DA_MAST}
-\title{Evaluate differential abundance with Wilcox rank sum test or DESeq2 (via Seurat)
-This evaluates expression on all features of the count matrix together}
+\title{Evaluate differential abundance with MAST (via Seurat)}
 \usage{
 call_DA_MAST(data, groups)
 }
 \arguments{
-\item{data}{simulated data set}
+\item{data}{simulated data set (samples x features)}
 
 \item{groups}{group (cohort) labels}
 }
 \value{
-p-value for DA for all features
+unadjusted p-values for all features
 }
 \description{
-Evaluate differential abundance with Wilcox rank sum test or DESeq2 (via Seurat)
-This evaluates expression on all features of the count matrix together
+Evaluate differential abundance with MAST (via Seurat)
 }
