@@ -28,7 +28,7 @@ eliminate_outliers <- function(df) {
   # Eliminate outlier simulations as above
   # These are ones with very small or very large differences between 
   #   conditions
-  log_diff <- log(df$delta_mean_v2)
+  log_diff <- log(df$fold_diff)
   mean_log_diff <- mean(log_diff)
   limit <- 3*sd(log_diff)
   idx_retain <- which(log_diff > mean_log_diff - limit & log_diff < mean_log_diff + limit)
@@ -52,7 +52,7 @@ for(p in p_all) {
     data <- readRDS(file.path("output", paste0("simresults_p",p,"_corrp",corrp,"_all.rds")))
 
     plot_data <- data %>%
-      select(delta_mean_v1, delta_mean_v2, rate, rate_type, method) %>%
+      select(uuid, absolute_diff, fold_diff, rate, rate_type, method, partial_info) %>%
       filter(method %in% c("baseline", "DESeq2", "MAST", "scran", "ALDEx2")) %>%
       pivot_wider(names_from = rate_type, values_from = rate)
     # Assign factor order...

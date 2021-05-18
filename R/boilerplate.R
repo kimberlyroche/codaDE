@@ -1,3 +1,11 @@
+#' Generate a current timestamp in Y-m-d H:M:S format
+#'
+#' @return timestamp string
+#' @export
+get_timestamp <- function() {
+  format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+}
+
 #' Generate a color palette suitable for stacked bar plots given a feature 
 #' number (S)
 #'
