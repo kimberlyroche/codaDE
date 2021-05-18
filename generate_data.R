@@ -11,7 +11,7 @@ option_list = list(
               help = "number of genes", metavar = "numeric"),
   make_option(c("--corrp"), type = "numeric", default = 0,
               help = "proportion of features to simulate as moderately positively correlated", metavar = "numeric"),
-  make_option(c("--n"), type = "numeric", default = 1,
+  make_option(c("--iter"), type = "numeric", default = 1,
               help = "number of data sets to generate", metavar = "numeric")
 );
 
@@ -20,10 +20,10 @@ opt = parse_args(opt_parser);
 
 # p <- opt$p
 # corrp <- opt$corrp
-# n <- opt$n
+# iter <- opt$iter
 p <- 100
-corrp <- 0.5
-n <- 10
+corrp <- 0
+iter <- 10
 
 # ------------------------------------------------------------------------------
 #   Simulate (and save) data set
@@ -52,7 +52,7 @@ proportion_da <- 0.75
 spike_in <- FALSE
 
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
-for(i in 1:n) {
+for(i in 1:iter) {
   uuid <- UUIDgenerate()
   
   # Create data set
@@ -79,14 +79,15 @@ for(i in 1:n) {
   # ------------------------------------------------------------------------------
   #   Add data set to DB
   # ------------------------------------------------------------------------------
-  res <- dbExecute(conn, paste0("INSERT into datasets VALUES(",
+  res <- dbExecute(conn, paste0("INSERT into datasets(UUID,P,CORRP,TIMESTAMP) ",
+                                "VALUES(",
                                 "'",uuid,"',",
                                 p,",",
                                 corrp,",",
                                 "'",get_timestamp(),"'",
                                 ")"))
 }
-dbGetQuery(conn, "SELECT * FROM datasets")
+# dbGetQuery(conn, "SELECT * FROM datasets")
 dbDisconnect(conn)
 
 

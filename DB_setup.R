@@ -43,12 +43,12 @@ discard <- dbExecute(conn, paste0("CREATE TABLE results(",
 # discard <- dbExecute(conn, "ALTER TABLE results DROP COLUMN FIT_IN_PROGRESS;")
 
 # List tables
-dbListTables(conn)
+# dbListTables(conn)
 
-dbGetQuery(conn, "SELECT * FROM datasets;")
-dbGetQuery(conn, "SELECT * FROM results;")
+# dbGetQuery(conn, "SELECT * FROM datasets;")
+# dbGetQuery(conn, "SELECT * FROM results;")
 
 # Flush DB
-discard <- dbExecute(conn, "DELETE FROM results WHERE TRUE;")
+# discard <- dbExecute(conn, "DELETE FROM results WHERE TRUE;")
 
 dbDisconnect(conn)

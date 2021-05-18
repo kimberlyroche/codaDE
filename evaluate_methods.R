@@ -23,15 +23,15 @@ allowed_methods <- c("NBGLM", "DESeq2", "MAST", "ALDEx2", "scran")
 #  Global params
 # ------------------------------------------------------------------------------
 
-p <- opt$p
-n <- opt$n
-method <- opt$method
-# p <- 100
-# n <- 2
-# method <- "NBGLM"
+# p <- opt$p
+# n <- opt$n
+# method <- opt$method
+p <- 100
+n <- 2
+method <- "MAST"
 
-if(!(opt$method %in% allowed_methods)) {
-  stop(paste0("Method '",opt$method,"' not allowed!\n"))
+if(!(method %in% allowed_methods)) {
+  stop(paste0("Method '",method,"' not allowed!\n"))
 }
 
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
@@ -195,7 +195,7 @@ for(uuid in sample(all_uuids)) {
                                                 result_type = 'fpr',
                                                 partial_info = 1))
   }
-  if(datasets_to_process %>% distinct(uuid) %>% tally() %>% pull(n) == n) {
+  if(nrow(datasets_to_process) > 0 && datasets_to_process %>% distinct(uuid) %>% tally() %>% pull(n) == n) {
     break;
   }
 }
@@ -259,9 +259,6 @@ for(this_uuid in unique(datasets_to_process$uuid)) {
                                     "WHERE RUN_ID = ",fpr_partial_run_id,";"))
   discard <- dbExecute(conn, "COMMIT;")
 }
-
 # dbGetQuery(conn, "SELECT * FROM results;")
-# discard <- dbExecute(conn, "DELETE FROM results WHERE TRUE;")
 
 dbDisconnect(conn)
-

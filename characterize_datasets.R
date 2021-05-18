@@ -79,8 +79,6 @@ for(uuid in update_uuids) {
                                     "MEDIAN_CORR_PARTIAL = ",median_cor2," ",
                                     "WHERE UUID == '", uuid, "';"))
 }
-
-dbGetQuery(conn, "SELECT * FROM datasets;")
+# dbGetQuery(conn, "SELECT * FROM datasets;")
 
 dbDisconnect(conn)
-
