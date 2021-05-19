@@ -50,7 +50,7 @@ for(uuid in update_uuids) {
   # Calculate fold change - no/partial information cases
   counts1 <- dataset$simulation$observed_counts1
   counts2 <- dataset$simulation$observed_counts2
-  half_n <- nrow(counts1)/2
+  n <- nrow(counts1)/2
   m1 <- mean(rowSums(counts1[1:n,]))
   m2 <- mean(rowSums(counts1[(n+1):(n*2),]))
   fold_diff1 <- max(c(m1, m2)) / min(c(m1, m2))
