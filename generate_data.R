@@ -9,8 +9,8 @@ library(optparse)
 option_list = list(
   make_option(c("--p"), type = "numeric", default = 100,
               help = "number of genes", metavar = "numeric"),
-  make_option(c("--corrp"), type = "numeric", default = 0,
-              help = "proportion of features to simulate as moderately positively correlated", metavar = "numeric"),
+  make_option(c("--corrp"), type = "logical", default = FALSE,
+              help = "simulate net positively correlated features", metavar = "logical"),
   make_option(c("--iter"), type = "numeric", default = 1,
               help = "number of data sets to generate", metavar = "numeric")
 );
@@ -27,20 +27,17 @@ iter <- opt$iter
 # ------------------------------------------------------------------------------
 
 # Set up simulation parameters
-if(corrp == 0) {
-  base_correlation <- diag(p)
-  concentration <- 1e6
-} else if(corrp == 1) {
-  base_correlation <- matrix(0.5, p, p)
-  diag(base_correlation) <- 1
-  concentration <- p + 100
-} else {
-  # Assume 50%
+if(corrp) {
+  # Generate roughly 50% positively correlated features. Remaining features will
+  # be random (and roughly symmetrical) in their +/- correlation.
   half_p <- round(p/2)
   base_correlation <- matrix(0, p, p)
   base_correlation[1:half_p,1:half_p] <- 0.5
   diag(base_correlation) <- 1
-  concentration <- p + 100
+  concentration <- p + 10
+} else {
+  base_correlation <- diag(p)
+  concentration <- 1e6
 }
 
 n <- 10 # replicate number
