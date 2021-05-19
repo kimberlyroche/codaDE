@@ -44,7 +44,9 @@ update_uuids <- dbGetQuery(conn, paste0("SELECT UUID FROM datasets WHERE ",
                                         "MEAN_CORR_PARTIAL IS NULL OR ",
                                         "MEDIAN_CORR IS NULL OR ",
                                         "MEDIAN_CORR_PARTIAL IS NULL;"))$UUID
-for(uuid in update_uuids) {
+for(u in 1:length(update_uuids)) {
+  uuid <- update_uuids[u]
+  cat(paste0("Updating ", uuid, " (", u, "/", length(update_uuids), ")\n"))
   fn <- file.path(output_dir, paste0(uuid, ".rds"))
   dataset <- readRDS(fn)
   # Calculate fold change - no/partial information cases

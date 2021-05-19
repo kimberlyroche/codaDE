@@ -5,6 +5,7 @@ library(stringr)
 file.dirs <- c("p100_corrp0", "p100_corrp0.5", "p100_corrp1",
                "p1000_corrp0", "p1000_corrp0.5", "p1000_corrp1",
                "p5000_corrp0", "p5000_corrp0.5", "p5000_corrp1")
+file.dirs <- c("p100_corrp0")
 
 for(file.dir in file.dirs) {
   cat("Parsing files in:", file.dir, "\n")
