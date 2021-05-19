@@ -77,7 +77,7 @@ for(i in 1:iter) {
                                 "VALUES(",
                                 "'",uuid,"',",
                                 p,",",
-                                corrp,",",
+                                as.integer(corrp),",",
                                 "'",get_timestamp(),"'",
                                 ")"))
 }
