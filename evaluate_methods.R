@@ -23,18 +23,18 @@ allowed_methods <- c("NBGLM", "DESeq2", "MAST", "ALDEx2", "scran")
 #  Global params
 # ------------------------------------------------------------------------------
 
-# p <- opt$p
-# n <- opt$n
-# method <- opt$method
-p <- 100
-n <- 2
-method <- "MAST"
+n <- opt$n
+p <- opt$p
+method <- opt$method
 
 if(!(method %in% allowed_methods)) {
   stop(paste0("Method '",method,"' not allowed!\n"))
 }
 
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
+# Increase the "busy" timeout; default is too short
+discard <- dbExecute(conn, "PRAGMA busy_timeout = 60000;")
+
 output_dir <- file.path("output", "datasets")
 
 # ------------------------------------------------------------------------------

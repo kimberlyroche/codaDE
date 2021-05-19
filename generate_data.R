@@ -18,12 +18,9 @@ option_list = list(
 opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
 
-# p <- opt$p
-# corrp <- opt$corrp
-# iter <- opt$iter
-p <- 100
-corrp <- 0
-iter <- 10
+p <- opt$p
+corrp <- opt$corrp
+iter <- opt$iter
 
 # ------------------------------------------------------------------------------
 #   Simulate (and save) data set
