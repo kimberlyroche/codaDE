@@ -31,6 +31,12 @@ if(!(method %in% allowed_methods)) {
   stop(paste0("Method '",method,"' not allowed!\n"))
 }
 
+# Randomly wait a few seconds before connecting. This is a stupid but effective
+# way to prevent a race condition that seems to allow the first job in a batch
+# to connect and write, but not subsequent jobs in a batch.
+
+Sys.sleep(runif(1, min = 1, max = 10))
+
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 # Increase the "busy" timeout; default is too short
 discard <- dbExecute(conn, "PRAGMA busy_timeout = 60000;")
@@ -143,6 +149,9 @@ if(p < 1) {
   all_uuids <- dbGetQuery(conn, paste0("SELECT UUID FROM datasets ",
                                        "WHERE P = ",p,";"))$UUID
 }
+
+cat(paste0("Found ", length(all_uuids), " datasets matching criteria!\n"))
+
 datasets_to_process <- data.frame(uuid = c(),
                                   run_id = c(),
                                   result_type = c(),
@@ -150,8 +159,10 @@ datasets_to_process <- data.frame(uuid = c(),
 for(uuid in sample(all_uuids)) {
   run_id <- dbGetQuery(conn, paste0("SELECT RUN_ID FROM results ",
                                     "WHERE UUID = '",uuid,"' AND ",
-                                    "METHOD = '",method,"';"))
+                                    "METHOD = '",method,"' AND ",
+                                    "(RESULT IS NOT NULL OR FIT_IN_PROGRESS = 1);"))
   if(nrow(run_id) == 0) {
+    cat(paste0("Selecting candidate ", uuid, "\n"))
     # No partial total abundance info case
     discard <- dbExecute(conn,
                          paste0("INSERT INTO results(UUID, METHOD, ",
@@ -194,6 +205,8 @@ for(uuid in sample(all_uuids)) {
                                                 run_id = run_id,
                                                 result_type = 'fpr',
                                                 partial_info = 1))
+  } else {
+    cat(paste0("Candidate ", uuid, " has already been processed!\n"))
   }
   if(nrow(datasets_to_process) > 0 && datasets_to_process %>% distinct(uuid) %>% tally() %>% pull(n) == n) {
     break;
@@ -202,6 +215,7 @@ for(uuid in sample(all_uuids)) {
 discard <- dbExecute(conn, "COMMIT;")
 
 for(this_uuid in unique(datasets_to_process$uuid)) {
+  cat("Updating UUID: ", this_uuid, "\n")
   # Get run ID assignments ahead of time
   tpr_run_id <- datasets_to_process %>%
     filter(result_type == 'tpr' & partial_info == 0 & uuid == this_uuid) %>%
@@ -233,10 +247,14 @@ for(this_uuid in unique(datasets_to_process$uuid)) {
                                oracle_calls = oracle_calls)
   
   discard <- dbExecute(conn, "BEGIN TRANSACTION;")
-  discard <- dbExecute(conn, paste0("UPDATE results SET RESULT = ",rates$tpr," ",
+  discard <- dbExecute(conn, paste0("UPDATE results SET RESULT = ",rates$tpr,", ",
+                                    "FIT_IN_PROGRESS = 0 ",
                                     "WHERE RUN_ID = ",tpr_run_id,";"))
-  discard <- dbExecute(conn, paste0("UPDATE results SET RESULT = ",rates$fpr," ",
+  cat(paste0("Updated ", discard, " entry with run ID ", tpr_run_id, "\n"))
+  discard <- dbExecute(conn, paste0("UPDATE results SET RESULT = ",rates$fpr,", ",
+                                    "FIT_IN_PROGRESS = 0 ",
                                     "WHERE RUN_ID = ",fpr_run_id,";"))
+  cat(paste0("Updated ", discard, " entry with run ID ", fpr_run_id, "\n"))
   discard <- dbExecute(conn, "COMMIT;")
   
   # Partial total abundance information case
@@ -253,12 +271,18 @@ for(this_uuid in unique(datasets_to_process$uuid)) {
                                oracle_calls = oracle_calls)
   
   discard <- dbExecute(conn, "BEGIN TRANSACTION;")
-  discard <- dbExecute(conn, paste0("UPDATE results SET RESULT = ",rates$tpr," ",
+  discard <- dbExecute(conn, paste0("UPDATE results SET RESULT = ",rates$tpr,", ",
+                                    "FIT_IN_PROGRESS = 0 ",
                                     "WHERE RUN_ID = ",tpr_partial_run_id,";"))
-  discard <- dbExecute(conn, paste0("UPDATE results SET RESULT = ",rates$fpr," ",
+  cat(paste0("Updated ", discard, " entry with run ID ", tpr_partial_run_id, "\n"))
+  discard <- dbExecute(conn, paste0("UPDATE results SET RESULT = ",rates$fpr,", ",
+                                    "FIT_IN_PROGRESS = 0 ",
                                     "WHERE RUN_ID = ",fpr_partial_run_id,";"))
+  cat(paste0("Updated ", discard, " entry with run ID ", fpr_partial_run_id, "\n"))
   discard <- dbExecute(conn, "COMMIT;")
 }
+
 # dbGetQuery(conn, "SELECT * FROM results;")
+# print(dbGetQuery(conn, paste0("SELECT * FROM results WHERE RUN_ID >= ", tpr_run_id, " AND RUN_ID <= ", fpr_partial_run_id, ";")))
 
 dbDisconnect(conn)
