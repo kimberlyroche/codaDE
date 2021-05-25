@@ -199,7 +199,6 @@ for(u in 1:length(update_uuids)) {
                                   median_d_rel, ", ",
                                   e1, ", ",
                                   d_entropy, ");"))
-             
     }
   }
 }

@@ -110,9 +110,9 @@ for(i in 1:nrow(results)) {
                                         line$MEDIAN_CORR_PARTIAL,");"))
 }
 
-# dbGetQuery(conn_new, "SELECT * FROM datasets LIMIT 10;")
-# dbGetQuery(conn_new, "SELECT * FROM characteristics LIMIT 10;")
-# dbGetQuery(conn_new, "SELECT * FROM results LIMIT 10;")
+# dbGetQuery(conn, "SELECT * FROM datasets LIMIT 10;")
+# dbGetQuery(conn, "SELECT * FROM characteristics LIMIT 10;")
+# dbGetQuery(conn, "SELECT * FROM results LIMIT 10;")
 
 dbDisconnect(conn)
 dbDisconnect(conn_new)
