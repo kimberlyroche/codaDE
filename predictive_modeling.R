@@ -29,17 +29,19 @@ data <- results %>%
   filter(METHOD == use_method) %>%
   filter(RESULT_TYPE == use_result_type)
 
+# Subset for testing
+data <- data[sample(1:nrow(data), size = 100),]
 
 # Scale the features
 features <- data %>%
   select(!c(UUID, METHOD, RESULT, RESULT_TYPE))
-features <- apply(features, 2, function(x) {
+features <- as.data.frame(apply(features, 2, function(x) {
   if(sd(x) > 0) {
     scale(x)
   } else {
     scale(x, scale = FALSE)
   }
-})
+}))
 response <- data %>%
   select(RESULT)
 
@@ -67,12 +69,12 @@ output_pred <- predict(gp, newData = test_features, se.fit = FALSE)
 cat(paste0("Elapsed time: ", Sys.time() - start, "\n"))
 
 plot_df <- data.frame(true = test_response,
-                      predicted = output_pred[,1])
-ggplot(plot_df, aes(x = true, y = predicted)) +
+                      predicted = output_pred[,1],
+                      p = factor(test_features$P))
+levels(plot_df$p) <- c("low", "med", "high")
+ggplot(plot_df, aes(x = true, y = predicted, fill = p)) +
   geom_point(shape = 21, size = 3) +
   labs(x = "observed FPR",
        y = "predicted FPR")
-
-# Evaluate on test (visualize)
 
 dbDisconnect(conn)

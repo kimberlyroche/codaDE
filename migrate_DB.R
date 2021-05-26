@@ -61,6 +61,8 @@ for(i in 1:nrow(results)) {
                               line$CORRP,", '",
                               line$TIMESTAMP,"');"))
 }
+results <- dbGetQuery(conn, "SELECT COUNT(DISTINCT(UUID)) FROM datasets;")
+cat(paste0("Updated ", results[1,1], " UUIDS in datasets table\n"))
 
 cat("Copying results from OLD results table to NEW results table...\n")
 # Make sure to omit partially completed results here
@@ -79,6 +81,8 @@ for(i in 1:nrow(results)) {
                               line$RESULT,", ",
                               "'",line$RESULT_TYPE,"', 0);"))
 }
+results <- dbGetQuery(conn, "SELECT COUNT(DISTINCT(UUID)) FROM results;")
+cat(paste0("Updated ", results[1,1], " UUIDS in results table\n"))
 
 cat("Copying results from OLD datasets table to NEW characteristics table...\n")
 # Make sure to omit partially completed results here
@@ -92,6 +96,13 @@ results <- dbGetQuery(conn, paste0("SELECT UUID, FOLD_CHANGE, ",
                                    "MEAN_CORR_PARTIAL IS NOT NULL AND ",
                                    "MEDIAN_CORR IS NOT NULL AND ",
                                    "MEDIAN_CORR_PARTIAL IS NOT NULL;"))
+results_partial <- dbGetQuery(conn, paste0("SELECT UUID FROM datasets WHERE ",
+                                   "FOLD_CHANGE IS NULL OR ",
+                                   "FOLD_CHANGE_PARTIAL IS NULL OR ",
+                                   "FOLD_CHANGE IS NULL OR ",
+                                   "MEAN_CORR_PARTIAL IS NULL OR ",
+                                   "MEDIAN_CORR IS NULL OR ",
+                                   "MEDIAN_CORR_PARTIAL IS NULL;"))
 for(i in 1:nrow(results)) {
   line <- results[i,]
   discard <- dbExecute(conn_new, paste0("INSERT INTO characteristics(",
@@ -108,6 +119,15 @@ for(i in 1:nrow(results)) {
                                         line$FOLD_CHANGE_PARTIAL, ", ",
                                         line$MEAN_CORR_PARTIAL, ", ",
                                         line$MEDIAN_CORR_PARTIAL,");"))
+}
+for(i in 1:nrow(results_partial)) {
+  line <- results_partial[i,,drop=FALSE]
+  discard <- dbExecute(conn_new, paste0("INSERT INTO characteristics",
+                                        "(UUID, PARTIAL) ",
+                                        "VALUES ('",line$UUID,"', 0);"))
+  discard <- dbExecute(conn_new, paste0("INSERT INTO characteristics",
+                                        "(UUID, PARTIAL) ",
+                                        "VALUES ('",line$UUID,"', 1);"))
 }
 
 # dbGetQuery(conn, "SELECT * FROM datasets LIMIT 10;")
