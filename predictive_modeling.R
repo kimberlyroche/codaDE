@@ -22,59 +22,70 @@ results <- dbGetQuery(conn, paste0("SELECT datasets.UUID, P, PARTIAL, ",
                                    "ON (characteristics.UUID=results.UUID ",
                                    "AND characteristics.partial=results.PARTIAL_INFO);"))
 
-use_method <- "NBGLM"
-use_result_type <- "tpr"
+for(use_method in c("DESeq2", "ALDEx2", "MAST", "scran")) {
+  for(use_result_type in c("fpr", "tpr")) {
 
-data <- results %>%
-  filter(METHOD == use_method) %>%
-  filter(RESULT_TYPE == use_result_type)
+    cat(paste0("Modeling ", use_result_type, " w/ ", use_method, "\n"))
 
-# Subset for testing
-data <- data[sample(1:nrow(data), size = 100),]
+    data <- results %>%
+      filter(METHOD == use_method) %>%
+      filter(RESULT_TYPE == use_result_type)
 
-# Scale the features
-features <- data %>%
-  select(!c(UUID, METHOD, RESULT, RESULT_TYPE))
-features <- as.data.frame(apply(features, 2, function(x) {
-  if(sd(x) > 0) {
-    scale(x)
-  } else {
-    scale(x, scale = FALSE)
+    # Subset for testing
+    # data <- data[sample(1:nrow(data), size = 100),]
+
+    # Scale the features
+    features <- data %>%
+      select(!c(UUID, METHOD, RESULT, RESULT_TYPE))
+    features <- as.data.frame(apply(features, 2, function(x) {
+      if(sd(x) > 0) {
+        scale(x)
+      } else {
+        scale(x, scale = FALSE)
+      }
+    }))
+    response <- data %>%
+      select(RESULT)
+
+    # Drop columns with no variation
+    # In practice this only happens in testing/subsetting to small samples
+    features <- features[,apply(features, 2, sd) > 0]
+
+    # Define test/train set
+    n <- nrow(data)
+    train_idx <- sample(1:nrow(data), size = round(n*0.8))
+    test_idx <- setdiff(1:nrow(data), train_idx)
+    train_features <- features[train_idx,]
+    train_response <- response[train_idx,]
+    test_features <- features[test_idx,]
+    test_response <- response[test_idx,]
+
+    # Fit GP on training set
+    start <- Sys.time()
+    gp <- mlegp(train_features, train_response)
+    cat(paste0("Elapsed time: ", Sys.time() - start, "\n"))
+
+    # Predict on test set
+    start <- Sys.time()
+    output_pred <- predict(gp, newData = test_features, se.fit = FALSE)
+    cat(paste0("Elapsed time: ", Sys.time() - start, "\n"))
+
+    plot_df <- data.frame(true = test_response,
+                          predicted = output_pred[,1],
+                          p = factor(test_features$P))
+    levels(plot_df$p) <- c("low", "med", "high")
+    pl <- ggplot(plot_df, aes(x = true, y = predicted, fill = p)) +
+      geom_point(shape = 21, size = 3) +
+      labs(x = "observed FPR",
+           y = "predicted FPR",
+           fill = "feature no.")
+    ggsave(file.path("output", "images", paste0("GP_predictions_", use_method, "_", use_result_type, ".png")),
+           plot = pl,
+           dpi = 100,
+           units = "in",
+           height = 6,
+           width = 7)
+
+    dbDisconnect(conn)
   }
-}))
-response <- data %>%
-  select(RESULT)
-
-# Drop columns with no variation
-# In practice this only happens in testing/subsetting to small samples
-features <- features[,apply(features, 2, sd) > 0]
-
-# Define test/train set
-n <- nrow(data)
-train_idx <- sample(1:nrow(data), size = round(n*0.8))
-test_idx <- setdiff(1:nrow(data), train_idx)
-train_features <- features[train_idx,]
-train_response <- response[train_idx,]
-test_features <- features[test_idx,]
-test_response <- response[test_idx,]
-
-# Fit GP on training set
-start <- Sys.time()
-gp <- mlegp(train_features, train_response)
-cat(paste0("Elapsed time: ", Sys.time() - start, "\n"))
-
-# Predict on test set
-start <- Sys.time()
-output_pred <- predict(gp, newData = test_features, se.fit = FALSE)
-cat(paste0("Elapsed time: ", Sys.time() - start, "\n"))
-
-plot_df <- data.frame(true = test_response,
-                      predicted = output_pred[,1],
-                      p = factor(test_features$P))
-levels(plot_df$p) <- c("low", "med", "high")
-ggplot(plot_df, aes(x = true, y = predicted, fill = p)) +
-  geom_point(shape = 21, size = 3) +
-  labs(x = "observed FPR",
-       y = "predicted FPR")
-
-dbDisconnect(conn)
+}
