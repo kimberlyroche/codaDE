@@ -4,14 +4,36 @@ library(codaDE)
 library(tidyverse)
 library(RSQLite)
 library(mlegp)
+library(randomForest)
 library(tidyr)
+library(optparse)
 
-output_dir <- file.path("output", "GP")
-if(!dir.exists(output_dir)) {
-  dir.create(output_dir)
+# For plotting betas
+library(jtools)
+library(ggstance)
+library(broom.mixed)
+
+option_list = list(
+  make_option(c("--model"), type = "character", default = "GP",
+              help = "predictive model to use: GP, linear, RF", metavar = "character")
+);
+
+opt_parser = OptionParser(option_list = option_list);
+opt = parse_args(opt_parser);
+model <- opt$model
+if(!(model %in% c("GP", "linear", "RF"))) {
+  stop("Invalid model specified!\n")
 }
 
-# Create DB (if doesn't exist?)
+# GP models take a while to run. Save the results for later tinkering.
+output_dir <- "output"
+if(model == "GP") {
+  output_dir <- file.path("output", model)
+  if(!dir.exists(output_dir)) {
+    dir.create(output_dir)
+  }
+}
+
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 results <- dbGetQuery(conn, paste0("SELECT datasets.UUID, P, PARTIAL, ",
@@ -26,6 +48,8 @@ results <- dbGetQuery(conn, paste0("SELECT datasets.UUID, P, PARTIAL, ",
                                    "LEFT JOIN results ",
                                    "ON (characteristics.UUID=results.UUID ",
                                    "AND characteristics.partial=results.PARTIAL_INFO);"))
+
+mean_RMSE <- 0
 
 for(use_method in c("NBGLM", "DESeq2", "ALDEx2", "MAST", "scran")) {
   for(use_result_type in c("fpr", "tpr")) {
@@ -68,41 +92,104 @@ for(use_method in c("NBGLM", "DESeq2", "ALDEx2", "MAST", "scran")) {
     test_features <- features[test_idx,]
     test_response <- response[test_idx,]
 
-    # Fit GP on training set
-    start <- Sys.time()
-    gp <- mlegp(train_features, train_response)
-    cat(paste0("Elapsed fit time: ", Sys.time() - start, "\n"))
+    if(model == "linear") {
+      lm_train_data <- cbind(train_features, train_response)
+      res <- lm(train_response ~ P + PARTIAL + FOLD_CHANGE + MEAN_CORR + MEDIAN_CORR + BASE_SPARSITY + DELTA_SPARSITY + PERCENT_STABLE + DIR_CONSENSUS + MAX_DELTA_REL + MEDIAN_DELTA_REL + BASE_ENTROPY + DELTA_ENTROPY, data = lm_train_data)
+      plot_summs(res)
+      lm_test_data <- cbind(test_features, test_response)
+      res_pred <- predict(res, newdata = lm_test_data)
+      plot_df <- data.frame(true = test_response,
+                            predicted = res_pred,
+                            p = factor(test_features$P))
+      levels(plot_df$p) <- c("low", "med", "high")
+      pl <- ggplot(plot_df, aes(x = true, y = predicted, fill = p)) +
+        geom_point(shape = 21, size = 3) +
+        labs(x = paste0("observed ", toupper(use_result_type)),
+             y = paste0("predicted ", toupper(use_result_type)),
+             fill = "feature no.")
+    }
 
-    # Predict on test set
-    start <- Sys.time()
-    output_pred <- predict(gp, newData = test_features, se.fit = FALSE)
-    cat(paste0("Elapsed predict time: ", Sys.time() - start, "\n"))
-
-    cat("Saving results...\n")
-    saveRDS(list(train_features = cbind(UUID = train_uuids, train_features),
-                 test_features = cbind(UUID = test_uuids, test_features),
-                 train_response = train_response,
-                 test_response = test_response,
-                 prediction = output_pred[,1]),
-            file.path(output_dir,
-                      paste0("results_", use_method, "_", use_result_type, ".rds")))
+    if(model == "RF") {
+      rf_train_data <- cbind(train_features, train_response)
+      res <- randomForest(train_response ~ P + PARTIAL + FOLD_CHANGE + MEAN_CORR + MEDIAN_CORR + BASE_SPARSITY + DELTA_SPARSITY + PERCENT_STABLE + DIR_CONSENSUS + MAX_DELTA_REL + MEDIAN_DELTA_REL + BASE_ENTROPY + DELTA_ENTROPY, data = rf_train_data)
+      rf_test_data <- cbind(test_features, test_response)
+      res_pred <- predict(res, newdata = rf_test_data)
+      plot_df <- data.frame(true = test_response,
+                            predicted = res_pred,
+                            p = factor(test_features$P))
+      levels(plot_df$p) <- c("low", "med", "high")
+      pl <- ggplot(plot_df, aes(x = true, y = predicted, fill = p)) +
+        geom_point(shape = 21, size = 3) +
+        labs(x = paste0("observed ", toupper(use_result_type)),
+             y = paste0("predicted ", toupper(use_result_type)),
+             fill = "feature no.")
+    }
     
-    plot_df <- data.frame(true = test_response,
-                          predicted = output_pred[,1],
-                          p = factor(test_features$P))
-    levels(plot_df$p) <- c("low", "med", "high")
-    pl <- ggplot(plot_df, aes(x = true, y = predicted, fill = p)) +
-      geom_point(shape = 21, size = 3) +
-      labs(x = paste0("observed ", toupper(use_result_type)),
-           y = paste0("predicted ", toupper(use_result_type)),
-           fill = "feature no.")
-    ggsave(file.path("output", "images", paste0("GP_predictions_", use_method, "_", use_result_type, ".png")),
+    if(model == "GP") {
+      # Fit
+      result_filename <- file.path(output_dir,
+                                   paste0("results_", use_method, "_", use_result_type, ".rds"))
+      if(file.exists(result_filename)) {
+        res_obj <- readRDS(result_filename)
+        test_response <- res_obj$test_response
+        prediction <- res_obj$prediction
+        test_features <- res_obj$test_features
+      } else {
+        start <- Sys.time()
+        gp <- mlegp(train_features, train_response)
+        cat(paste0("Elapsed fit time: ", Sys.time() - start, "\n"))
+  
+        # Predict on test set
+        start <- Sys.time()
+        output_pred <- predict(gp, newData = test_features, se.fit = FALSE)
+        cat(paste0("Elapsed predict time: ", Sys.time() - start, "\n"))
+    
+        cat("Saving results...\n")
+        prediction <- output_pred[,1]
+        saveRDS(list(train_features = cbind(UUID = train_uuids, train_features),
+                     test_features = cbind(UUID = test_uuids, test_features),
+                     train_response = train_response,
+                     test_response = test_response,
+                     prediction = prediction),
+                result_filename)
+      }
+      
+      plot_df <- data.frame(true = test_response,
+                            predicted = prediction,
+                            p = factor(test_features$P))
+      levels(plot_df$p) <- c("low", "med", "high")
+      pl <- ggplot(plot_df, aes(x = true, y = predicted, fill = p)) +
+        geom_point(shape = 21, size = 3) +
+        labs(x = paste0("observed ", toupper(use_result_type)),
+             y = paste0("predicted ", toupper(use_result_type)),
+             fill = "feature no.")
+    }
+    
+    show(pl)
+    ggsave(file.path("output",
+                     "images",
+                     paste0(model, "_results"),
+                     paste0(model,
+                            "_predictions_",
+                            use_method,
+                            "_",
+                            use_result_type,
+                            ".png")),
            plot = pl,
            dpi = 100,
            units = "in",
            height = 6,
            width = 7)
 
-    dbDisconnect(conn)
+    # RMSE
+    sq.err <- (plot_df$true - plot_df$predicted)^2
+    rms.err <- sqrt(mean(sq.err))
+    cat(paste0("RMSE (", model, "): ", round(rms.err, 3), "\n"))
+    mean_RMSE <- mean_RMSE + rms.err
+    
   }
 }
+
+cat(paste0("Mean RMSE (", model, "): ", round(mean_RMSE/10, 3), "\n"))
+
+dbDisconnect(conn)
