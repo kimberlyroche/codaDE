@@ -47,21 +47,15 @@ if(length(unmatched_set) > 0) {
   }
 }
 
-# If any features are missing, we'll update them all
-update_uuids <- dbGetQuery(conn,
-                           paste0("SELECT DISTINCT UUID FROM characteristics ",
-                                  "WHERE ",
-                                  "FOLD_CHANGE IS NULL OR ",
-                                  "MEAN_CORR IS NULL OR ",
-                                  "MEDIAN_CORR IS NULL OR ",
-                                  "BASE_SPARSITY IS NULL OR ",
-                                  "DELTA_SPARSITY IS NULL OR ",
-                                  "PERCENT_STABLE IS NULL OR ",
-                                  "DIR_CONSENSUS IS NULL OR ",
-                                  "MAX_DELTA_REL IS NULL OR ",
-                                  "MEDIAN_DELTA_REL IS NULL OR ",
-                                  "BASE_ENTROPY IS NULL OR ",
-                                  "DELTA_ENTROPY IS NULL;"))$UUID
+# Update if 1) dataset + either PARTIAL condition is missing an entry in characteristics table or
+#           2) if those entries exist but have missing values
+# Check PARTIAL = 0 condition
+uuid_status <- dbGetQuery(conn, "SELECT * FROM datasets LEFT JOIN characteristics ON datasets.UUID=characteristics.UUID")
+update_vector <- apply(uuid_status %>% select(!c(UUID, P, CORRP, TIMESTAMP, PARTIAL)), 1, function(x) sum(is.na(x)) > 0)
+update_uuids <- uuid_status$UUID[update_vector]
+# Update all
+# update_uuids <- dbGetQuery(conn,
+#                            paste0("SELECT DISTINCT UUID FROM datasets;"))$UUID
 for(u in 1:length(update_uuids)) {
   uuid <- update_uuids[u]
   cat(paste0("Updating ", uuid, " (", u, "/", length(update_uuids), ")\n"))
@@ -225,7 +219,7 @@ for(u in 1:length(update_uuids)) {
     # If exists, update
     results <- dbGetQuery(conn,
                           paste0("SELECT * FROM characteristics WHERE UUID='",
-                                 uuid, "' AND PARTIAL = 0;"))
+                                 uuid, "' AND PARTIAL = ", partial, ";"))
     
     if(nrow(results) > 0) {
       # UPDATE
@@ -271,9 +265,9 @@ for(u in 1:length(update_uuids)) {
                                         "FW_RA_SD_D=",FW_RA_SD_D,", ",
                                         "FW_RA_PPOS_D=",FW_RA_PPOS_D,", ",
                                         "FW_RA_PNEG_D=",FW_RA_PNEG_D,", ",
-                                        "FW_RA_PFC05=",FW_RA_PFC05,", ",
-                                        "FW_RA_PFC1=",FW_RA_PFC1,", ",
-                                        "FW_RA_PFC2=",FW_RA_PFC2,", ",
+                                        "FW_RA_PFC05_D=",FW_RA_PFC05_D,", ",
+                                        "FW_RA_PFC1_D=",FW_RA_PFC1_D,", ",
+                                        "FW_RA_PFC2_D=",FW_RA_PFC2_D,", ",
                                         "FW_LOG_MAX_D=",FW_LOG_MAX_D,", ",
                                         "FW_LOG_MED_D=",FW_LOG_MED_D,", ",
                                         "FW_LOG_SD_D=",FW_LOG_SD_D,", ",
@@ -289,7 +283,7 @@ for(u in 1:length(update_uuids)) {
                                         "FW_CLR_PNEG_D=",FW_CLR_PNEG_D,", ",
                                         "FW_CLR_PFC05_D=",FW_CLR_PFC05_D,", ",
                                         "FW_CLR_PFC1_D=",FW_CLR_PFC1_D,", ",
-                                        "FW_CLR_PFC2_D=",FW_CLR_PFC2_D,", ",
+                                        "FW_CLR_PFC2_D=",FW_CLR_PFC2_D," ",
                                         " WHERE ",
                                         "UUID='",uuid,"' AND ",
                                         "PARTIAL=",partial,";"))
@@ -358,7 +352,7 @@ for(u in 1:length(update_uuids)) {
                                   "FW_CLR_PFC1_D, ",
                                   "FW_CLR_PFC2_D) ",
                                   "VALUES(",
-                                  "'", uuid, "', 0, ",
+                                  "'", uuid, "', ",partial,", ",
                                   TOTALS_C_FC, ", ",
                                   TOTALS_C_D, ", ",
                                   TOTALS_C_MAX_D, ", ",

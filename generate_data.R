@@ -46,6 +46,9 @@ proportion_da <- 0.75
 spike_in <- FALSE
 
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
+# Increase the "busy" timeout; default is too short
+discard <- dbExecute(conn, "PRAGMA busy_timeout = 60000;")
+
 for(i in 1:iter) {
   uuid <- UUIDgenerate()
   

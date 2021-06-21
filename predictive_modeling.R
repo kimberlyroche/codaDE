@@ -37,12 +37,67 @@ if(model == "GP") {
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 results <- dbGetQuery(conn, paste0("SELECT datasets.UUID, P, PARTIAL, ",
-                                   "FOLD_CHANGE, MEAN_CORR, MEDIAN_CORR, ",
-                                   "BASE_SPARSITY, DELTA_SPARSITY, ",
-                                   "PERCENT_STABLE, DIR_CONSENSUS, ",
-                                   "MAX_DELTA_REL, MEDIAN_DELTA_REL, ",
-                                   "BASE_ENTROPY, DELTA_ENTROPY, METHOD, ",
-                                   "RESULT, RESULT_TYPE FROM ",
+                                   "TOTALS_C_FC, ",
+                                   "TOTALS_C_D, ",
+                                   "TOTALS_C_MAX_D, ",
+                                   "TOTALS_C_MED_D, ",
+                                   "TOTALS_C_SD_D, ",
+                                   "CORR_RA_MED, ",
+                                   "CORR_RA_SD, ",
+                                   "CORR_RA_SKEW, ",
+                                   "CORR_LOG_MED, ",
+                                   "CORR_LOG_SD, ",
+                                   "CORR_LOG_SKEW, ",
+                                   "CORR_CLR_MED, ",
+                                   "CORR_CLR_SD, ",
+                                   "CORR_CLR_SKEW, ",
+                                   "COMP_C_P0_A, ",
+                                   "COMP_C_P0_B, ",
+                                   "COMP_C_P1_A, ",
+                                   "COMP_C_P1_B, ",
+                                   "COMP_C_P5_A, ",
+                                   "COMP_C_P5_B, ",
+                                   "COMP_RA_P01_A, ",
+                                   "COMP_RA_P01_B, ",
+                                   "COMP_RA_P1_A, ",
+                                   "COMP_RA_P1_B, ",
+                                   "COMP_RA_P5_A, ",
+                                   "COMP_RA_P5_B, ",
+                                   "COMP_RA_MAX_A, ",
+                                   "COMP_RA_MED_A, ",
+                                   "COMP_RA_SD_A, ",
+                                   "COMP_RA_SKEW_A, ",
+                                   "COMP_RA_MAX_B, ",
+                                   "COMP_RA_MED_B, ",
+                                   "COMP_RA_SD_B, ",
+                                   "COMP_RA_SKEW_B, ",
+                                   "COMP_C_ENT_A, ",
+                                   "COMP_C_ENT_B, ",
+                                   "FW_RA_MAX_D, ",
+                                   "FW_RA_MED_D, ",
+                                   "FW_RA_SD_D, ",
+                                   "FW_RA_PPOS_D, ",
+                                   "FW_RA_PNEG_D, ",
+                                   "FW_RA_PFC05_D, ",
+                                   "FW_RA_PFC1_D, ",
+                                   "FW_RA_PFC2_D, ",
+                                   "FW_LOG_MAX_D, ",
+                                   "FW_LOG_MED_D, ",
+                                   "FW_LOG_SD_D, ",
+                                   "FW_LOG_PPOS_D, ",
+                                   "FW_LOG_PNEG_D, ",
+                                   "FW_LOG_PFC05_D, ",
+                                   "FW_LOG_PFC1_D, ",
+                                   "FW_LOG_PFC2_D, ",
+                                   "FW_CLR_MAX_D, ",
+                                   "FW_CLR_MED_D, ",
+                                   "FW_CLR_SD_D, ",
+                                   "FW_CLR_PPOS_D, ",
+                                   "FW_CLR_PNEG_D, ",
+                                   "FW_CLR_PFC05_D, ",
+                                   "FW_CLR_PFC1_D, ",
+                                   "FW_CLR_PFC2_D, ",
+                                   "METHOD, RESULT, RESULT_TYPE FROM ",
                                    "datasets LEFT JOIN characteristics ",
                                    "ON datasets.UUID=characteristics.UUID ",
                                    "LEFT JOIN results ",
@@ -60,6 +115,11 @@ for(use_method in c("NBGLM", "DESeq2", "ALDEx2", "MAST", "scran")) {
       filter(METHOD == use_method) %>%
       filter(RESULT_TYPE == use_result_type)
 
+    # These predictors appear to be strongly correlated.
+    # Let's drop them for now.
+    data <- data %>%
+      select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
+    
     # Subset for testing
     # data <- data[sample(1:nrow(data), size = 100),]
 
@@ -91,11 +151,27 @@ for(use_method in c("NBGLM", "DESeq2", "ALDEx2", "MAST", "scran")) {
     test_uuids <- uuids[test_idx]
     test_features <- features[test_idx,]
     test_response <- response[test_idx,]
-
+    
+    # Could add elastic net here!
+    
     if(model == "linear") {
       lm_train_data <- cbind(train_features, train_response)
-      res <- lm(train_response ~ P + PARTIAL + FOLD_CHANGE + MEAN_CORR + MEDIAN_CORR + BASE_SPARSITY + DELTA_SPARSITY + PERCENT_STABLE + DIR_CONSENSUS + MAX_DELTA_REL + MEDIAN_DELTA_REL + BASE_ENTROPY + DELTA_ENTROPY, data = lm_train_data)
-      plot_summs(res)
+      res <- lm(train_response ~ ., data = lm_train_data)
+      pl <- plot_summs(res)
+      ggsave(file.path("output",
+                       "images",
+                       paste0(model, "_results"),
+                       paste0(model,
+                              "_betas_",
+                              use_method,
+                              "_",
+                              use_result_type,
+                              ".png")),
+             plot = pl,
+             dpi = 100,
+             units = "in",
+             height = 8,
+             width = 4)
       lm_test_data <- cbind(test_features, test_response)
       res_pred <- predict(res, newdata = lm_test_data)
       plot_df <- data.frame(true = test_response,
@@ -111,7 +187,7 @@ for(use_method in c("NBGLM", "DESeq2", "ALDEx2", "MAST", "scran")) {
 
     if(model == "RF") {
       rf_train_data <- cbind(train_features, train_response)
-      res <- randomForest(train_response ~ P + PARTIAL + FOLD_CHANGE + MEAN_CORR + MEDIAN_CORR + BASE_SPARSITY + DELTA_SPARSITY + PERCENT_STABLE + DIR_CONSENSUS + MAX_DELTA_REL + MEDIAN_DELTA_REL + BASE_ENTROPY + DELTA_ENTROPY, data = rf_train_data)
+      res <- randomForest(train_response ~ ., data = rf_train_data)
       rf_test_data <- cbind(test_features, test_response)
       res_pred <- predict(res, newdata = rf_test_data)
       plot_df <- data.frame(true = test_response,
@@ -165,7 +241,7 @@ for(use_method in c("NBGLM", "DESeq2", "ALDEx2", "MAST", "scran")) {
              fill = "feature no.")
     }
     
-    show(pl)
+    # show(pl)
     ggsave(file.path("output",
                      "images",
                      paste0(model, "_results"),

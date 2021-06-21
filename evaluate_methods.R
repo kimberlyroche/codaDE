@@ -31,6 +31,8 @@ if(!(method %in% allowed_methods)) {
   stop(paste0("Method '",method,"' not allowed!\n"))
 }
 
+cat(paste0("EVALUATING: ", method, " ON P=", p, " x N=", n, "\n"))
+
 # Randomly wait a few seconds before connecting. This is a stupid but effective
 # way to prevent a race condition that seems to allow the first job in a batch
 # to connect and write, but not subsequent jobs in a batch.
