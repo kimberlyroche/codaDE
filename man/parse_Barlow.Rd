@@ -4,7 +4,11 @@
 \alias{parse_Barlow}
 \title{Parse the Barlow et al. (2020) 16S data}
 \usage{
-parse_Barlow()
+parse_Barlow(absolute = TRUE)
+}
+\arguments{
+\item{absolute}{flag indicating whether or not to parse absolute abundance
+data}
 }
 \value{
 named list of counts and group labels

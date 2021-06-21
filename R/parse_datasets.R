@@ -5,14 +5,14 @@
 #' @return named list of counts and group labels
 #' @export
 parse_Barlow <- function(absolute = TRUE) {
-  if(absolute) {
-    parsed_data_fn <- file.path("data", "absolute_Barlow.rds")
-  } else {
-    parsed_data_fn <- file.path("data", "relative_Barlow.rds")
-  }
-  if(file.exists(parsed_data_fn)) {
-    return(readRDS(parsed_data_fn))
-  } else {
+  # if(absolute) {
+  #   parsed_data_fn <- file.path("data", "absolute_Barlow.rds")
+  # } else {
+  #   parsed_data_fn <- file.path("data", "relative_Barlow.rds")
+  # }
+  # if(file.exists(parsed_data_fn)) {
+  #   return(readRDS(parsed_data_fn))
+  # } else {
     file_dir <- file.path("data", "Barlow_2020")
     
     if(absolute) {
@@ -65,9 +65,9 @@ parse_Barlow <- function(absolute = TRUE) {
     counts <- t(counts)
     
     parsed_obj <- list(counts = counts, groups = groups, tax = tax)
-    saveRDS(parsed_obj, file = parsed_data_fn)
+    # saveRDS(parsed_obj, file = parsed_data_fn)
     return(parsed_obj)
-  }
+  # }
 }
 
 #' Parse the Morton et al. (2019) 16S data
@@ -75,10 +75,10 @@ parse_Barlow <- function(absolute = TRUE) {
 #' @return named list of counts and group labels
 #' @export
 parse_Morton <- function() {
-  parsed_data_fn <- file.path("data", "absolute_Morton.rds")
-  if(file.exists(parsed_data_fn)) {
-    return(readRDS(parsed_data_fn))
-  } else {
+  # parsed_data_fn <- file.path("data", "absolute_Morton.rds")
+  # if(file.exists(parsed_data_fn)) {
+  #   return(readRDS(parsed_data_fn))
+  # } else {
     file_dir <- file.path("data", "Morton_2019", "Github")
     
     otu_table <- read.delim(file.path(file_dir, "oral_trimmed_deblur.txt"),
@@ -128,9 +128,9 @@ parse_Morton <- function() {
     counts <- counts / min_observed
     
     parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
-    saveRDS(parsed_obj, file = parsed_data_fn)
+    # saveRDS(parsed_obj, file = parsed_data_fn)
     return(parsed_obj)
-  }
+  # }
 }
 
 #' Utility function that applies the ERCC normalization code from Athanasiadou
@@ -188,44 +188,58 @@ normalize_Athanasiadou <- function(file_dir, SI_file, RNA_file,
 
 #' Parse the Athanasiadou et al. (2021) bulk RNA-seq data
 #'
+#' @param absolute flag indicating whether or not to parse absolute abundance
+#' data
 #' @param which_data options are "ciona" or "yeast"
 #' @return named list of counts and group labels
 #' @export
-parse_Athanasiadou <- function(which_data = "ciona") {
+parse_Athanasiadou <- function(absolute = TRUE, which_data = "ciona") {
   which_data <- tolower(which_data)
   if(!(which_data %in% c("ciona", "yeast"))) {
     stop("Invalid data type!")
   }
-  parsed_data_fn <- file.path("data",
-                              paste0("absolute_Athanasiadou_",
-                                     which_data,
-                                     ".rds"))
-  if(file.exists(parsed_data_fn)) {
-    return(readRDS(parsed_data_fn))
-  } else {
+  # parsed_data_fn <- file.path("data",
+  #                             paste0("absolute_Athanasiadou_",
+  #                                    which_data,
+  #                                    ".rds"))
+  # if(file.exists(parsed_data_fn)) {
+  #   return(readRDS(parsed_data_fn))
+  # } else {
     if(which_data == "yeast") {
       file_dir <- file.path("data", "Athanasiadou_2021", "S1CodeandData")
       
       groups <- as.factor(rep(c("C12", "C20", "C30"), rep(3,3)))
-      counts <- normalize_Athanasiadou(file_dir = file_dir,
-                                       SI_file = "YmatSIyeast.txt",
-                                       RNA_file = "YmatRNAyeast.txt",
-                                       ERCC_annot = "ERCCyeast.txt",
-                                       groups = groups)
+      
+      if(absolute) {
+        counts <- normalize_Athanasiadou(file_dir = file_dir,
+                                         SI_file = "YmatSIyeast.txt",
+                                         RNA_file = "YmatRNAyeast.txt",
+                                         ERCC_annot = "ERCCyeast.txt",
+                                         groups = groups)
+      } else {
+        counts <- as.matrix(read.table(file = file.path(file_dir,
+                                                                 RNA_file = "YmatRNAyeast.txt")))
+      }
       
       parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
-      saveRDS(parsed_obj, file = parsed_data_fn)
+      # saveRDS(parsed_obj, file = parsed_data_fn)
       return(parsed_obj)
     } else {
       # Ciona robusta
       file_dir <- file.path("data", "Athanasiadou_2021", "S1CodeandData")
       
       groups <- as.factor(rep(c("lacz", "dnfgfr", "camras"), rep(3,3)))
-      counts <- normalize_Athanasiadou(file_dir = file_dir,
-                                       SI_file = "YmatSIciona.txt",
-                                       RNA_file = "YmatRNAciona.txt",
-                                       ERCC_annot = "ERCCciona.txt",
-                                       groups = groups)
+      
+      if(absolute) {
+        counts <- normalize_Athanasiadou(file_dir = file_dir,
+                                         SI_file = "YmatSIciona.txt",
+                                         RNA_file = "YmatRNAciona.txt",
+                                         ERCC_annot = "ERCCciona.txt",
+                                         groups = groups)
+      } else {
+        counts <- as.matrix(read.table(file = file.path(file_dir,
+                                                        RNA_file = "YmatRNAciona.txt")))
+      }
       
       baseline_counts <- counts[,which(groups == "lacz")]
       absent_tax_idx <- which(rowSums(baseline_counts) == 0)
@@ -239,8 +253,8 @@ parse_Athanasiadou <- function(which_data = "ciona") {
       counts <- counts * scale
       
       parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
-      saveRDS(parsed_obj, file = parsed_data_fn)
+      # saveRDS(parsed_obj, file = parsed_data_fn)
       return(parsed_obj)
     }
-  }
+  # }
 }

@@ -1,9 +1,9 @@
 #' Generate simulated differential expression for two conditions
 #'
 #' @param counts_A counts associated with the baseline/control condition 
-#' (arranged p x n)
+#' (arranged n x p)
 #' @param counts_B counts associated with the second condition 
-#' (arranged p x n)
+#' (arranged n x p)
 #' @import tidyverse
 #' @import entropy
 #' @import driver
@@ -57,9 +57,17 @@ characterize_dataset <- function(counts_A, counts_B) {
   ra_correlation_vector <- ra_correlation[upper.tri(ra_correlation,
                                                     diag = FALSE)]
   
-  log_correlation <- cor(log(counts_A + pseudocount))
+  temp <- log(counts_A + pseudocount)
+  # Find features with zero standard deviation and remove them here
+  # They'll cause trouble with the correlation computation
+  remove_idx <- unname(which(apply(temp, 2, sd) == 0))
+  if(length(remove_idx) > 0) {
+    temp <- temp[,-remove_idx]
+  }
+  log_correlation <- cor(temp)
   log_correlation_vector <- log_correlation[upper.tri(log_correlation,
                                                       diag = FALSE)]
+
   clr_correlation <- cor(clr_A)
   clr_correlation_vector <- clr_correlation[upper.tri(clr_correlation,
                                                       diag = FALSE)]
@@ -337,6 +345,7 @@ fit_predictive_model <- function(model = "linear", do_predict = FALSE,
   dbDisconnect(conn)
   
   fitted_models <- list()
+  train_feature_sets <- list()
   predictions <- list()
 
   for(use_result_type in c("fpr", "tpr")) {
@@ -378,11 +387,12 @@ fit_predictive_model <- function(model = "linear", do_predict = FALSE,
     non_factors <- setdiff(1:ncol(features), factors)
     features_nonfactors <- features[,non_factors]
     features_nonfactors <- as.data.frame(apply(features_nonfactors, 2, function(x) {
-      if(sd(x) > 0) {
-        scale(x)
-      } else {
-        scale(x, scale = FALSE)
-      }
+      # if(sd(x) > 0) {
+      #   scale(x)
+      # } else {
+      #   scale(x, scale = FALSE)
+      # }
+      x
     }))
     # Drop columns with no variation
     # In practice this only happens in testing/subsetting to small samples
@@ -550,6 +560,7 @@ fit_predictive_model <- function(model = "linear", do_predict = FALSE,
       }
     }
     fitted_models[[use_result_type]] <- res
+    train_feature_sets[[use_result_type]] <- train_features
     if(do_predict) {
       predictions[[use_result_type]] <- list(true = test_response,
                                              predicted = prediction,
@@ -557,7 +568,9 @@ fit_predictive_model <- function(model = "linear", do_predict = FALSE,
     }
   }
   if(do_predict) {
-    return(list(fitted_model = fitted_models, predictions = predictions))
+    return(list(fitted_model = fitted_models,
+                train_features = train_feature_sets,
+                predictions = predictions))
   } else {
     return(fitted_models)
   }

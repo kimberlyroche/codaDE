@@ -258,3 +258,150 @@ call_DA_scran <- function(data, groups) {
                        by = "feature")
   pval_df
 }
+
+#' Wrapper for call_DA_NB generating reference and target calls
+#'
+#' @param ref_data absolute abundance data set (samples x features)
+#' @param data relative abundance data set (samples x features)
+#' @param groups group (cohort) labels
+#' @param oracle_calls optional baseline (true) differential abundance calls
+#' @return baseline (true) differential abundance calls and calls made on 
+#' relative abundances
+#' @export
+DE_by_NB <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_NB(ref_data, groups)
+  }
+  calls <- call_DA_NB(data, groups)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
+#' Wrapper for call_DA_DESeq2 generating reference and target calls
+#'
+#' @param ref_data absolute abundance data set (samples x features)
+#' @param data relative abundance data set (samples x features)
+#' @param groups group (cohort) labels
+#' @param oracle_calls optional baseline (true) differential abundance calls
+#' @return baseline (true) differential abundance calls and calls made on 
+#' relative abundances
+#' @export
+DE_by_DESeq2 <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_DESeq2(ref_data, groups)
+  }
+  calls <- call_DA_DESeq2(data, groups)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
+#' Wrapper for call_DA_MAST generating reference and target calls
+#'
+#' @param ref_data absolute abundance data set (samples x features)
+#' @param data relative abundance data set (samples x features)
+#' @param groups group (cohort) labels
+#' @param oracle_calls optional baseline (true) differential abundance calls
+#' @return baseline (true) differential abundance calls and calls made on 
+#' relative abundances
+#' @export
+DE_by_MAST <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_MAST(ref_data, groups)
+  }
+  calls <- call_DA_MAST(data, groups)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
+#' Wrapper for call_DA_ALDEx2 generating reference and target calls
+#'
+#' @param ref_data absolute abundance data set (samples x features)
+#' @param data relative abundance data set (samples x features)
+#' @param groups group (cohort) labels
+#' @param oracle_calls optional baseline (true) differential abundance calls
+#' @return baseline (true) differential abundance calls and calls made on 
+#' relative abundances
+#' @export
+DE_by_ALDEx2 <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_ALDEx2(ref_data, groups)
+  }
+  calls <- call_DA_ALDEx2(data, groups)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
+#' Wrapper for call_DA_scran generating reference and target calls
+#'
+#' @param ref_data absolute abundance data set (samples x features)
+#' @param data relative abundance data set (samples x features)
+#' @param groups group (cohort) labels
+#' @param oracle_calls optional baseline (true) differential abundance calls
+#' @return baseline (true) differential abundance calls and calls made on 
+#' relative abundances
+#' @export
+DE_by_scran <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_scran(ref_data, groups)
+  }
+  calls <- call_DA_scran(data, groups)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
+#' Calculates the discrepancy between differential abundance calls made on
+#' absolute and relative abundances
+#'
+#' @param ref_data absolute abundance data set (samples x features)
+#' @param data relative abundance data set (samples x features)
+#' @param groups group (cohort) labels
+#' @param method differential abundance calling method (e.g. "DESeq2")
+#' @param oracle_calls optional baseline (true) differential abundance calls
+#' @return named list of true positive rate, false positive rate, and baseline
+#' (true) differential expression calls
+#' @export
+calc_DE_discrepancy <- function(ref_data, data, groups, method = "NBGLM",
+                                oracle_calls = NULL) {
+  if(method == "NBGLM") {
+    DE_calls <- DE_by_NB(ref_data, data, groups, oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls$pval
+    }
+    calls <- DE_calls$calls$pval
+  }
+  if(method == "DESeq2") {
+    DE_calls <- DE_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls$pval
+    }
+    calls <- DE_calls$calls$pval
+  }
+  if(method == "MAST") {
+    DE_calls <- DE_by_MAST(ref_data, data, groups, oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls$pval
+    }
+    calls <- DE_calls$calls$pval
+  }
+  if(method == "ALDEx2") {
+    DE_calls <- DE_by_ALDEx2(ref_data, data, groups,
+                             oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls$pval
+    }
+    calls <- DE_calls$calls$pval
+  }
+  if(method == "scran") {
+    DE_calls <- DE_by_scran(ref_data, data, groups, oracle_calls = oracle_calls)
+    if(is.null(oracle_calls)) {
+      oracle_calls <- DE_calls$oracle_calls$pval
+    }
+    calls <- DE_calls$calls$pval
+  }
+  
+  de <- calls < 0.05
+  sim_de <- oracle_calls < 0.05
+  
+  TP <- sum(de & sim_de)
+  FP <- sum(de & !sim_de)
+  
+  TN <- sum(!de & !sim_de)
+  FN <- sum(!de & sim_de)
+  
+  return(list(tpr = TP/(TP+FN), fpr = FP/(FP+TN), oracle_calls = oracle_calls))
+}
