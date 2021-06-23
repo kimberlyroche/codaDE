@@ -1,3 +1,23 @@
+To run jobs (6/22/21):
+1) Run `pull_open_uuids.R` to enumerate jobs
+   You need to specity P, CORRP, METHOD and an output file name
+2) Run `batch_eval.pl`, setting METHOD and TOTAL JOB NUMBER in the temp file
+   This will put the results in the `temp` folder
+3) Run `pull_result_into_db.R`
+   This will add the results in all files in the `temp` directory to the DB
+
+We need to run this workflow 30x for:
+  P = 100 / 1000 / 5000
+  CORRP = 0 / 1
+  METHOD = ALDEx2 / DESeq2 / MAST / NBGLM / scran
+
+EACH of these runs will produce 800 DB entries:
+  100 data sets x PARTIAL INFO (0 / 1) x BASELINE (threshold / self) x RESULT_TYPE (tpr / fpr)
+
+# --------------------------------------------------------------------------------------------------------
+#   OLDER SETUP STUFF
+# --------------------------------------------------------------------------------------------------------
+
 This was compiled with gcc/6.2.0
 
 To submit job arrays of simulations/DE evaluations use:

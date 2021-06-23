@@ -1,7 +1,3 @@
-# Open all output files in some directory
-
-# Parse them and input into database
-
 source("path_fix.R")
 
 library(RSQLite)

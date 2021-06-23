@@ -4,7 +4,8 @@ library(RSQLite)
 library(optparse)
 
 ps <- c(100, 1000, 5000)
-methods <- c("ALDEx2", "DESeq2", "MAST", "NBGLM", "scran")
+# methods <- c("ALDEx2", "DESeq2", "MAST", "NBGLM", "scran")
+methods <- c("DESeq2")
 
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 corrp <- 1
