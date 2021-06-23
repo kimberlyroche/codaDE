@@ -55,7 +55,7 @@ for(i in 1:iter) {
   # Create data set
   data_obj <- build_simulated_reference(p = p,
                                         log_mean = 1,
-                                        log_var = 2,
+                                        log_var = 4,
                                         log_noise_var = 2,
                                         base_correlation = base_correlation,
                                         concentration = concentration)
