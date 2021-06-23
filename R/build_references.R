@@ -16,7 +16,7 @@
 #' @import MASS
 #' @export
 build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 4,
-                                      log_noise_var = 1, base_correlation = NULL,
+                                      log_noise_var = 4, base_correlation = NULL,
                                       concentration = 1e6, save_name = NULL) {
   if(is.null(base_correlation)) {
     base_correlation <- diag(p)
