@@ -41,6 +41,7 @@ discard <- dbExecute(conn_new, paste0("CREATE TABLE results(",
                                   "UUID VARCHAR(36),",
                                   "METHOD VARCHAR(64),",
                                   "PARTIAL_INFO INT,",
+                                  "BASELINE VARCHAR(64),",
                                   "RESULT REAL,",
                                   "RESULT_TYPE VARCHAR(24),",
                                   "FIT_IN_PROGRESS INTEGER);"))
