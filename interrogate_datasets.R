@@ -25,6 +25,7 @@ corrp <- opt$corrp
 # Pull UUIDs matching P, CORRP characterstics
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 res <- dbGetQuery(conn, paste0("SELECT UUID FROM datasets WHERE P=",p," AND CORRP=",corrp))
+sparsity <- c()
 fc_distro <- c()
 de_distro <- c()
 for(i in 1:length(res$UUID)) {
@@ -45,6 +46,8 @@ for(i in 1:length(res$UUID)) {
   fc <- m1 / m2
   prop_de <- sum(fc <= (2/3) | fc >= (3/2)) / length(fc)
   de_distro <- c(de_distro, prop_de)
+  # Calculate percent zeros
+  sparsity <- c(sparsity, sum(counts_A == 0)/(nrow(counts_A)*ncol(counts_A)))
 }
 
 plot_df <- data.frame(x = fc_distro)
@@ -60,3 +63,7 @@ pl <- ggplot(plot_df, aes(x = x)) +
   labs(x = "proportion differentially abundant features") +
   xlim(c(0, 1))
 ggsave(paste0("data_hist_de_p",p,"_corrp",corrp,".png"), pl, units = "in", dpi = 100, height = 4, width = 5)
+
+cat(paste0("Average sparsity: ", round(mean(sparsity), 3), "\n"))
+cat(paste0("\tMin sparsity: ", round(min(sparsity), 3), "\n"))
+cat(paste0("\tMax sparsity: ", round(max(sparsity), 3), "\n"))

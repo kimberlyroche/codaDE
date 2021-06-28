@@ -9,10 +9,12 @@ library(optparse)
 option_list = list(
   make_option(c("--p"), type = "numeric", default = 100,
               help = "number of genes", metavar = "numeric"),
-  make_option(c("--corrp"), type = "logical", default = FALSE,
-              help = "simulate net positively correlated features", metavar = "logical"),
-  make_option(c("--iter"), type = "numeric", default = 1,
-              help = "number of data sets to generate", metavar = "numeric")
+  make_option(c("--corrp"), type = "numeric", default = 0,
+              help = "simulate net positively correlated features", metavar = "numeric"),
+  make_option(c("--iter_start"), type = "numeric", default = 1,
+              help = "index of first iteration", metavar = "numeric"),
+  make_option(c("--iter_end"), type = "numeric", default = 100,
+              help = "index of last iteration", metavar = "numeric")
 );
 
 opt_parser = OptionParser(option_list = option_list);
@@ -20,7 +22,20 @@ opt = parse_args(opt_parser);
 
 p <- opt$p
 corrp <- opt$corrp
-iter <- opt$iter
+iter_start <- opt$iter_start
+iter_end <- opt$iter_end
+
+if(iter_start < 1 | iter_start > iter_end | iter_end > 100) {
+  stop("Iteration start and end must be in range 1..100!\n")
+}
+
+calc_fc <- function(M) {
+  counts_A <- M[1:(nrow(M)/2),]
+  counts_B <- M[(nrow(M)/2+1):nrow(M),]
+  m1 <- mean(rowSums(counts_A))
+  m2 <- mean(rowSums(counts_B))
+  max(c(m1, m2)) / min(c(m1, m2))
+}
 
 calc_fc <- function(M) {
   counts_A <- M[1:(nrow(M)/2),]
@@ -35,7 +50,7 @@ calc_fc <- function(M) {
 # ------------------------------------------------------------------------------
 
 # Set up simulation parameters
-if(corrp) {
+if(corrp == 1) {
   # Generate roughly 50% positively correlated features. Remaining features will
   # be random (and roughly symmetrical) in their +/- correlation.
   half_p <- round(p/2)
@@ -57,8 +72,9 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 # Increase the "busy" timeout; default is too short
 discard <- dbExecute(conn, "PRAGMA busy_timeout = 60000;")
 
-perturbations <- seq(from = 0.1, to = 4, length.out = iter)
-for(i in 1:iter) {
+perturbations <- seq(from = 0.1, to = 4, length.out = 100)
+for(i in iter_start:iter_end) {
+  cat(paste0("Iteration ", i, " / ", iter_end, "\n"))
   uuid <- UUIDgenerate()
   
   # Create data set

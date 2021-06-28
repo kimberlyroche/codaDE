@@ -7,9 +7,12 @@ library(RSQLite)
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 discard <- dbExecute(conn, paste0("CREATE TABLE datasets(",
-                                  "UUID VARCHAR(36) PRIMARY KEY",
-                                  "P INTEGER",
-                                  "CORRP INTEGER",
+                                  "UUID VARCHAR(36) PRIMARY KEY, ",
+                                  "P INTEGER, ",
+                                  "CORRP INTEGER, ",
+                                  "FC_ABSOLUTE REAL, ",
+                                  "FC_RELATIVE REAL, ",
+                                  "FC_PARTIAL REAL, ",
                                   "TIMESTAMP VARCHAR(19))"))
 
 discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",

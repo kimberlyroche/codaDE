@@ -48,7 +48,7 @@ for(u in 1:length(all_uuids)) {
   res <- dbGetQuery(conn, paste0("SELECT * FROM results ",
                                  "WHERE UUID = '",uuid,"' AND ",
                                  "METHOD = '",method,"' AND ",
-                                 "(RESULT IS NOT NULL OR FIT_IN_PROGRESS = 1);"))
+                                 "RESULT IS NOT NULL;"))
   # There are 8 combos of fit we want for each method
   #   1) 'self' or 'threshold' as differential abundance reference
   #   2) partial info = 0 or 1
@@ -73,4 +73,4 @@ wishlist <- wishlist %>%
   select(-result_type) %>%
   distinct()
 
-write.table(wishlist, file = file)
+write.table(wishlist, file = paste0(file, "_", p, "_", corrp, "_", method, ".txt"))
