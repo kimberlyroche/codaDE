@@ -26,22 +26,24 @@ for(file in file_list) {
   results <- read.table(file.path(dir, file))
   for(i in 1:nrow(results)) {
     job <- results[i,]
-    insertions <- insertions + dbExecute(conn, paste0("INSERT INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE, RESULT_TYPE, RESULT) VALUES (",
-                                                      "'",job$uuid,"', ",
-                                                      "'",job$method,"', ",
-                                                      job$partial_info,", ",
-                                                      "'",job$baseline,"', ",
-                                                      "'tpr', ",
-                                                      job$tpr,")"))
-    insertions <- insertions + dbExecute(conn, paste0("INSERT INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE, RESULT_TYPE, RESULT) VALUES (",
-                                                      "'",job$uuid,"', ",
-                                                      "'",job$method,"', ",
-                                                      job$partial_info,", ",
-                                                      "'",job$baseline,"', ",
-                                                      "'fpr', ",
-                                                      job$fpr,")"))
+    if(!any(is.na(job))) {
+      insertions <- insertions + dbExecute(conn, paste0("INSERT OR IGNORE INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE, RESULT_TYPE, RESULT) VALUES (",
+                                                        "'",job$uuid,"', ",
+                                                        "'",job$method,"', ",
+                                                        job$partial_info,", ",
+                                                        "'",job$baseline,"', ",
+                                                        "'tpr', ",
+                                                        job$tpr,")"))
+      insertions <- insertions + dbExecute(conn, paste0("INSERT OR IGNORE INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE, RESULT_TYPE, RESULT) VALUES (",
+                                                        "'",job$uuid,"', ",
+                                                        "'",job$method,"', ",
+                                                        job$partial_info,", ",
+                                                        "'",job$baseline,"', ",
+                                                        "'fpr', ",
+                                                        job$fpr,")"))
+    }
   }
-  cat(paste0("Succeeded on ", insertions, " / ", nrow(results)*2, " rows\n"))
+  cat(paste0("Succeeded on ", insertions, " rows\n"))
 }
 
 dbDisconnect(conn)

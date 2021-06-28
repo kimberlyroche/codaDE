@@ -5,10 +5,16 @@ use List::Util qw(min);
 
 # evaluate_methods.R needs: method, input, output, start, end
 
-my $method = "DESeq2";
-my $input = "temp.txt";
-my $ln = 399;
-my $chunks = 10;
+my $p = 100;
+my $corrp = 1;
+#my $method = "ALDEx2";
+#my $method = "DESeq2";
+#my $method = "MAST";
+#my $method = "NBGLM";
+my $method = "scran";
+my $input = "input_".$p."_".$corrp."_".$method.".txt";
+my $ln = 4;
+my $chunks = 4;
 
 # ----------------------------------------------------------------------------------------
 
@@ -32,7 +38,7 @@ while($start <= $ln) {
 
   print $fh 'srun Rscript evaluate_methods.R --method='.$method.
                                              ' --input='.$input.
-                                             ' --output=add'.
+                                             ' --output=res_'.$p."_".$corrp."_".$method.
                                              ' --start='.$start.
                                              ' --end='.$end."\n\n";
 

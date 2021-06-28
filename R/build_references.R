@@ -29,10 +29,10 @@ build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 4,
   K <- cov2cor(rinvwishart(1, concentration, base_correlation*concentration)[,,1])
 
   # Add randomness to log perturbation size
-  log_noise_var2 <- runif(1, min = 0.1, max = log_noise_var)
+  # log_noise_var2 <- runif(1, min = 0.1, max = log_noise_var)
   # log_counts1 <- mvrnorm(1, rep(log_mean, p), diag(p)*log_var)
   log_counts1 <- rnorm(p, rep(log_mean, p), sqrt(log_var))
-  log_perturbation <- mvrnorm(1, rep(0, p), K*log_noise_var2)
+  log_perturbation <- mvrnorm(1, rep(0, p), K*log_noise_var)
   log_counts2 <- log_counts1 + log_perturbation
 
   counts1 <- exp(log_counts1)
