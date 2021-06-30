@@ -8,10 +8,10 @@ characterize_dataset(counts_A, counts_B)
 }
 \arguments{
 \item{counts_A}{counts associated with the baseline/control condition 
-(arranged p x n)}
+(arranged n x p)}
 
 \item{counts_B}{counts associated with the second condition 
-(arranged p x n)}
+(arranged n x p)}
 }
 \description{
 Generate simulated differential expression for two conditions
