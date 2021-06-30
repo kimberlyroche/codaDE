@@ -55,6 +55,10 @@ update_uuids <- uuid_status$UUID[update_vector]
 # Update all
 # update_uuids <- dbGetQuery(conn,
 #                            paste0("SELECT DISTINCT UUID FROM datasets;"))$UUID
+
+update_uuids <- c("ddae19f2-3ce9-4a0e-b317-3ab8e4dd5c54",
+                  "39f1bba3-1d30-43f7-835c-e06c8fb08134")
+
 for(u in 1:length(update_uuids)) {
   uuid <- update_uuids[u]
   cat(paste0("Updating ", uuid, " (", u, "/", length(update_uuids), ")\n"))
