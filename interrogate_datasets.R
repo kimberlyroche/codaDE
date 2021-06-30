@@ -1,3 +1,6 @@
+# This helper script will cycle through all datasets and update the PERCENT_DIFF
+# field in the `datasets` table in the DB.
+
 source("path_fix.R")
 
 library(RSQLite)
@@ -25,45 +28,17 @@ corrp <- opt$corrp
 # Pull UUIDs matching P, CORRP characterstics
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 res <- dbGetQuery(conn, paste0("SELECT UUID FROM datasets WHERE P=",p," AND CORRP=",corrp))
-sparsity <- c()
-fc_distro <- c()
-de_distro <- c()
+updates <- 0
 for(i in 1:length(res$UUID)) {
   cat(paste0("Parsing dataset ", i, " / ", length(res$UUID), "\n"))
   uuid <- res$UUID[i]
   data <- readRDS(file.path("output", "datasets", paste0(uuid, ".rds")))
-  # Calculate FC
-  M <- data$simulation$abundances
-  counts_A <- M[1:(nrow(M)/2),]
-  counts_B <- M[(nrow(M)/2+1):nrow(M),]
-  m1 <- mean(rowSums(counts_A))
-  m2 <- mean(rowSums(counts_B))
-  fc <- max(c(m1, m2)) / min(c(m1, m2))
-  fc_distro <- c(fc_distro, fc)
   # Estimate % DE features
-  m1 <- colMeans(counts_A + 0.1)
-  m2 <- colMeans(counts_B + 0.1)
-  fc <- m1 / m2
-  prop_de <- sum(fc <= (2/3) | fc >= (3/2)) / length(fc)
-  de_distro <- c(de_distro, prop_de)
-  # Calculate percent zeros
-  sparsity <- c(sparsity, sum(counts_A == 0)/(nrow(counts_A)*ncol(counts_A)))
+  M <- data$simulation$abundances
+  prop_de <- sum(calc_threshold_DA(M) == 0) / ncol(M)
+  discard <- dbExecute(conn, paste0("UPDATE datasets SET PERCENT_DIFF=",prop_de," WHERE UUID='",uuid,"'"))
+  updates <- updates + discard
 }
+dbDisconnect(conn)
 
-plot_df <- data.frame(x = fc_distro)
-pl <- ggplot(plot_df, aes(x = x)) +
-  geom_histogram(color = "#ffffff") +
-  labs(x = "fold change across conditions") +
-  xlim(c(0, 20))
-ggsave(paste0("data_hist_fc_p",p,"_corrp",corrp,".png"), pl, units = "in", dpi = 100, height = 4, width = 5)
-
-plot_df <- data.frame(x = de_distro)
-pl <- ggplot(plot_df, aes(x = x)) +
-  geom_histogram(color = "#ffffff") +
-  labs(x = "proportion differentially abundant features") +
-  xlim(c(0, 1))
-ggsave(paste0("data_hist_de_p",p,"_corrp",corrp,".png"), pl, units = "in", dpi = 100, height = 4, width = 5)
-
-cat(paste0("Average sparsity: ", round(mean(sparsity), 3), "\n"))
-cat(paste0("\tMin sparsity: ", round(min(sparsity), 3), "\n"))
-cat(paste0("\tMax sparsity: ", round(max(sparsity), 3), "\n"))
+cat(paste0("Updated ", updates, " datasets\n"))

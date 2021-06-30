@@ -90,6 +90,7 @@ for(i in iter_start:iter_end) {
                                        proportion_da = proportion_da,
                                        spike_in = spike_in)
 
+  prop_de <- sum(calc_threshold_DA(sim_data$abundances) == 0) / ncol(sim_data$abundances)
   fc_abs <- calc_fc(sim_data$abundances)
   fc_rel <- calc_fc(sim_data$observed_counts1)
   fc_par <- calc_fc(sim_data$observed_counts2)
@@ -104,7 +105,7 @@ for(i in iter_start:iter_end) {
   # ------------------------------------------------------------------------------
   #   Add data set to DB
   # ------------------------------------------------------------------------------
-  res <- dbExecute(conn, paste0("INSERT into datasets(UUID,P,CORRP,FC_ABSOLUTE,FC_RELATIVE,FC_PARTIAL,TIMESTAMP) ",
+  res <- dbExecute(conn, paste0("INSERT into datasets(UUID,P,CORRP,FC_ABSOLUTE,FC_RELATIVE,FC_PARTIAL,PERCENT_DIFF,TIMESTAMP) ",
                                 "VALUES(",
                                 "'",uuid,"',",
                                 p,",",
@@ -112,6 +113,7 @@ for(i in iter_start:iter_end) {
                                 fc_abs,",",
                                 fc_rel,",",
                                 fc_par,",",
+                                prop_de,",",
                                 "'",get_timestamp(),"'",
                                 ")"))
 }

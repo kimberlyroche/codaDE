@@ -405,3 +405,38 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NBGLM",
   
   return(list(tpr = TP/(TP+FN), fpr = FP/(FP+TN), oracle_calls = oracle_calls))
 }
+
+#' Threshold to generate calls on differentially abundant features
+#'
+#' @param counts abundance data set (samples x features)
+#' @param nA optional parameter specifying the number of samples in condition A
+#' @return differential calls in the form of faux p-values (0 for differential,
+#' 1 for not differential)
+#' @export
+calc_threshold_DA <- function(counts, nA = NULL, nB = NULL) {
+  if(is.null(nA)) {
+    nA <- nrow(counts)/2
+    nB <- nA
+  }
+  m1 <- colMeans(counts[1:nA,] + 0.1)
+  m2 <- colMeans(counts[(nA+1):nrow(counts),] + 0.1)
+  fc <- m1 / m2
+  oracle_calls <- rep(1, ncol(counts))
+  oracle_calls[fc <= 0.5 | fc >= 1.5] <- 0
+  oracle_calls
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

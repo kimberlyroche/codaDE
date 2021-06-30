@@ -75,12 +75,7 @@ for(i in 1:nrow(wishlist)) {
   if(job$baseline == "threshold") {
     # "Differential" features will be those with mean fold change in abundance of 
     # >= 1.5 or <= 0.5
-    M <- data$simulation$abundances
-    m1 <- colMeans(M[1:(nrow(M)/2),] + 0.1)
-    m2 <- colMeans(M[(nrow(M)/2 + 1):nrow(M),] + 0.1)
-    fc <- m1 / m2
-    oracle_calls <- rep(1, ncol(M))
-    oracle_calls[fc <= 0.5 | fc >= 1.5] <- 0
+    oracle_calls <- calc_threshold_DA(data$simulation$abundances)
   } else if(job$baseline == "self") {
     oracle_calls <- NULL
   }
