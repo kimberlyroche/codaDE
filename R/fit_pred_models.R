@@ -113,7 +113,9 @@ characterize_dataset <- function(counts_A, counts_B) {
   
   bins <- quantile(c(relab_A[relab_A > 0], relab_B[relab_B > 0]),
                    probs = seq(from = 0, to = 1, length.out = 20))
-  
+  # Add jitter to force unique bins
+  bins <- bins + seq_along(bins) * .Machine$double.eps
+
   COMP_C_ENT_A <- entropy(table(cut(relab_A, breaks = c(0, bins))))
   COMP_C_ENT_B <- entropy(table(cut(relab_B, breaks = c(0, bins))))
   

@@ -413,7 +413,7 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NBGLM",
 #' @return differential calls in the form of faux p-values (0 for differential,
 #' 1 for not differential)
 #' @export
-calc_threshold_DA <- function(counts, nA = NULL, nB = NULL) {
+calc_threshold_DA <- function(counts, nA = NULL) {
   if(is.null(nA)) {
     nA <- nrow(counts)/2
     nB <- nA

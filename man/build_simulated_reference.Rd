@@ -7,8 +7,8 @@
 build_simulated_reference(
   p = 1000,
   log_mean = 0,
-  log_var = 2,
-  log_noise_var = 1,
+  log_var = 4,
+  log_noise_var = 4,
   base_correlation = NULL,
   concentration = 1e+06,
   save_name = NULL

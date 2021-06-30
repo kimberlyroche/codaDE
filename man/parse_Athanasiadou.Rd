@@ -4,9 +4,12 @@
 \alias{parse_Athanasiadou}
 \title{Parse the Athanasiadou et al. (2021) bulk RNA-seq data}
 \usage{
-parse_Athanasiadou(which_data = "ciona")
+parse_Athanasiadou(absolute = TRUE, which_data = "ciona")
 }
 \arguments{
+\item{absolute}{flag indicating whether or not to parse absolute abundance
+data}
+
 \item{which_data}{options are "ciona" or "yeast"}
 }
 \value{
