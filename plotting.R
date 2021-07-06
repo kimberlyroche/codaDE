@@ -8,6 +8,7 @@ library(RSQLite)
 # library(ggROC)
 # library(pROC)
 library(gridExtra)
+library(RColorBrewer)
 
 source("ggplot_fix.R")
 
@@ -23,7 +24,6 @@ source("ggplot_fix.R")
 # palette <- generate_highcontrast_palette(7)
 # palette <- c("#46A06B", "#B95D6E", "#EF82BB", "#755A7F", "#E3C012")
 
-palette <- c("#46A06B", "#FF5733", "#EF82BB", "#755A7F", "#E3C012", "#B95D6E")
 palette <- c("#46A06B", "#FF5733", "#EF82BB", "#7E54DE", "#E3C012", "#B95D6E")
 
 # ------------------------------------------------------------------------------
@@ -51,9 +51,7 @@ references <- c("threshold", "self")
 
 # Build a fold change color scale
 res <- dbGetQuery(conn, "SELECT FC_ABSOLUTE FROM datasets")$FC_ABSOLUTE
-
-ramped_palette1 <- colorRampPalette(c("#00cc00", "#ffffff", "#ff9900"))(3)
-
+ramped_palette1 <- colorRampPalette(c("#00cc00", "#ffffff", "#fe8b00"))(7)
 res <- dbGetQuery(conn, "SELECT FC_ABSOLUTE FROM datasets")$FC_ABSOLUTE
 qq <- quantile(res, probs = seq(from = 0, to = 1, length.out = 4))
 ramped_palette2 <- colorRampPalette(c("#7479c4", "#e63030"))(3)
@@ -75,14 +73,26 @@ for(p in ps) {
           pivot_wider(names_from = "RESULT_TYPE", values_from = "RESULT")
         
         # Plot with percent-differential labeling
-        
-        
-        
+        # PERCENT <- res$PERCENT_DIFF
+        # PERCENT_factor <- cut(PERCENT, breaks = seq(from = 0.1, to = 0.8, by = 0.1))
+        # # levels(FC_factor) <- c("low", "moderate", "high")
+        # pl <- ggplot(res, aes(x = 1 - fpr, y = tpr, fill = PERCENT_factor)) +
+        #   geom_point(size = 3, shape = 21) +
+        #   scale_fill_manual(values = ramped_palette1) +
+        #   xlim(c(0,1)) +
+        #   ylim(c(0,1)) +
+        #   labs(x = "specificity (1 - FPR)",
+        #        y = "sensitivity (TPR)",
+        #        fill = "Fold change ") +
+        #   theme_bw() +
+        #   theme(legend.position = "none") +
+        #   facet_wrap(. ~ METHOD, ncol = 5)
+        # show(pl)
         
         # Plot fold change labeling
         FC <- res$FC_ABSOLUTE
         FC_factor <- cut(FC, breaks = qq)
-        levels(FC_factor) <- c("low", "moderate", "high")
+        levels(FC_factor) <- c("low (1-1.5x)", "moderate (1.5-2.5x)", "high (>2.5x)")
         pl <- ggplot(res, aes(x = 1 - fpr, y = tpr, fill = FC_factor)) +
           geom_point(size = 3, shape = 21) +
           scale_fill_manual(values = ramped_palette2) +
@@ -92,7 +102,7 @@ for(p in ps) {
                y = "sensitivity (TPR)",
                fill = "Fold change ") +
           theme_bw() +
-          theme(legend.position = "none") +
+          # theme(legend.position = "none") +
           facet_wrap(. ~ METHOD, ncol = 5)
         # show(pl)
         ggsave(file.path("output",
@@ -109,7 +119,7 @@ for(p in ps) {
                dpi = 100,
                units = "in",
                height = 3,
-               width = 12)
+               width = 14)
         
         # Plot with no labeling
         pl <- ggplot(res, aes(x = 1 - fpr, y = tpr, fill = METHOD)) +
@@ -149,16 +159,17 @@ for(p in ps) {
 # ------------------------------------------------------------------------------
 
 res <- dbGetQuery(conn, "SELECT P, CORRP, PERCENT_DIFF, FC_ABSOLUTE FROM datasets")
-res$PERCENT_DIFF <- rnorm(nrow(res), 0.5, 0.1) # fake data as placeholders
 res$CORRP <- factor(res$CORRP)
-levels(res$CORRP) <- c("independent features", "correlated features")
+levels(res$CORRP) <- c("independent feature simulations", "correlated feature simulations")
 
-pl <- ggplot(res, aes(x = factor(P), y = PERCENT_DIFF)) +
-  geom_boxplot() +
+pl <- ggplot(res, aes(x = PERCENT_DIFF, fill = factor(P))) +
+  geom_density(alpha = 0.6) +
+  scale_fill_brewer(palette = "RdYlGn") +
   facet_wrap(. ~ CORRP) +
+  xlim(c(0, 1)) +
   theme_bw() +
-  labs(x = "feature number",
-       y = "percent differentially abundant features")
+  labs(x = "percent differentially abundant features",
+       fill = "Feature number")
 show(pl)
 ggsave(file.path("output",
                  "images",
@@ -169,12 +180,14 @@ ggsave(file.path("output",
        height = 3,
        width = 6)
 
-pl <- ggplot(res, aes(x = factor(P), y = FC_ABSOLUTE)) +
-  geom_boxplot() +
+pl <- ggplot(res, aes(x = FC_ABSOLUTE, fill = factor(P))) +
+  geom_density(alpha = 0.6) +
+  scale_fill_brewer(palette = "RdYlGn") +
   facet_wrap(. ~ CORRP) +
+  xlim(c(0, 25)) +
   theme_bw() +
-  labs(x = "feature number",
-       y = "absolute fold change in abundance")
+  labs(x = "absolute fold change in abundance",
+       fill = "Feature number")
 show(pl)
 ggsave(file.path("output",
                  "images",

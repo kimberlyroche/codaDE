@@ -234,7 +234,7 @@ characterize_dataset <- function(counts_A, counts_B) {
 #'
 #' @param model options are "linear", "RF" (random forest), "EN" (elastic net),
 #' "GP" (Gaussian process)
-#' @param do_predict flag indicating whether or not to generated predictions on a
+#' @param do_predict flag indicating whether or not to evaluate predictions on a
 #' test set
 #' @param DE_method which DE calling method's results to predict; if "all",
 #' prediction is over all results together
@@ -251,7 +251,8 @@ characterize_dataset <- function(counts_A, counts_B) {
 #' @import broom.mixed
 #' @export
 fit_predictive_model <- function(model = "linear", do_predict = FALSE,
-                                 DE_method = "all", plot_weights = FALSE) {
+                                 DE_method = "all", plot_weights = FALSE,
+                                 exclude_partials = TRUE, exclude_indepedent = FALSE) {
   if(!(model %in% c("linear", "RF", "EN", "GP"))) {
     stop(paste0("Invalid model type: ", model, "!"))
   }
@@ -259,21 +260,14 @@ fit_predictive_model <- function(model = "linear", do_predict = FALSE,
     stop(paste0("Invalid DE calling method: ", DE_method, "!\n"))
   }
   # GP models take a while to run. Save the results for later tinkering.
-  output_dir <- "output"
-  if(model == "GP") {
-    if(model == "GP") {
-      output_dir <- file.path("output", model)
-      if(!dir.exists(output_dir)) {
-        dir.create(output_dir)
-      }
+  save_path <- list("output", "images", paste0(model, "_results"), DE_method)
+  for(i in 1:length(save_path)) {
+    fp <- do.call(file.path, save_path[1:i])
+    if(!dir.exists(fp)) {
+      dir.create(fp)
     }
   }
-  if(plot_weights) {
-    result_dir <- file.path(output_dir, "images", paste0(model, "_results"))
-    if(!dir.exists(result_dir)) {
-      dir.create(result_dir)
-    }
-  }
+  save_dir <- fp
   
   conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
   
@@ -338,7 +332,7 @@ fit_predictive_model <- function(model = "linear", do_predict = FALSE,
                                      "FW_CLR_PFC05_D, ",
                                      "FW_CLR_PFC1_D, ",
                                      "FW_CLR_PFC2_D, ",
-                                     "METHOD, RESULT, RESULT_TYPE FROM ",
+                                     "METHOD, RESULT, RESULT_TYPE, BASELINE FROM ",
                                      "datasets LEFT JOIN characteristics ",
                                      "ON datasets.UUID=characteristics.UUID ",
                                      "LEFT JOIN results ",
@@ -346,162 +340,153 @@ fit_predictive_model <- function(model = "linear", do_predict = FALSE,
                                      "AND characteristics.partial=results.PARTIAL_INFO);"))
   dbDisconnect(conn)
   
-  fitted_models <- list()
-  train_feature_sets <- list()
-  predictions <- list()
+  if(exclude_partials) {
+    results <- results %>%
+      filter(PARTIAL == 0)
+  }
+  if(exclude_indepedent) {
+    results <- results %>%
+      filter(CORRP == 1)
+  }
+  
+  fitted_models <- list(self = list(), threshold = list())
+  train_feature_sets <- list(self = list(), threshold = list())
+  predictions <- list(self = list(), threshold = list())
 
-  for(use_result_type in c("fpr", "tpr")) {
-    cat(paste0("Modeling ", use_result_type, " w/ DE method ", DE_method, "\n"))
-    
-    if(DE_method == "all") {
+  for(use_baseline in c("self", "threshold")) {
+    for(use_result_type in c("fpr", "tpr")) {
+      cat(paste0("Modeling ", use_result_type, " w/ DE method ", DE_method, "\n"))
+      
       data <- results %>%
-        filter(RESULT_TYPE == use_result_type)
-    } else {
-      data <- results %>%
-        filter(METHOD == DE_method) %>%
-        filter(RESULT_TYPE == use_result_type)
-    }
-    
-    # These predictors appear to be strongly correlated.
-    # Let's drop them for now.
-    data <- data %>%
-      select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
-    
-    # Subset for testing
-    # data <- data[sample(1:nrow(data), size = 100),]
-    
-    # Scale the features
-    uuids <- data$UUID
-    if(DE_method == "all") {
-      features <- data %>%
-        select(!c(UUID, RESULT, RESULT_TYPE))
-      features$PARTIAL <- factor(features$PARTIAL)
-      features$CORRP <- factor(features$CORRP)
-      features$METHOD <- factor(features$METHOD)
-    } else {
-      features <- data %>%
-        select(!c(UUID, METHOD, RESULT, RESULT_TYPE))
-      features$PARTIAL <- factor(features$PARTIAL)
-      features$CORRP <- factor(features$CORRP)
-    }
-    
-    factors <- which(colnames(features) %in% c("PARTIAL", "CORRP", "METHOD", "P"))
-    non_factors <- setdiff(1:ncol(features), factors)
-    features_nonfactors <- features[,non_factors]
-    features_nonfactors <- as.data.frame(apply(features_nonfactors, 2, function(x) {
-      # if(sd(x) > 0) {
-      #   scale(x)
-      # } else {
-      #   scale(x, scale = FALSE)
-      # }
-      x
-    }))
-    # Drop columns with no variation
-    # In practice this only happens in testing/subsetting to small samples
-    features_nonfactors <- features_nonfactors[,apply(features_nonfactors, 2, sd) > 0]
-    features <- cbind(features[,factors], features_nonfactors)
-    response <- data %>%
-      select(RESULT)
-    
-    n <- nrow(data)
-    
-    if(model == "EN") {
-      response_vector <- unname(unlist(response))
-      if(use_result_type == "fpr") {
-        # Predict specificity: 1 - fpr
-        response_vector <- 1 - response_vector
-      }
-      trainRowNumbers <- createDataPartition(response_vector,
-                                             p = 0.5,
-                                             list = FALSE)
+        filter(BASELINE == use_baseline)
       
-      # Separate out the training set
-      train_data <- cbind(RESULT = response_vector[trainRowNumbers],
-                          features[trainRowNumbers,])
-      
-      start <- Sys.time()
-      res <- train(RESULT ~ ., data = train_data,
-                   method = "glmnet",
-                   trControl = trainControl("cv", number = 10),
-                   tuneLength = 10)
-      diff <- Sys.time() - start
-      cat(paste0("EN model train time: ", round(diff, 2), " ", attr(diff, "units"), "\n"))
-      
-      # plot(res) # best parameter
-      
-      res$bestTune # best coefficient
-      # Per the documentation:
-      #   lambda seems to be the strength of the overall penalty term
-      #   (1-alpha) is the ridge weight, alpha is the LASSO weight
-      
-      model_features <- as.matrix(coef(res$finalModel, res$bestTune$lambda))
-      # Eliminate zero-weight features
-      model_features <- data.frame(feature_name = rownames(model_features),
-                                   beta = unname(unlist(model_features)))
-      model_features <- model_features %>%
-        filter(beta > 0) %>%
-        filter(feature_name != "(Intercept)")
-      
-      if(plot_weights) {
-        pl <- ggplot(model_features, aes(reorder(feature_name, beta), beta)) +
-          geom_bar(stat = "identity") + 
-          coord_flip() + 
-          scale_y_continuous("Weight") +
-          scale_x_discrete("Ordered feature weights")
-        ggsave(file.path("output",
-                         "images",
-                         paste0(model, "_results"),
-                         paste0(model,
-                                "_betas_",
-                                DE_method,
-                                "_",
-                                use_result_type,
-                                ".png")),
-               plot = pl,
-               dpi = 100,
-               units = "in",
-               height = 8,
-               width = 4)
+      if(DE_method == "all") {
+        data <- data %>%
+          filter(RESULT_TYPE == use_result_type)
+      } else {
+        data <- data %>%
+          filter(METHOD == DE_method) %>%
+          filter(RESULT_TYPE == use_result_type)
       }
       
-      if(do_predict) {
-        test_data <- cbind(RESULT = response_vector[-trainRowNumbers],
-                           features[-trainRowNumbers,])
+      # These predictors appear to be strongly correlated.
+      # Let's drop them for now.
+      data <- data %>%
+        select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
+      
+      # Subset for testing
+      # data <- data[sample(1:nrow(data), size = 100),]
+      
+      # Scale the features
+      uuids <- data$UUID
+      if(DE_method == "all") {
+        features <- data %>%
+          select(!c(UUID, RESULT, RESULT_TYPE, BASELINE))
+        features$PARTIAL <- factor(features$PARTIAL)
+        features$CORRP <- factor(features$CORRP)
+        features$METHOD <- factor(features$METHOD)
+      } else {
+        features <- data %>%
+          select(!c(UUID, METHOD, RESULT, RESULT_TYPE, BASELINE))
+        features$PARTIAL <- factor(features$PARTIAL)
+        features$CORRP <- factor(features$CORRP)
+      }
+      
+      factors <- which(colnames(features) %in% c("PARTIAL", "CORRP", "METHOD", "P"))
+      non_factors <- setdiff(1:ncol(features), factors)
+      features_nonfactors <- features[,non_factors]
+      features_nonfactors <- as.data.frame(apply(features_nonfactors, 2, function(x) {
+        # if(sd(x) > 0) {
+        #   scale(x)
+        # } else {
+        #   scale(x, scale = FALSE)
+        # }
+        x
+      }))
+      # Drop columns with no variation
+      # In practice this only happens in testing/subsetting to small samples
+      features_nonfactors <- features_nonfactors[,apply(features_nonfactors, 2, sd) > 0]
+      features <- cbind(features[,factors], features_nonfactors)
+      response <- data %>%
+        select(RESULT)
+      
+      n <- nrow(data)
+      
+      if(model == "EN") {
+        save_fn <- file.path(save_dir,
+                             paste0(model,
+                                    "_",
+                                    DE_method,
+                                    "_",
+                                    use_result_type,
+                                    "_",
+                                    use_baseline,
+                                    ".rds"))
+        if(!file.exists(save_fn)) {
+          response_vector <- unname(unlist(response))
+          if(use_result_type == "fpr") {
+            # Predict specificity: 1 - fpr
+            response_vector <- 1 - response_vector
+          }
+          trainRowNumbers <- createDataPartition(response_vector,
+                                                 p = 0.5,
+                                                 list = FALSE)
+          
+          # Separate out the training set
+          train_data <- cbind(RESULT = response_vector[trainRowNumbers],
+                              features[trainRowNumbers,])
+          
+          start <- Sys.time()
+          res <- train(RESULT ~ ., data = train_data,
+                       method = "glmnet",
+                       trControl = trainControl("cv", number = 10),
+                       tuneLength = 10)
+          diff <- Sys.time() - start
+          cat(paste0("EN model train time: ", round(diff, 2), " ", attr(diff, "units"), "\n"))
+          
+          # plot(res) # best parameter
+          
+          res$bestTune # best coefficient
+          # Per the documentation:
+          #   lambda seems to be the strength of the overall penalty term
+          #   (1-alpha) is the ridge weight, alpha is the LASSO weight
+          
+          model_features <- as.matrix(coef(res$finalModel, res$bestTune$lambda))
+          # Eliminate zero-weight features
+          model_features <- data.frame(feature_name = rownames(model_features),
+                                       beta = unname(unlist(model_features)))
+          model_features <- model_features %>%
+            filter(beta > 0) %>%
+            filter(feature_name != "(Intercept)")
+          
+          saveRDS(list(result = res,
+                       train_features = features[trainRowNumbers,],
+                       train_response = response_vector[trainRowNumbers],
+                       test_features = features[-trainRowNumbers,],
+                       test_response = response_vector[-trainRowNumbers]), save_fn)
+        } else {
+          res_obj <- readRDS(save_fn)
+          res <- res_obj$result
+          train_features <- res_obj$train_features
+          train_response <- res_obj$train_response
+          test_features <- res_obj$test_features
+          test_response <- res_obj$test_response
+        }
         
-        test_response <- test_data$RESULT
-        prediction <- predict(res, test_data)
-        p_labels <- test_data$P
-      }
-    } else {
-      # Define test/train set for all remaining methods
-      train_idx <- sample(1:nrow(data), size = round(n*0.8))
-      test_idx <- setdiff(1:nrow(data), train_idx)
-      train_uuids <- uuids[train_idx]
-      train_features <- features[train_idx,]
-      train_response <- response[train_idx,]
-      if(use_result_type == "fpr") {
-        train_response <- 1 - train_response
-      }
-      test_uuids <- uuids[test_idx]
-      test_features <- features[test_idx,]
-      test_response <- response[test_idx,]
-      if(use_result_type == "fpr") {
-        test_response <- 1 - test_response
-      }
-      
-      if(model == "linear") {
-        lm_train_data <- cbind(train_features, train_response)
-        res <- lm(train_response ~ ., data = lm_train_data)
         if(plot_weights) {
-          pl <- plot_summs(res)
-          ggsave(file.path("output",
-                           "images",
-                           paste0(model, "_results"),
+          pl <- ggplot(model_features, aes(reorder(feature_name, beta), beta)) +
+            geom_bar(stat = "identity") + 
+            coord_flip() + 
+            scale_y_continuous("Weight") +
+            scale_x_discrete("Ordered feature weights")
+          ggsave(file.path(save_dir,
                            paste0(model,
                                   "_betas_",
                                   DE_method,
                                   "_",
                                   use_result_type,
+                                  "_",
+                                  use_baseline,
                                   ".png")),
                  plot = pl,
                  dpi = 100,
@@ -509,64 +494,196 @@ fit_predictive_model <- function(model = "linear", do_predict = FALSE,
                  height = 8,
                  width = 4)
         }
+        
         if(do_predict) {
-          lm_test_data <- cbind(test_features, test_response)
-          prediction <- predict(res, newdata = lm_test_data)
-          test_response <- test_response
-          p_labels <- test_features$P
+          # Prev. syntax
+          # test_data <- cbind(RESULT = response_vector[-trainRowNumbers],
+          #                    features[-trainRowNumbers,])
+          # test_response <- test_data$RESULT
+          test_data <- cbind(data.frame(RESULT = test_response),
+                             test_features)
+          prediction <- predict(res, test_data)
+          p_labels <- test_data$P
         }
-      }
-      
-      if(model == "RF") {
-        rf_train_data <- cbind(train_features, train_response)
-        res <- randomForest(train_response ~ ., data = rf_train_data)
-        if(do_predict) {
-          rf_test_data <- cbind(test_features, test_response)
-          prediction <- predict(res, newdata = rf_test_data)
-          test_response <- test_response
-          p_labels <- test_features$P
+      } else {
+        # Define test/train set for all remaining methods
+        train_idx <- sample(1:nrow(data), size = round(n*0.8))
+        test_idx <- setdiff(1:nrow(data), train_idx)
+        train_uuids <- uuids[train_idx]
+        train_features <- features[train_idx,]
+        train_response <- response[train_idx,]
+        if(use_result_type == "fpr") {
+          train_response <- 1 - train_response
         }
-      }
-      
-      if(model == "GP") {
-        # Fit
-        result_filename <- file.path(output_dir,
-                                     paste0("results_", DE_method, "_", use_result_type, ".rds"))
-        if(do_predict & file.exists(result_filename)) {
-          res_obj <- readRDS(result_filename)
-          test_response <- res_obj$test_response
-          prediction <- res_obj$prediction
-          test_features <- res_obj$test_features
-          p_labels <- test_features$P
-        } else {
-          start <- Sys.time()
-          res <- mlegp(train_features, train_response)
-          cat(paste0("Elapsed fit time: ", Sys.time() - start, "\n"))
+        test_uuids <- uuids[test_idx]
+        test_features <- features[test_idx,]
+        test_response <- response[test_idx,]
+        if(use_result_type == "fpr") {
+          test_response <- 1 - test_response
+        }
+        
+        if(model == "linear") {
+          save_fn <- file.path(save_dir,
+                               paste0(model,
+                                      "_",
+                                      DE_method,
+                                      "_",
+                                      use_result_type,
+                                      "_",
+                                      use_baseline,
+                                      ".rds"))
+          if(!file.exists(save_fn)) {
+            lm_train_data <- cbind(train_features, train_response)
+            res <- lm(train_response ~ ., data = lm_train_data)
+            saveRDS(list(result = res,
+                         train_features = train_features,
+                         train_response = train_response,
+                         test_features = test_features,
+                         test_response = test_response), save_fn)
+          } else {
+            res_obj <- readRDS(save_fn)
+            res <- res_obj$result
+            train_features <- res_obj$train_features
+            train_response <- res_obj$train_response
+            test_features <- res_obj$test_features
+            test_response <- res_obj$test_response
+          }
+          
+          if(plot_weights) {
+            pl <- plot_summs(res)
+            ggsave(file.path(save_dir,
+                             paste0(model,
+                                    "_betas_",
+                                    DE_method,
+                                    "_",
+                                    use_result_type,
+                                    "_",
+                                    use_baseline,
+                                    ".png")),
+                   plot = pl,
+                   dpi = 100,
+                   units = "in",
+                   height = 8,
+                   width = 4)
+          }
+          if(do_predict) {
+            lm_test_data <- cbind(test_features, test_response)
+            prediction <- predict(res, newdata = lm_test_data)
+            test_response <- test_response
+            p_labels <- test_features$P
+          }
+        }
+        
+        if(model == "RF") {
+          save_fn <- file.path(save_dir,
+                               paste0(model,
+                                      "_",
+                                      DE_method,
+                                      "_",
+                                      use_result_type,
+                                      "_",
+                                      use_baseline,
+                                      ".rds"))
+          if(!file.exists(save_fn)) {
+            rf_train_data <- cbind(train_features, train_response)
+            res <- randomForest(train_response ~ ., data = rf_train_data)
+            saveRDS(list(result = res,
+                         train_features = train_features,
+                         train_response = train_response,
+                         test_features = test_features,
+                         test_response = test_response), save_fn)
+          } else {
+            res_obj <- readRDS(save_fn)
+            res <- res_obj$result
+            train_features <- res_obj$train_features
+            train_response <- res_obj$train_response
+            test_features <- res_obj$test_features
+            test_response <- res_obj$test_response
+          }
+
+          if(plot_weights) {
+            plot_df <- varImpPlot(res)
+            plot_df <- data.frame(feature = rownames(plot_df),
+                                  "IncNodePurity" = plot_df[,1])
+            rownames(plot_df) <- NULL
+            plot_df <- plot_df %>%
+              arrange(desc(IncNodePurity)) %>%
+              slice(1:20)
+            pl <- ggplot(plot_df, aes(x = IncNodePurity,
+                                      y = reorder(feature, IncNodePurity))) +
+              geom_bar(stat = "identity") +
+              labs(y = "feature")
+            show(pl)
+            ggsave(file.path(save_dir,
+                             paste0(model,
+                                    "_betas_",
+                                    DE_method,
+                                    "_",
+                                    use_result_type,
+                                    "_",
+                                    use_baseline,
+                                    ".png")),
+                   plot = pl,
+                   dpi = 100,
+                   units = "in",
+                   height = 4,
+                   width = 6)
+          }
           
           if(do_predict) {
-            # Predict on test set
+            rf_test_data <- cbind(test_features, test_response)
+            prediction <- predict(res, newdata = rf_test_data)
+            test_response <- test_response
+            p_labels <- test_features$P
+          }
+        }
+        
+        if(model == "GP") {
+          save_fn <- file.path(save_dir,
+                               paste0(model,
+                                      "_",
+                                      DE_method,
+                                      "_",
+                                      use_result_type,
+                                      "_",
+                                      use_baseline,
+                                      ".rds"))
+          if(!file.exists(save_fn)) {
+            start <- Sys.time()
+            train_features$PARTIAL <- as.numeric(train_features$PARTIAL)
+            train_features$CORRP <- as.numeric(train_features$CORRP)
+            res <- mlegp(train_features, train_response)
+            cat(paste0("Elapsed fit time: ", Sys.time() - start, "\n"))
+            saveRDS(list(result = res,
+                         train_features = train_features,
+                         train_response = train_response,
+                         test_features = test_features,
+                         test_response = test_response), save_fn)
+          } else {
+            res_obj <- readRDS(save_fn)
+            res <- res_obj$result
+            train_features <- res_obj$train_features
+            train_response <- res_obj$train_response
+            test_features <- res_obj$test_features
+            test_response <- res_obj$test_response
+          }
+          
+          if(do_predict) {
             start <- Sys.time()
             output_pred <- predict(res, newData = test_features, se.fit = FALSE)
             cat(paste0("Elapsed predict time: ", Sys.time() - start, "\n"))
-            
-            cat("Saving results...\n")
             prediction <- output_pred[,1]
-            saveRDS(list(train_features = cbind(UUID = train_uuids, train_features),
-                         test_features = cbind(UUID = test_uuids, test_features),
-                         train_response = train_response,
-                         test_response = test_response,
-                         prediction = prediction),
-                    result_filename)
+            p_labels <- test_features$P
           }
         }
       }
-    }
-    fitted_models[[use_result_type]] <- res
-    train_feature_sets[[use_result_type]] <- train_features
-    if(do_predict) {
-      predictions[[use_result_type]] <- list(true = test_response,
-                                             predicted = prediction,
-                                             p_labels = p_labels)
+      fitted_models[[use_baseline]][[use_result_type]] <- res
+      train_feature_sets[[use_baseline]][[use_result_type]] <- train_features
+      if(do_predict) {
+        predictions[[use_baseline]][[use_result_type]] <- list(true = test_response,
+                                               predicted = prediction,
+                                               p_labels = p_labels)
+      }
     }
   }
   if(do_predict) {
