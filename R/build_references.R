@@ -83,7 +83,7 @@ build_Barlow_reference <- function() {
 #' @return NULL
 #' @export
 build_Morton_reference <- function() {
-  parsed_obj <- parse_Morton()
+  parsed_obj <- parse_Morton() # check this -- this fn. has been altered!
   counts <- parsed_obj$counts
   groups <- parsed_obj$groups
 

@@ -72,9 +72,11 @@ parse_Barlow <- function(absolute = TRUE) {
 
 #' Parse the Morton et al. (2019) 16S data
 #'
+#' @param absolute flag indicating whether or not to parse absolute abundance
+#' data
 #' @return named list of counts and group labels
 #' @export
-parse_Morton <- function() {
+parse_Morton <- function(absolute = TRUE) {
   # parsed_data_fn <- file.path("data", "absolute_Morton.rds")
   # if(file.exists(parsed_data_fn)) {
   #   return(readRDS(parsed_data_fn))
@@ -85,10 +87,12 @@ parse_Morton <- function() {
                             sep = "\t", header = TRUE, stringsAsFactors = FALSE)
     metadata <- read.delim(file.path(file_dir, "oral_trimmed_metadata.txt"),
                            sep = "\t", header = TRUE, stringsAsFactors = FALSE)
-    
-    # "flowcount" is calculated this way in the paper
-    # (See their Python notebook for Fig. 2)
-    flowcount <- (metadata$flow.cell.5min.1 + metadata$flow.cell.5min.2) / 2
+
+    if(absolute) {
+      # "flowcount" is calculated this way in the paper
+      # (See their Python notebook for Fig. 2)
+      flowcount <- (metadata$flow.cell.5min.1 + metadata$flow.cell.5min.2) / 2
+    }
     event_labels <- metadata$brushing_event
     subject_labels <- metadata$HostSubject
     timepoint_labels <- metadata$`Timepoint.`
@@ -98,14 +102,19 @@ parse_Morton <- function() {
     
     # Compute relative abundances
     tax_legend <- otu_table$OTU_ID
-    props <- otu_table[,2:ncol(otu_table)]
-    props <- apply(props, 2, function(x) x/sum(x))
     
-    # Scale these up to absolute abundances
-    # `props` is taxa x samples
-    counts <- props
-    for(i in 1:ncol(counts)) {
-      counts[,i] <- counts[,i]*flowcount[i]
+    if(absolute) {
+      props <- otu_table[,2:ncol(otu_table)]
+      props <- apply(props, 2, function(x) x/sum(x))
+      
+      # Scale these up to absolute abundances
+      # `props` is taxa x samples
+      counts <- props
+      for(i in 1:ncol(counts)) {
+        counts[,i] <- counts[,i]*flowcount[i]
+      }
+    } else {
+      counts <- otu_table[,2:ncol(otu_table)]
     }
     
     # Re-order samples by condition (event before/after) and subject (where most
@@ -123,9 +132,11 @@ parse_Morton <- function() {
                        rep("after", length(after_events))),
                      levels = c("before", "after"))
     
-    # Scale by minimum observed abundance as I did with Barlow et al.
-    min_observed <- min(counts[which(counts > 0, arr.ind = TRUE)])
-    counts <- counts / min_observed
+    if(absolute) {
+      # Scale by minimum observed abundance as I did with Barlow et al.
+      min_observed <- min(counts[which(counts > 0, arr.ind = TRUE)])
+      counts <- counts / min_observed
+    }
     
     parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
     # saveRDS(parsed_obj, file = parsed_data_fn)
@@ -257,4 +268,77 @@ parse_Athanasiadou <- function(absolute = TRUE, which_data = "ciona") {
       return(parsed_obj)
     }
   # }
+}
+
+#' Parse the TCGA ESCA RNA-seq data
+#'
+#' @param absolute flag indicating whether or not to parse absolute abundance
+#' data
+#' @return named list of counts and group labels
+#' @export
+parse_ESCA <- function(absolute = TRUE) {
+  file_dir <- file.path("data", "TCGA_ESCA")
+  
+  # Think about how to even utilize spike-ins for this normalization
+  # See: https://www.biostars.org/p/81803/
+  # Or Lun et al. 2017
+  
+  # Pull SCC labels from Campbell et al. supplement
+  sccs <- read.delim(file.path(file_dir,
+                               "cell_reports_squamous_TCGA_paper_sup1_mmc2_table_S1M.txt"))
+  
+  # Pull ESCA log2 RPKM RNA-seq data
+  esca <- read.delim(file.path(file_dir,
+                               "Human__TCGA_ESCA__UNC__RNAseq__HiSeq_RNA__01_28_2016__BI__Gene__Firehose_RSEM_log2.cct"))
+  colnames(esca)[1] <- "gene_name"
+  
+  # Find spike-ins and separate into spike-in and all other sequence data sets
+  spikein_idx <- unname(which(sapply(esca$gene_name, function(x) {
+    str_detect(x, "^ERCC")
+  })))
+  esca_spike <- esca[spikein_idx,2:ncol(esca)]
+  esca <- esca[-spikein_idx,2:ncol(esca)]
+  
+  # Label samples with tumor subtype
+  barcodes <- unname(sapply(colnames(esca), function(x) {
+    str_replace_all(x, "\\.", "-")
+  }))
+  scc_flag <- rep("Other", ncol(esca))
+  scc_flag[barcodes %in% sccs$Patient.Barcodes] <- "SCC"
+  
+  # Visualizing via PCA show these two tumor types are very different
+  # temp <- esca[sample(1:nrow(esca), size = 200),]
+  # 
+  # coords <- cmdscale(dist(t(temp)))
+  # ggplot(data.frame(x = coords[,1], y = coords[,2], scc = scc_flag),
+  #        aes(x = x, y = y, fill = factor(scc))) +
+  #   geom_point(size = 2, shape = 21)
+  
+  # Plot omitted here but there's an overall higher spike-in abundance in the
+  # SCC samples
+  
+  if(absolute) {
+    size_factor <- unname(colMeans(esca_spike))
+    counts <- esca / size_factor
+    counts <- 2**counts - 1 # assume a pseudocount of 1 was added here
+    groups <- scc_flag
+    tax = NULL
+  } else {
+    counts <- 2**esca - 1 # assume a pseudocount of 1 was added here
+    groups <- scc_flag
+    tax = NULL
+  }
+  
+  # Clean up all the labels we won't use
+  rownames(counts) <- NULL
+  colnames(counts) <- NULL
+  counts <- as.matrix(counts)
+
+  counts <- cbind(counts[,groups == "Other"], counts[,groups == "SCC"])
+  groups <- sort(groups)
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  
+  # saveRDS(parsed_obj, file = parsed_data_fn)
+  return(parsed_obj)
 }

@@ -241,7 +241,10 @@ call_DA_scran <- function(data, groups) {
     # sce <- runTSNE(sce, dimred = "PCAsub")
     # plotTSNE(sce, colour_by = "label", text_by = "label")
   } else {
-    cluster <- groups + 1
+    cluster <- as.numeric(as.factor(groups))
+    if(min(cluster) == 0) {
+      cluster <- cluster + 1
+    }
   }
   # Assigning to the 'colLabels' of the 'sce'
   colLabels(sce) <- factor(cluster)
