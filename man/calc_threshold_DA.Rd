@@ -4,7 +4,7 @@
 \alias{calc_threshold_DA}
 \title{Threshold to generate calls on differentially abundant features}
 \usage{
-calc_threshold_DA(counts, nA = NULL, nB = NULL)
+calc_threshold_DA(counts, nA = NULL)
 }
 \arguments{
 \item{counts}{abundance data set (samples x features)}

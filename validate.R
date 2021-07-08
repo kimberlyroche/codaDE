@@ -55,10 +55,10 @@ if(dataset_name == "TCGA_ESCA") {
   abs_data <- parse_ESCA(absolute = TRUE)
   rel_data <- parse_ESCA(absolute = FALSE)
   # Downsample for testing
-  k <- 1000
-  sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
-  abs_data$counts <- abs_data$counts[sample_idx,]
-  rel_data$counts <- rel_data$counts[sample_idx,]
+  # k <- 100
+  # sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
+  # abs_data$counts <- abs_data$counts[sample_idx,]
+  # rel_data$counts <- rel_data$counts[sample_idx,]
 }
 
 # Reorient as (samples x features)
@@ -183,6 +183,7 @@ for(use_result_type in c("tpr", "fpr")) {
                                  "_",
                                  use_baseline,
                                  ".rds"))
+
     if(!file.exists(model_fn)) {
       stop("Predictive model fit not found!")
     }

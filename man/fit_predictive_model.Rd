@@ -8,14 +8,16 @@ fit_predictive_model(
   model = "linear",
   do_predict = FALSE,
   DE_method = "all",
-  plot_weights = FALSE
+  plot_weights = FALSE,
+  exclude_partials = TRUE,
+  exclude_indepedent = FALSE
 )
 }
 \arguments{
 \item{model}{options are "linear", "RF" (random forest), "EN" (elastic net),
 "GP" (Gaussian process)}
 
-\item{do_predict}{flag indicating whether or not to generated predictions on a
+\item{do_predict}{flag indicating whether or not to evaluate predictions on a
 test set}
 
 \item{DE_method}{which DE calling method's results to predict; if "all",
