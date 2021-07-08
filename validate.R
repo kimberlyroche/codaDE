@@ -4,6 +4,35 @@ library(codaDE)
 library(tidyverse)
 library(gridExtra)
 library(randomForest)
+library(optparse)
+
+option_list = list(
+  make_option(c("--dataset"),
+              type = "character",
+              default = "Barlow",
+              help = "data set to use: Barlow, Morton, Athanasiadou_yeast, Athanadiadou_ciona, TCGA_ESCA",
+              metavar = "character"),
+  make_option(c("--baseline"),
+              type = "character",
+              default = "self",
+              help = "calls to use as a reference: self, threshold",
+              metavar = "character")
+);
+
+opt_parser = OptionParser(option_list = option_list);
+opt = parse_args(opt_parser);
+
+dataset_name <- opt$dataset
+use_baseline <- opt$baseline
+
+if(!(dataset_name %in% c("Barlow", "Morton", "Athanasiadou_yeast",
+                         "Athanadiadou_ciona", "TCGA_ESCA"))) {
+  stop(paste0("Invalid data set: ", dataset_name, "!\n"))
+}
+
+if(!(use_baseline %in% c("self", "threshold"))) {
+  stop(paste0("Invalid DA baseline: ", use_baseline, "!\n"))
+}
 
 palette <- list(ALDEx2 = "#46A06B",
                 DESeq2 = "#FF5733",
@@ -13,17 +42,10 @@ palette <- list(ALDEx2 = "#46A06B",
                 simulated = "#DDDDDD")
 
 model <- "RF"
-use_baseline <- "threshold"
 
 # ------------------------------------------------------------------------------
 #   Parse and wrangle validation data
 # ------------------------------------------------------------------------------
-
-# dataset_name <- "Barlow"
-# dataset_name <- "Morton"
-# dataset_name <- "Athanasiadou_yeast"
-# dataset_name <- "Athanasiadou_ciona"
-dataset_name <- "TCGA_ESCA"
 
 if(dataset_name == "Barlow") {
   abs_data <- parse_Barlow(absolute = TRUE)
@@ -55,10 +77,10 @@ if(dataset_name == "TCGA_ESCA") {
   abs_data <- parse_ESCA(absolute = TRUE)
   rel_data <- parse_ESCA(absolute = FALSE)
   # Downsample for testing
-  k <- 1000
-  sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
-  abs_data$counts <- abs_data$counts[sample_idx,]
-  rel_data$counts <- rel_data$counts[sample_idx,]
+  # k <- 1000
+  # sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
+  # abs_data$counts <- abs_data$counts[sample_idx,]
+  # rel_data$counts <- rel_data$counts[sample_idx,]
 }
 
 # Reorient as (samples x features)
@@ -86,8 +108,8 @@ retain_features <- colSums(ref_data) > 10 & colSums(data) > 10
 ref_data <- ref_data[,retain_features]
 data <- data[,retain_features]
 
-dim(ref_data)
-round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100
+cat(paste0("Dataset dimensions: ", nrow(ref_data), " x ", ncol(ref_data), "\n"))
+cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
 
 # ------------------------------------------------------------------------------
 #   Wrangle data for prediction-making
@@ -157,7 +179,8 @@ for(use_result_type in c("tpr", "fpr")) {
     if(use_baseline == "threshold") {
       # "Differential" features will be those with mean fold change in abundance of 
       # >= 1.5 or <= 0.5
-      oracle_calls <- calc_threshold_DA(ref_data)
+      oracle_calls <- calc_threshold_DA(ref_data,
+                                        nA = sum(groups == groups[1]))
     } else {
       oracle_calls <- NULL
     }
@@ -228,7 +251,7 @@ for(use_result_type in c("tpr", "fpr")) {
     pred_real <- predict(fit_obj$result, newdata = features_df)
     
     plot_df <- rbind(plot_df,
-                     data.frame(true = rates$tpr,
+                     data.frame(true = ifelse(use_result_type == "tpr", rates$tpr, 1 - rates$fpr),
                                 predicted = pred_real,
                                 type = DE_method))
     
