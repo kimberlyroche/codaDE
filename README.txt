@@ -1,3 +1,25 @@
+# --------------------------------------------------------------------------------------------------------
+#   GENERATING DATA
+# --------------------------------------------------------------------------------------------------------
+
+Must sweep over FEATURE NUMBER x CORRP. Currently gives 6 combos - e.g. P = 1000, CORRP = 1.
+Run 1K of each combination.
+
+If CORRP = 0, features are totally independent. We'll use this case for illustration in the manuscript 
+only.
+
+If CORRP = 1, features are net positively correlated but to varying degrees. 
+
+Need to sweep through:
+	1) CORRP = 1 iterations x 4 (DESIGN THESE MANUALLY)
+	2) perturbations (from 0.1 to 4) x 10
+	3) log_mean (from 2 to 6) x 5
+	4) replicate noise (from 0 to 1) x 6
+
+# --------------------------------------------------------------------------------------------------------
+#   EVALUATING JOBS (UPDATE THIS)
+# --------------------------------------------------------------------------------------------------------
+
 To run jobs (6/22/21):
 1) Run `pull_open_uuids.R` to enumerate jobs as:
    > Rscript pull_open_uuids.R --p=100 --corrp=0 --method=ALDEx2 --file=input

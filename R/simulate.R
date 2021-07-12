@@ -40,10 +40,9 @@ spike_in_ones <- function(counts) {
 #' "Morton", "Athanasiadou_ciona", "simulated"
 #' @param data_obj optional reference data set object; this takes precedence 
 #' over ref_data_name
-#' @param asymmetry proportion of baseline abundances to draw from condition 1
-#' @param proportion_da proportion of differentially abundant genes
-#' @param spike_in simulate a control feature with low dispersion across 
-#' conditions; this is indexed as the last feature
+#' @param replicate_noise optional deviation parameter associated with variation
+#' in replicate totals (a max of 1 is approx. an upper limit)
+#' @param proportion_da optional proportion of differentially abundant genes
 #' @return named list of true abundances, observed abundances, and group 
 #' assignments
 #' @import LaplacesDemon
@@ -52,9 +51,8 @@ simulate_sequence_counts <- function(n = 20,
                                      p = 100,
                                      ref_data_name = "simulated",
                                      data_obj = NULL,
-                                     asymmetry = 1,
-                                     proportion_da = 0.75,
-                                     spike_in = FALSE) {
+                                     replicate_noise = 0,
+                                     proportion_da = 0.75) {
   if(is.null(ref_data_name) & is.null(data_obj)) {
     stop("One of ref_data_name and ref_data must be specified!")
   }
@@ -66,8 +64,16 @@ simulate_sequence_counts <- function(n = 20,
   n_da <- round(p * proportion_da)
   n_not_da <- p - n_da
 
-  p1 <- round(asymmetry*p)
-  p2 <- p - p1
+  # Randomly select which condition to use as the baseline
+  if(rbinom(1, size = 1, prob = 0.5) == 1) {
+    # Base condition is #1
+    p1 <- p
+    p2 <- 0
+  } else {
+    # Base condition is #2
+    p1 <- 0
+    p2 <- p
+  }
   
   baseline_features1 <- sample(1:length(data_obj$cond1), size = p1, replace = TRUE)
   baseline_features2 <- sample(1:length(data_obj$cond2), size = p2, replace = TRUE)
@@ -86,19 +92,18 @@ simulate_sequence_counts <- function(n = 20,
   # Assign control vs. treatment groups
   groups <- c(rep(0, n), rep(1, n))
   
+  mu_scale <- sapply(rnorm(n*2, 1, replicate_noise), function(x) max(0.1, x))
   # Sample true counts (format: samples [rows] x genes [columns])
   abundances <- sapply(1:p, function(j) {
     counts <- rnbinom(n*2,
-                      mu = c(rep(all_params[j,1], n), rep(all_params[j,3], n)),
+                      mu = c(rep(all_params[j,1], n), rep(all_params[j,3], n))*mu_scale,
                       size = c(rep(all_params[j,2], n), rep(all_params[j,4], n)))
     counts
   })
 
-  if(spike_in) {
-    spike_in_mean <- mean(all_params[,1]) # mean baseline abundance
-    # Noisy
-    abundances <- cbind(abundances, rnbinom(n*2, mu = spike_in_mean, size = 100))
-  }
+  # Spike-in; not used
+  # spike_in_mean <- mean(all_params[,1]) # mean baseline abundance
+  # abundances <- cbind(abundances, rnbinom(n*2, mu = spike_in_mean, size = 100))
 
   # If there are any fully-zero taxa, spike-in a random 1-count in each 
   # condition. This is so these taxa don't get summarily filtered out by some of 
@@ -108,16 +113,14 @@ simulate_sequence_counts <- function(n = 20,
   
   realized_total_counts <- rowSums(abundances)
   
-  # These are relative counts
-  library_sizes.observed_counts1 <- sample(realized_total_counts)
+  # Arbitrarily choose an average sequencing depth
+  # A Poisson has awfully little variation relative to "real" data
+  # library_sizes.observed_counts1 <- rpois(n*2, runif(1, min = 5000, 2e06))
+  library_sizes.observed_counts1 <- rnbinom(n*2, mu = runif(1, min = 5000, 2e06), size = 100)
   
-  # These are counts with total abundances correlated with true abundances
-  library_sizes.observed_counts2 <- rnorm(n*2,
-                                          mean = realized_total_counts,
-                                          sd = sd(realized_total_counts))
-  library_sizes.observed_counts2 <- sapply(library_sizes.observed_counts2,
-                                           function(x) max(x, 1000))
-  library_sizes.observed_counts2 <- round(library_sizes.observed_counts2)
+  # Choose an average sequencing depth centered on the original
+  library_sizes.observed_counts2 <- c(rnbinom(n, mu = mean(realized_total_counts[1:n]), size = 10),
+                                      rnbinom(n, mu = mean(realized_total_counts[(n+1):(n*2)]), size = 10))
   
   # Transform to proportions (samples x features)
   sampled_proportions <- t(apply(abundances, 1, function(x) x/sum(x)))
@@ -130,8 +133,7 @@ simulate_sequence_counts <- function(n = 20,
   observed_counts1 <- spike_in_ones(observed_counts1)
   observed_counts2 <- spike_in_ones(observed_counts2)
   
-  return(list(spike_in = spike_in,
-              baseline_counts = baseline_counts,
+  return(list(baseline_counts = baseline_counts,
               treatment_counts = treatment_counts,
               abundances = abundances,
               observed_counts1 = observed_counts1,
