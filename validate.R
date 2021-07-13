@@ -10,7 +10,7 @@ option_list = list(
   make_option(c("--dataset"),
               type = "character",
               default = "Barlow",
-              help = "data set to use: Barlow, Morton, Athanasiadou_yeast, Athanadiadou_ciona, TCGA_ESCA",
+              help = "data set to use: Barlow, Morton, Athanasiadou_yeast, Athanasiadou_ciona, TCGA_ESCA",
               metavar = "character"),
   make_option(c("--baseline"),
               type = "character",
@@ -26,7 +26,7 @@ dataset_name <- opt$dataset
 use_baseline <- opt$baseline
 
 if(!(dataset_name %in% c("Barlow", "Morton", "Athanasiadou_yeast",
-                         "Athanadiadou_ciona", "TCGA_ESCA"))) {
+                         "Athanasiadou_ciona", "TCGA_ESCA"))) {
   stop(paste0("Invalid data set: ", dataset_name, "!\n"))
 }
 
@@ -208,7 +208,7 @@ for(use_result_type in c("tpr", "fpr")) {
                                  ".rds"))
 
     if(!file.exists(model_fn)) {
-      stop("Predictive model fit not found!")
+      stop(paste0("Predictive model fit not found: ", model_fn, "!\n"))
     }
     fit_obj <- readRDS(model_fn)
     

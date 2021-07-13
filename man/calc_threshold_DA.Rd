@@ -4,10 +4,16 @@
 \alias{calc_threshold_DA}
 \title{Threshold to generate calls on differentially abundant features}
 \usage{
-calc_threshold_DA(counts, nA = NULL)
+calc_threshold_DA(counts, fc_lower = 0.5, fc_upper = 1.5, nA = NULL)
 }
 \arguments{
 \item{counts}{abundance data set (samples x features)}
+
+\item{fc_lower}{a lower threshold on fold change; smaller than this and 
+observed change will be recorded as "differential"}
+
+\item{fc_upper}{an upper threshold on fold change; larger than this and
+observed change will be recorded as "differential"}
 
 \item{nA}{optional parameter specifying the number of samples in condition A}
 }
