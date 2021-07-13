@@ -20,7 +20,7 @@ option_list = list(
 opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
 
-allowed_methods <- c("ALDEx2", "DESeq2", "MAST", "NBGLM", "scran")
+allowed_methods <- c("ALDEx2", "DESeq2", "MAST", "scran")
 
 # ------------------------------------------------------------------------------
 #  Validate input
@@ -71,6 +71,9 @@ for(i in 1:nrow(wishlist)) {
   job <- wishlist[i,]
   data <- readRDS(file.path(output_dir, paste0(job$uuid, ".rds")))
   
+  # LEFT OFF HERE 7/13; NEED TO PARSE BASELINE CALLS FROM DATASETS DB TABLE
+  # FOR USE AS ORACLE!!!
+
   # Get baseline differential abundance calls
   if(job$baseline == "threshold") {
     # "Differential" features will be those with mean fold change in abundance of 
