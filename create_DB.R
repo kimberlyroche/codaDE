@@ -28,6 +28,9 @@ discard <- dbExecute(conn, paste0("CREATE TABLE datasets(",
 #                                   "FC_PARTIAL REAL, ",
 #                                   "TIMESTAMP VARCHAR(19))"))
 
+dbDisconnect(conn)
+quit()
+
 discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",
                                   "UUID VARCHAR(36),",
                                   "PARTIAL INTEGER,",
@@ -101,5 +104,3 @@ discard <- dbExecute(conn, paste0("CREATE TABLE results(",
                                   "RESULT_TYPE VARCHAR(24),",
                                   "RESULT REAL,",
                                   "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE, RESULT_TYPE));"))
-
-dbDisconnect(conn)

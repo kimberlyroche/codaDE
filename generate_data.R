@@ -105,9 +105,9 @@ for(i in 1:nrow(wishlist)) {
     concentration <- 1e6
   } else {
     # Partial correlation
-    base_correlation[1:half_p,1:half_p] <- rhos[corrp]
+    base_correlation[1:half_p,1:half_p] <- rhos[job$CORRP]
     diag(base_correlation) <- 1
-    concentration <- job$P + concentrations[corrp]
+    concentration <- job$P + concentrations[job$CORRP]
   }
   
   # Create reference distributions
