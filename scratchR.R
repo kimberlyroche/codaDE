@@ -53,6 +53,9 @@ i <- 5
 log_mean <- 2
 replicate_noise <- 1
 
+seq(from = 0.1, to = 4, length.out = 10)
+# 0.1, 0.2, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4
+
 # Create data set
 data_obj <- build_simulated_reference(p = p,
                                       log_mean = log_mean,

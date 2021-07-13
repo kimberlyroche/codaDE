@@ -10,10 +10,23 @@ discard <- dbExecute(conn, paste0("CREATE TABLE datasets(",
                                   "UUID VARCHAR(36) PRIMARY KEY, ",
                                   "P INTEGER, ",
                                   "CORRP INTEGER, ",
+                                  "LOG_MEAN REAL, ",
+                                  "PERTURBATION REAL, ",
+                                  "REP_NOISE REAL, ",
                                   "FC_ABSOLUTE REAL, ",
                                   "FC_RELATIVE REAL, ",
                                   "FC_PARTIAL REAL, ",
-                                  "TIMESTAMP VARCHAR(19))"))
+                                  "BASELINE_CALLS VARCHAR(100000))"))
+
+# Previous version
+# discard <- dbExecute(conn, paste0("CREATE TABLE datasets(",
+#                                   "UUID VARCHAR(36) PRIMARY KEY, ",
+#                                   "P INTEGER, ",
+#                                   "CORRP INTEGER, ",
+#                                   "FC_ABSOLUTE REAL, ",
+#                                   "FC_RELATIVE REAL, ",
+#                                   "FC_PARTIAL REAL, ",
+#                                   "TIMESTAMP VARCHAR(19))"))
 
 discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",
                                   "UUID VARCHAR(36),",

@@ -1,99 +1,141 @@
 source("path_fix.R")
 
-library(RSQLite)
-library(tidyverse)
 library(codaDE)
 library(uuid)
 library(optparse)
+library(readr)
+
+# e.g. input = input_100.txt
+#      output = res_100 (we'll append row numbers to this)
 
 option_list = list(
-  make_option(c("--p"), type = "numeric", default = 100,
-              help = "number of genes", metavar = "numeric"),
-  make_option(c("--corrp"), type = "numeric", default = 0,
-              help = "simulate net positively correlated features", metavar = "numeric"),
-  make_option(c("--iter_start"), type = "numeric", default = 1,
-              help = "index of first iteration", metavar = "numeric"),
-  make_option(c("--iter_end"), type = "numeric", default = 100,
-              help = "index of last iteration", metavar = "numeric")
+  make_option(c("--input"), type = "character", default = NULL,
+              help = "input filename", metavar = "character"),
+  make_option(c("--output"), type = "character", default = NULL,
+              help = "output filename", metavar = "character"),
+  make_option(c("--start"), type = "numeric", default = 1,
+              help = "start row index", metavar = "numeric"),
+  make_option(c("--end"), type = "numeric", default = Inf,
+              help = "end row index", metavar = "numeric")
 );
 
 opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
 
-p <- opt$p
-corrp <- opt$corrp
-iter_start <- opt$iter_start
-iter_end <- opt$iter_end
+# ------------------------------------------------------------------------------
+#   Validate input
+# ------------------------------------------------------------------------------
 
-if(iter_start < 1 | iter_start > iter_end | iter_end > 100) {
-  stop("Iteration start and end must be in range 1..100!\n")
+input <- opt$input
+output <- opt$output
+start <- opt$start
+end <- opt$end
+
+if(!file.exists(input)) {
+  stop("Input file not found!")
 }
+if(start < 1 | start > end) {
+  stop("Invalid start row!")
+}
+if(end < 1) {
+  stop("Invalid end row!")
+}
+
+n <- 10
+
+# These are parameters associated with simulated correlation between features
+rhos <- c(0.15, 0.3, 0.45, 0.6)
+concentrations <- c(50, 40, 30, 20)
+output_fn <- file.path("temp", paste0(output, "_", start, "-", end, ".tsv"))
+
+if(!file.exists("temp")) {
+  suppressWarnings(dir.create("temp"))
+}
+
+# Initialize output
+output_file <- file(output_fn)
+writeLines(paste0(c("UUID",
+                    "P",
+                    "CORRP",
+                    "LOG_MEAN",
+                    "PERTURBATION",
+                    "REP_NOISE",
+                    "FC_ABSOLUTE",
+                    "FC_RELATIVE",
+                    "FC_PARTIAL",
+                    "BASELINE_CALLS"), collapse = "\t"),
+           output_file)
+close(output_file)
+
+# ------------------------------------------------------------------------------
+#   Functions
+# ------------------------------------------------------------------------------
 
 calc_fc <- function(M) {
   counts_A <- M[1:(nrow(M)/2),]
   counts_B <- M[(nrow(M)/2+1):nrow(M),]
   m1 <- mean(rowSums(counts_A))
   m2 <- mean(rowSums(counts_B))
-  max(c(m1, m2)) / min(c(m1, m2))
-}
-
-calc_fc <- function(M) {
-  counts_A <- M[1:(nrow(M)/2),]
-  counts_B <- M[(nrow(M)/2+1):nrow(M),]
-  m1 <- mean(rowSums(counts_A))
-  m2 <- mean(rowSums(counts_B))
-  max(c(m1, m2)) / min(c(m1, m2))
+  m2 / m1
+  # max(c(m1, m2)) / min(c(m1, m2))
 }
 
 # ------------------------------------------------------------------------------
-#   Simulate (and save) data set
+#   Generate data sets
 # ------------------------------------------------------------------------------
 
-# Set up simulation parameters
-if(corrp == 1) {
-  # Generate roughly 50% positively correlated features. Remaining features will
-  # be random (and roughly symmetrical) in their +/- correlation.
-  half_p <- round(p/2)
-  base_correlation <- matrix(0, p, p)
-  base_correlation[1:half_p,1:half_p] <- 0.8
-  diag(base_correlation) <- 1
-  concentration <- p + 10
-} else {
-  base_correlation <- diag(p)
-  concentration <- 1e6
-}
+# Read chunk to make wishlist
+wishlist <- read.table(input)
+start <- min(start, nrow(wishlist))
+end <- min(end, nrow(wishlist))
+wishlist <- wishlist[start:end,]
 
-n <- 10 # replicate number
-asymmetry <- 1
-proportion_da <- 0.75
-spike_in <- FALSE
-
-conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
-# Increase the "busy" timeout; default is too short
-discard <- dbExecute(conn, "PRAGMA busy_timeout = 60000;")
-
-perturbations <- seq(from = 0.1, to = 4, length.out = 100)
-for(i in iter_start:iter_end) {
-  cat(paste0("Iteration ", i, " / ", iter_end, "\n"))
-  uuid <- UUIDgenerate()
+for(i in 1:nrow(wishlist)) {
+  cat(paste0("Processing job ", i, " / ", nrow(wishlist), "\n"))
   
-  # Create data set
-  data_obj <- build_simulated_reference(p = p,
-                                        log_mean = 1,
-                                        log_noise_var = perturbations[i],
+  # Parse data set
+  job <- wishlist[i,]
+  
+  half_p <- round(job$P/2) # need this repeatedly for later calculations
+  
+  base_correlation <- matrix(0, job$P, job$P)
+  if(job$CORRP == 0) {
+    # Independent features
+    base_correlation <- diag(job$P)
+    concentration <- 1e6
+  } else {
+    # Partial correlation
+    base_correlation[1:half_p,1:half_p] <- rhos[corrp]
+    diag(base_correlation) <- 1
+    concentration <- job$P + concentrations[corrp]
+  }
+  
+  # Create reference distributions
+  data_obj <- build_simulated_reference(p = job$P,
+                                        log_mean = job$LOG_MEAN,
+                                        log_noise_var = job$PERTURBATION,
                                         base_correlation = base_correlation,
                                         concentration = concentration)
+  
+  # Sample from these to create the data set
   sim_data <- simulate_sequence_counts(n = n,
-                                       p = p,
+                                       p = job$P,
                                        data_obj = data_obj,
-                                       asymmetry = asymmetry,
-                                       proportion_da = proportion_da,
-                                       spike_in = spike_in)
+                                       replicate_noise = job$REP_NOISE)
+  
+  # Visualize via
+  # plot_stacked_bars(sim_data$abundances)
 
-  prop_de <- sum(calc_threshold_DA(sim_data$abundances) == 0) / ncol(sim_data$abundances)
+  # Generate an ID for this data set
+  uuid <- UUIDgenerate()
+  
   fc_abs <- calc_fc(sim_data$abundances)
   fc_rel <- calc_fc(sim_data$observed_counts1)
   fc_par <- calc_fc(sim_data$observed_counts2)
+  
+  calls <- call_DA_NB(sim_data$abundances, sim_data$groups)$pval
+  # baseline_calls <- ifelse(calls < 0.05, 0, 1)
+  # baseline_calls_mtc <- ifelse(calls < 0.05/p, 0, 1)
   
   # Save it to "datasets" folder
   output_dir <- file.path("output", "datasets")
@@ -102,20 +144,20 @@ for(i in iter_start:iter_end) {
                simulation = sim_data),
           file = file.path(output_dir, paste0(uuid, ".rds")))
   
-  # ------------------------------------------------------------------------------
-  #   Add data set to DB
-  # ------------------------------------------------------------------------------
-  res <- dbExecute(conn, paste0("INSERT into datasets(UUID,P,CORRP,FC_ABSOLUTE,FC_RELATIVE,FC_PARTIAL,PERCENT_DIFF,TIMESTAMP) ",
-                                "VALUES(",
-                                "'",uuid,"',",
-                                p,",",
-                                as.integer(corrp),",",
-                                fc_abs,",",
-                                fc_rel,",",
-                                fc_par,",",
-                                prop_de,",",
-                                "'",get_timestamp(),"'",
-                                ")"))
+  # Add to output file
+  write_delim(data.frame(UUID = uuid,
+                         P = job$P,
+                         CORRP = job$CORRP,
+                         LOG_MEAN = job$LOG_MEAN,
+                         PERTURBATION = job$PERTURBATION,
+                         REP_NOISE = job$REP_NOISE,
+                         FC_ABSOLUTE = fc_abs,
+                         FC_RELATIVE = fc_rel,
+                         FC_PARTIAL = fc_par,
+                         BASELINE_CALLS = paste0(round(calls, 10), collapse = ";")),
+              output_fn,
+              delim = "\t",
+              append = TRUE)
+  
 }
-# dbGetQuery(conn, "SELECT * FROM datasets")
-dbDisconnect(conn)
+

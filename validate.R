@@ -237,9 +237,9 @@ for(use_result_type in c("tpr", "fpr")) {
     
     # oracle_calls <- calc_threshold_DA(ref_data,
     #                                   nA = sum(groups == groups[1]))
-    # oracle_calls <- DE_by_DESeq2(new_ref, data, groups, oracle_calls = NULL)$oracle_calls$pval
+    # oracle_calls <- DA_by_DESeq2(new_ref, data, groups, oracle_calls = NULL)$oracle_calls$pval
     oracle_calls <- NULL
-    DE_calls <- DE_by_MAST(new_ref, data, groups, oracle_calls = oracle_calls)
+    DE_calls <- DA_by_MAST(new_ref, data, groups, oracle_calls = oracle_calls)
     if(!is.null(oracle_calls)) {
       oracle <- ifelse(oracle_calls < 0.05, 0, 1)
     } else {

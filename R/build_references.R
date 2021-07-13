@@ -29,7 +29,7 @@ build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 4,
   # K <- cov2cor(rinvwishart(1, concentration, base_correlation*concentration)[,,1])
   
   # From CholWishart package; faster
-  K <- cov2cor(rInvWishart(1, concentration, base_correlation*concentration)[,,1])
+  K <- cov2cor(CholWishart::rInvWishart(1, concentration, base_correlation*concentration)[,,1])
   
   # Add randomness to log perturbation size
   log_counts1 <- rnorm(p, rep(log_mean, p), sqrt(log_var))
