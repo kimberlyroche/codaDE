@@ -1,9 +1,42 @@
+# --------------------------------------------------------------------------------------------------------
+#   GENERATING DATA
+# --------------------------------------------------------------------------------------------------------
+
+1) `generate_settings.R --p=XXX` should first be run to find missing datasets/parameterizations. This
+script sweeps through:
+	- CORRP = 0 (no correlation), 1, 2, 3, 4 (increasing correlation of features)
+	- LOG_MEAN = 2, 3, 4, 5, 6
+	- PERTURBATION = (0.1, 0.2, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4)
+	- REP_NOISE = 0, 0.2, 0.4, 0.6, 0.8, 1
+
+If CORRP = 0, features are totally independent. We'll use this case for illustration in the manuscript 
+only. If CORRP = 1, features are net positively correlated but to varying degrees. 
+
+2) Run `batch_eval.pl`, setting P and TOTAL JOB NUMBER in the script.
+   This will put the results in the `temp` folder
+
+	This calls `generate_data.R --input=XXX --output=XXX --start=XXX --end=XXX`, which generates the new 
+	data sets in chunks and makes baseline differential abundance calls on the absolute values, writing
+	results to a file tagged with row numbers.
+
+3) `store_gen_results.R` is the analog of `store_eval_results.R` below.
+
+# --------------------------------------------------------------------------------------------------------
+#   CHARACTERIZING DATA SETS
+# --------------------------------------------------------------------------------------------------------
+
+Put reference DA calling here
+
+# --------------------------------------------------------------------------------------------------------
+#   EVALUATING JOBS (UPDATE THIS)
+# --------------------------------------------------------------------------------------------------------
+
 To run jobs (6/22/21):
 1) Run `pull_open_uuids.R` to enumerate jobs as:
    > Rscript pull_open_uuids.R --p=100 --corrp=0 --method=ALDEx2 --file=input
 2) Run `batch_eval.pl`, setting P, CORRP, METHOD, and TOTAL JOB NUMBER in the script
    This will put the results in the `temp` folder
-3) Run `pull_result_into_db.R`
+3) Run `store_eval_results.R`
    This will add ANY results in all files in the `temp` directory to the DB
 
 We need to run this workflow 30x for:

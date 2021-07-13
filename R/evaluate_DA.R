@@ -271,7 +271,7 @@ call_DA_scran <- function(data, groups) {
 #' @return baseline (true) differential abundance calls and calls made on 
 #' relative abundances
 #' @export
-DE_by_NB <- function(ref_data, data, groups, oracle_calls = NULL) {
+DA_by_NB <- function(ref_data, data, groups, oracle_calls = NULL) {
   if(is.null(oracle_calls)) {
     oracle_calls <- call_DA_NB(ref_data, groups)
   }
@@ -288,7 +288,7 @@ DE_by_NB <- function(ref_data, data, groups, oracle_calls = NULL) {
 #' @return baseline (true) differential abundance calls and calls made on 
 #' relative abundances
 #' @export
-DE_by_DESeq2 <- function(ref_data, data, groups, oracle_calls = NULL) {
+DA_by_DESeq2 <- function(ref_data, data, groups, oracle_calls = NULL) {
   if(is.null(oracle_calls)) {
     oracle_calls <- call_DA_DESeq2(ref_data, groups)
   }
@@ -305,7 +305,7 @@ DE_by_DESeq2 <- function(ref_data, data, groups, oracle_calls = NULL) {
 #' @return baseline (true) differential abundance calls and calls made on 
 #' relative abundances
 #' @export
-DE_by_MAST <- function(ref_data, data, groups, oracle_calls = NULL) {
+DA_by_MAST <- function(ref_data, data, groups, oracle_calls = NULL) {
   if(is.null(oracle_calls)) {
     oracle_calls <- call_DA_MAST(ref_data, groups)
   }
@@ -322,7 +322,7 @@ DE_by_MAST <- function(ref_data, data, groups, oracle_calls = NULL) {
 #' @return baseline (true) differential abundance calls and calls made on 
 #' relative abundances
 #' @export
-DE_by_ALDEx2 <- function(ref_data, data, groups, oracle_calls = NULL) {
+DA_by_ALDEx2 <- function(ref_data, data, groups, oracle_calls = NULL) {
   if(is.null(oracle_calls)) {
     oracle_calls <- call_DA_ALDEx2(ref_data, groups)
   }
@@ -339,7 +339,7 @@ DE_by_ALDEx2 <- function(ref_data, data, groups, oracle_calls = NULL) {
 #' @return baseline (true) differential abundance calls and calls made on 
 #' relative abundances
 #' @export
-DE_by_scran <- function(ref_data, data, groups, oracle_calls = NULL) {
+DA_by_scran <- function(ref_data, data, groups, oracle_calls = NULL) {
   if(is.null(oracle_calls)) {
     oracle_calls <- call_DA_scran(ref_data, groups)
   }
@@ -361,28 +361,28 @@ DE_by_scran <- function(ref_data, data, groups, oracle_calls = NULL) {
 calc_DE_discrepancy <- function(ref_data, data, groups, method = "NBGLM",
                                 oracle_calls = NULL) {
   if(method == "NBGLM") {
-    DE_calls <- DE_by_NB(ref_data, data, groups, oracle_calls = oracle_calls)
+    DE_calls <- DA_by_NB(ref_data, data, groups, oracle_calls = oracle_calls)
     if(is.null(oracle_calls)) {
       oracle_calls <- DE_calls$oracle_calls$pval
     }
     calls <- DE_calls$calls$pval
   }
   if(method == "DESeq2") {
-    DE_calls <- DE_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls)
+    DE_calls <- DA_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls)
     if(is.null(oracle_calls)) {
       oracle_calls <- DE_calls$oracle_calls$pval
     }
     calls <- DE_calls$calls$pval
   }
   if(method == "MAST") {
-    DE_calls <- DE_by_MAST(ref_data, data, groups, oracle_calls = oracle_calls)
+    DE_calls <- DA_by_MAST(ref_data, data, groups, oracle_calls = oracle_calls)
     if(is.null(oracle_calls)) {
       oracle_calls <- DE_calls$oracle_calls$pval
     }
     calls <- DE_calls$calls$pval
   }
   if(method == "ALDEx2") {
-    DE_calls <- DE_by_ALDEx2(ref_data, data, groups,
+    DE_calls <- DA_by_ALDEx2(ref_data, data, groups,
                              oracle_calls = oracle_calls)
     if(is.null(oracle_calls)) {
       oracle_calls <- DE_calls$oracle_calls$pval
@@ -390,7 +390,7 @@ calc_DE_discrepancy <- function(ref_data, data, groups, method = "NBGLM",
     calls <- DE_calls$calls$pval
   }
   if(method == "scran") {
-    DE_calls <- DE_by_scran(ref_data, data, groups, oracle_calls = oracle_calls)
+    DE_calls <- DA_by_scran(ref_data, data, groups, oracle_calls = oracle_calls)
     if(is.null(oracle_calls)) {
       oracle_calls <- DE_calls$oracle_calls$pval
     }

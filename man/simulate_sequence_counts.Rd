@@ -9,9 +9,8 @@ simulate_sequence_counts(
   p = 100,
   ref_data_name = "simulated",
   data_obj = NULL,
-  asymmetry = 1,
-  proportion_da = 0.75,
-  spike_in = FALSE
+  replicate_noise = 0,
+  proportion_da = 0.75
 )
 }
 \arguments{
@@ -25,12 +24,10 @@ simulate_sequence_counts(
 \item{data_obj}{optional reference data set object; this takes precedence 
 over ref_data_name}
 
-\item{asymmetry}{proportion of baseline abundances to draw from condition 1}
+\item{replicate_noise}{optional deviation parameter associated with variation
+in replicate totals (a max of 1 is approx. an upper limit)}
 
-\item{proportion_da}{proportion of differentially abundant genes}
-
-\item{spike_in}{simulate a control feature with low dispersion across 
-conditions; this is indexed as the last feature}
+\item{proportion_da}{optional proportion of differentially abundant genes}
 }
 \value{
 named list of true abundances, observed abundances, and group 

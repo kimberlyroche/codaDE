@@ -39,6 +39,25 @@ for(DE_method in use_methods) {
 
   for(use_baseline in c("self", "threshold")) {
     for(use_result_type in c("tpr", "fpr")) {
+      # Save fitted model -- already done by fit_predictive_model()
+      # base_path <- c("output",
+      #                "images",
+      #                paste0(model, "_results"),
+      #                ifelse(together, "all", DE_method))
+      # for(i in 1:length(base_path)) {
+      #   suppressWarnings(dir.create(do.call(file.path, as.list(base_path[1:i]))))
+      # }
+      # model_fn <- file.path(do.call(file.path, as.list(base_path)),
+      #                       paste0(model,
+      #                              "_",
+      #                              ifelse(together, "all", DE_method),
+      #                              "_",
+      #                              use_result_type,
+      #                              "_",
+      #                              use_baseline,
+      #                              ".rds"))
+      # saveRDS(fit_obj$fitted_model[[use_baseline]][[use_result_type]], model_fn)
+      
       test_response <- fit_obj$predictions[[use_baseline]][[use_result_type]]$true
       prediction <- fit_obj$predictions[[use_baseline]][[use_result_type]]$predicted
       p_labels <- fit_obj$predictions[[use_baseline]][[use_result_type]]$p_labels
