@@ -46,7 +46,7 @@ n <- 10
 # These are parameters associated with simulated correlation between features
 rhos <- c(0.15, 0.3, 0.45, 0.6)
 concentrations <- c(50, 40, 30, 20)
-output_fn <- file.path("temp", paste0(output, "_", start, "-", end, ".tsv"))
+output_fn <- file.path("temp", paste0(output, "_", start, "-", end, ".txt"))
 
 if(!file.exists("temp")) {
   suppressWarnings(dir.create("temp"))
