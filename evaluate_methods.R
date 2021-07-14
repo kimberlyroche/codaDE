@@ -81,24 +81,35 @@ for(i in 1:nrow(wishlist)) {
   }
 
   if(job$partial_info == 0) {
-    rates <- calc_DA_discrepancy(data$simulation$abundances,
-                                 data$simulation$observed_counts1,
-                                 data$simulation$groups,
-                                 method = job$method,
-                                 oracle_calls = oracle_calls)
+    all_calls <- DA_wrapper(data$simulation$abundances,
+                            data$simulation$observed_counts1,
+                            data$simulation$groups,
+                            method = job$method,
+                            oracle_calls = oracle_calls)
   } else if(job$partial_info == 1) {
-    rates <- calc_DA_discrepancy(data$simulation$abundances,
-                                 data$simulation$observed_counts2,
-                                 data$simulation$groups,
-                                 method = job$method,
-                                 oracle_calls = oracle_calls)
-  } 
-
-  if(is.null(results)) {
-    results <- cbind(job, method = method, tpr = rates$tpr, fpr = rates$fpr)
+    all_calls <- DA_wrapper(data$simulation$abundances,
+                            data$simulation$observed_counts2,
+                            data$simulation$groups,
+                            method = job$method,
+                            oracle_calls = oracle_calls)
+  }
+  
+  if(job$baseline == "oracle") {
+    # The baseline calls are already present in the datasets table. In the interest of not
+    # keeping multiple copies of these - which could get out of sync - we'll force ourselves
+    # to refer back to the datasets table to find the oracle calls.
+    results_row <- cbind(job, baseline_calls = NA,
+                         calls = paste0(round(all_calls$calls, 10), collapse = ";"))
   } else {
-    results <- rbind(results,
-      cbind(job, method = method, tpr = rates$tpr, fpr = rates$fpr))
+    results_row <- cbind(job,
+                         baseline_calls = paste0(round(all_calls$oracle_calls, 10), collapse = ";"),
+                         calls = paste0(round(all_calls$calls, 10), collapse = ";"))
+  }
+  
+  if(is.null(results)) {
+    results <- results_row
+  } else {
+    results <- rbind(results, results_row)
   }
 }
 

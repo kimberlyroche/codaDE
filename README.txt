@@ -22,33 +22,25 @@ only. If CORRP = 1, features are net positively correlated but to varying degree
 3) `store_gen_results.R` is the analog of `store_eval_results.R` below.
 
 # --------------------------------------------------------------------------------------------------------
-#   CHARACTERIZING DATA SETS
-# --------------------------------------------------------------------------------------------------------
-
-TBD
-
-# --------------------------------------------------------------------------------------------------------
 #   EVALUATING JOBS (UPDATE THIS)
 # --------------------------------------------------------------------------------------------------------
 
 To run jobs (6/22/21):
 
 1) Run `pull_open_uuids.R` to enumerate jobs as:
-   > Rscript pull_open_uuids.R --p=100 --method=ALDEx2 --file=input
+   > Rscript pull_open_uuids.R --p=100 --file=input
 
-2) Run `batch_eval.pl`, setting P, CORRP, METHOD, and TOTAL JOB NUMBER in the script
-   This will put the results in the `temp` folder
+2) Run `batch_eval.pl`, setting P and JOB START and END LINE NUBMERS in the script.
+   This will put the results in the `temp` folder.
 
 3) Run `store_eval_results.R`
    This will add ANY results in all files in the `temp` directory to the DB
 
-We need to run this workflow 30x for:
-  P = 100 / 1000 / 5000
-  CORRP = 0 / 1
-  METHOD = ALDEx2 / DESeq2 / MAST / NBGLM / scran
+# --------------------------------------------------------------------------------------------------------
+#   CHARACTERIZING DATA SETS
+# --------------------------------------------------------------------------------------------------------
 
-EACH of these runs will produce 800 DB entries:
-  100 data sets x PARTIAL INFO (0 / 1) x BASELINE (threshold / self) x RESULT_TYPE (tpr / fpr)
+TBD
 
 # --------------------------------------------------------------------------------------------------------
 #   OLDER SETUP STUFF

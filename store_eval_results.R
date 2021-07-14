@@ -26,21 +26,14 @@ for(file in file_list) {
   results <- read.table(file.path(dir, file))
   for(i in 1:nrow(results)) {
     job <- results[i,]
-    if(!any(is.na(job))) {
-      insertions <- insertions + dbExecute(conn, paste0("INSERT OR IGNORE INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE, RESULT_TYPE, RESULT) VALUES (",
+    if(!any(is.na(job %>% select(-baseline_calls)))) {
+      insertions <- insertions + dbExecute(conn, paste0("INSERT OR IGNORE INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, BASELINE_CALLS, CALLS) VALUES (",
                                                         "'",job$uuid,"', ",
                                                         "'",job$method,"', ",
                                                         job$partial_info,", ",
                                                         "'",job$baseline,"', ",
-                                                        "'tpr', ",
-                                                        job$tpr,")"))
-      insertions <- insertions + dbExecute(conn, paste0("INSERT OR IGNORE INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE, RESULT_TYPE, RESULT) VALUES (",
-                                                        "'",job$uuid,"', ",
-                                                        "'",job$method,"', ",
-                                                        job$partial_info,", ",
-                                                        "'",job$baseline,"', ",
-                                                        "'fpr', ",
-                                                        job$fpr,")"))
+                                                        ifelse(is.na(job$baseline_calls), "NULL, ", paste0("'", job$baseline_calls,"', ")),
+                                                        "'",job$calls,"')"))
     }
   }
   cat(paste0("Succeeded on ", insertions, " rows\n"))
