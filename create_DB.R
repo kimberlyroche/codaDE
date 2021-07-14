@@ -6,27 +6,26 @@ library(RSQLite)
 # Create DB (if doesn't exist?)
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
-discard <- dbExecute(conn, paste0("CREATE TABLE datasets(",
-                                  "UUID VARCHAR(36) PRIMARY KEY, ",
-                                  "P INTEGER, ",
-                                  "CORRP INTEGER, ",
-                                  "LOG_MEAN REAL, ",
-                                  "PERTURBATION REAL, ",
-                                  "REP_NOISE REAL, ",
-                                  "FC_ABSOLUTE REAL, ",
-                                  "FC_RELATIVE REAL, ",
-                                  "FC_PARTIAL REAL, ",
-                                  "BASELINE_CALLS VARCHAR(100000))"))
-
-# Previous version
 # discard <- dbExecute(conn, paste0("CREATE TABLE datasets(",
 #                                   "UUID VARCHAR(36) PRIMARY KEY, ",
 #                                   "P INTEGER, ",
 #                                   "CORRP INTEGER, ",
+#                                   "LOG_MEAN REAL, ",
+#                                   "PERTURBATION REAL, ",
+#                                   "REP_NOISE REAL, ",
 #                                   "FC_ABSOLUTE REAL, ",
 #                                   "FC_RELATIVE REAL, ",
 #                                   "FC_PARTIAL REAL, ",
-#                                   "TIMESTAMP VARCHAR(19))"))
+#                                   "BASELINE_CALLS VARCHAR(100000))"))
+
+# discard <- dbExecute(conn, paste0("CREATE TABLE results(",
+#                                   "UUID VARCHAR(36),",
+#                                   "METHOD VARCHAR(64),",
+#                                   "PARTIAL_INFO INT,",
+#                                   "BASELINE_TYPE VARCHAR(16),",
+#                                   "BASELINE_CALLS VARCHAR(100000),",
+#                                   "CALLS VARCHAR(100000),",
+#                                   "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE));"))
 
 dbDisconnect(conn)
 quit()
@@ -95,12 +94,3 @@ discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",
                                   "FW_CLR_PFC1_D REAL,",
                                   "FW_CLR_PFC2_D REAL,",
                                   "PRIMARY KEY(UUID, PARTIAL));"))
-
-discard <- dbExecute(conn, paste0("CREATE TABLE results(",
-                                  "UUID VARCHAR(36),",
-                                  "METHOD VARCHAR(64),",
-                                  "PARTIAL_INFO INT,",
-                                  "BASELINE VARCHAR(64),",
-                                  "RESULT_TYPE VARCHAR(24),",
-                                  "RESULT REAL,",
-                                  "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE, RESULT_TYPE));"))

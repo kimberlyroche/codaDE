@@ -22,7 +22,7 @@ my $j = min($i + $chunk_sz - 1, $end);
 while($i <= $end) {
   open(my $fh, '>', $filename);
   print $fh '#!/bin/bash'."\n";
-  print $fh '#SBATCH -J eval_'.$start.'-'.$end."\n";
+  print $fh '#SBATCH -J eval_'.$i.'-'.$j."\n";
   print $fh '#SBATCH --mem=16GB'."\n";
   print $fh '#SBATCH --get-user-env'."\n";
   print $fh '#SBATCH --time=2:00:00'."\n";
@@ -39,7 +39,7 @@ while($i <= $end) {
 
   my $call_str = "sbatch $filename";
   print("Calling: ".$call_str."\n");
-  `$call_str`;
+  #`$call_str`;
 
   # the world's laziest delay
   my $lazy = 0;
