@@ -80,13 +80,13 @@ for(i in 1:nrow(wishlist)) {
   }
 
   if(job$partial_info == 0) {
-    rates <- calc_DE_discrepancy(data$simulation$abundances,
+    rates <- calc_DA_discrepancy(data$simulation$abundances,
                                  data$simulation$observed_counts1,
                                  data$simulation$groups,
                                  method = method,
                                  oracle_calls = oracle_calls)
   } else if(job$partial_info == 1) {
-    rates <- calc_DE_discrepancy(data$simulation$abundances,
+    rates <- calc_DA_discrepancy(data$simulation$abundances,
                                  data$simulation$observed_counts2,
                                  data$simulation$groups,
                                  method = method,

@@ -358,7 +358,7 @@ DA_by_scran <- function(ref_data, data, groups, oracle_calls = NULL) {
 #' @return named list of true positive rate, false positive rate, and baseline
 #' (true) differential expression calls
 #' @export
-calc_DE_discrepancy <- function(ref_data, data, groups, method = "NBGLM",
+calc_DA_discrepancy <- function(ref_data, data, groups, method = "NBGLM",
                                 oracle_calls = NULL) {
   if(method == "NBGLM") {
     DE_calls <- DA_by_NB(ref_data, data, groups, oracle_calls = oracle_calls)

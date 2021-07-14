@@ -187,7 +187,7 @@ for(use_result_type in c("tpr", "fpr")) {
       oracle_calls <- NULL
     }
     
-    rates <- calc_DE_discrepancy(ref_data,
+    rates <- calc_DA_discrepancy(ref_data,
                                  data,
                                  groups,
                                  method = DE_method,
