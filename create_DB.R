@@ -18,14 +18,14 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 #                                   "FC_PARTIAL REAL, ",
 #                                   "BASELINE_CALLS VARCHAR(100000))"))
 
-discard <- dbExecute(conn, paste0("CREATE TABLE results(",
-                                  "UUID VARCHAR(36),",
-                                  "METHOD VARCHAR(64),",
-                                  "PARTIAL_INFO INT,",
-                                  "BASELINE_TYPE VARCHAR(16),",
-                                  "BASELINE_CALLS VARCHAR(100000),",
-                                  "CALLS VARCHAR(100000),",
-                                  "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE));"))
+# discard <- dbExecute(conn, paste0("CREATE TABLE results(",
+#                                   "UUID VARCHAR(36),",
+#                                   "METHOD VARCHAR(64),",
+#                                   "PARTIAL_INFO INT,",
+#                                   "BASELINE_TYPE VARCHAR(16),",
+#                                   "BASELINE_CALLS VARCHAR(100000),",
+#                                   "CALLS VARCHAR(100000),",
+#                                   "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE));"))
 
 dbDisconnect(conn)
 quit()

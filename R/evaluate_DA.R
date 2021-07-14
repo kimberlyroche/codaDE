@@ -347,18 +347,17 @@ DA_by_scran <- function(ref_data, data, groups, oracle_calls = NULL) {
   return(list(oracle_calls = oracle_calls, calls = calls))
 }
 
-#' Calculates the discrepancy between differential abundance calls made on
-#' absolute and relative abundances
+#' Wrapper function for differential abundance calling
 #'
 #' @param ref_data absolute abundance data set (samples x features)
 #' @param data relative abundance data set (samples x features)
 #' @param groups group (cohort) labels
 #' @param method differential abundance calling method (e.g. "DESeq2")
 #' @param oracle_calls optional baseline (true) differential abundance calls
-#' @return named list of true positive rate, false positive rate, and baseline
-#' (true) differential expression calls
+#' @return named list of baseline (true) differential abundance calls and
+#' calls made on relative abundances (the observed data)
 #' @export
-calc_DA_discrepancy <- function(ref_data, data, groups, method = "NBGLM",
+DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
                                 oracle_calls = NULL) {
   if(method == "NBGLM") {
     DE_calls <- DA_by_NB(ref_data, data, groups, oracle_calls = oracle_calls)
@@ -396,17 +395,44 @@ calc_DA_discrepancy <- function(ref_data, data, groups, method = "NBGLM",
     }
     calls <- DE_calls$calls$pval
   }
-  
+    
+  return(list(calls = calls, oracle_calls = oracle_calls))
+}
+
+#' Calculates the discrepancy between differential abundance calls made on
+#' absolute and relative abundances
+#'
+#' @param calls calls (p-value vector) made on relative abundances (the observed 
+#' data)
+#' @param oracle_calls calls (p-value vector) made on the absolute abundances
+#' @return named list of true positive rate, false positive rate with and
+#' without multiple test correction
+#' @export
+calc_DA_discrepancy <- function(calls, oracle_calls) {
   de <- calls < 0.05
   sim_de <- oracle_calls < 0.05
   
   TP <- sum(de & sim_de)
   FP <- sum(de & !sim_de)
-  
   TN <- sum(!de & !sim_de)
   FN <- sum(!de & sim_de)
+  tpr_unadjusted <- TP/(TP+FN)
+  fpr_unadjusted <- FP/(FP+TN)
+
+  de <- p.adjust(calls) < 0.05
+  sim_de <- p.adjust(oracle_calls) < 0.05
   
-  return(list(tpr = TP/(TP+FN), fpr = FP/(FP+TN), oracle_calls = oracle_calls))
+  TP <- sum(de & sim_de)
+  FP <- sum(de & !sim_de)
+  TN <- sum(!de & !sim_de)
+  FN <- sum(!de & sim_de)
+  tpr_adjusted <- TP/(TP+FN)
+  fpr_adjusted <- FP/(FP+TN)
+  
+  return(list(tpr_unadjusted = tpr_unadjusted,
+              fpr_unadjusted = fpr_unadjusted,
+              tpr_adjusted = tpr_adjusted,
+              fpr_adjusted = fpr_adjusted))
 }
 
 #' Threshold to generate calls on differentially abundant features

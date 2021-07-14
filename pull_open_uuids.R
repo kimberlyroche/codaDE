@@ -35,12 +35,12 @@ for(u in 1:length(all_uuids)) {
                                  "WHERE UUID = '",uuid,"' AND ",
                                  "CALLS IS NOT NULL;"))
   # There are 16 combos of fit we want for each dataset
-  #   1) 'self' or 'threshold' as differential abundance reference
+  #   1) 'self' or 'oracle' as differential abundance reference
   #   2) partial info = 0 or 1
   #   3) method = ALDEx2, DESeq2, MAST, scran
   #
   # Look for any missing combos and add them to the wishlist
-  for(ref in c("self", "threshold")) {
+  for(ref in c("self", "oracle")) {
     for(par in c(0, 1)) {
       for(method in c("ALDEx2", "DESeq2", "MAST", "scran")) {
         if(res %>% filter(BASELINE_TYPE == ref & PARTIAL_INFO == par & METHOD == method) %>% count() %>% pull(n) == 0) {
