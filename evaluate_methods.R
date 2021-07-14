@@ -5,8 +5,6 @@ library(codaDE)
 library(optparse)
 
 option_list = list(
-  make_option(c("--method"), type = "character", default = NULL,
-              help = "differential abundance method", metavar = "character"),
   make_option(c("--input"), type = "character", default = NULL,
               help = "input filename", metavar = "character"),
   make_option(c("--output"), type = "character", default = NULL,
@@ -19,8 +17,6 @@ option_list = list(
 
 opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
-
-allowed_methods <- c("ALDEx2", "DESeq2", "MAST", "scran")
 
 # ------------------------------------------------------------------------------
 #  Validate input
