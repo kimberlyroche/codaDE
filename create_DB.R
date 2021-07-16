@@ -27,9 +27,6 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 #                                   "CALLS VARCHAR(100000),",
 #                                   "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE));"))
 
-dbDisconnect(conn)
-quit()
-
 discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",
                                   "UUID VARCHAR(36),",
                                   "PARTIAL INTEGER,",
@@ -94,3 +91,6 @@ discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",
                                   "FW_CLR_PFC1_D REAL,",
                                   "FW_CLR_PFC2_D REAL,",
                                   "PRIMARY KEY(UUID, PARTIAL));"))
+
+dbDisconnect(conn)
+quit()

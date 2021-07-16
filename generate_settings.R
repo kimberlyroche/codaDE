@@ -63,6 +63,6 @@ for(corrp in corrp_sweep) {
   }
 }
 
-write.table(settings, file = paste0("input_", p, ".txt"), sep = "\t")
+write.table(settings, file = paste0("input_gen_", p, ".txt"), sep = "\t")
 
 dbDisconnect(conn)

@@ -12,7 +12,7 @@ script sweeps through:
 If CORRP = 0, features are totally independent. We'll use this case for illustration in the manuscript 
 only. If CORRP = 1, features are net positively correlated but to varying degrees. 
 
-2) Run `batch_eval.pl`, setting P and TOTAL JOB NUMBER in the script.
+2) Run `batch_gen.pl`, setting P and TOTAL JOB NUMBER in the script.
    This will put the results in the `temp` folder
 
 	This calls `generate_data.R --input=XXX --output=XXX --start=XXX --end=XXX`, which generates the new 
@@ -22,25 +22,30 @@ only. If CORRP = 1, features are net positively correlated but to varying degree
 3) `store_gen_results.R` is the analog of `store_eval_results.R` below.
 
 # --------------------------------------------------------------------------------------------------------
-#   EVALUATING JOBS (UPDATE THIS)
+#   EVALUATING JOBS
 # --------------------------------------------------------------------------------------------------------
 
-To run jobs (6/22/21):
-
-1) Run `pull_open_uuids.R` to enumerate jobs as:
-   > Rscript pull_open_uuids.R --p=100 --file=input
+1) Run `pull_eval_uuids.R` to enumerate jobs as:
+   > Rscript pull_eval_uuids.R --p=100
 
 2) Run `batch_eval.pl`, setting P and JOB START and END LINE NUBMERS in the script.
    This will put the results in the `temp` folder.
 
 3) Run `store_eval_results.R`
-   This will add ANY results in all files in the `temp` directory to the DB
+   This will add ANY results that exist in files in the `temp` directory to the DB!
 
 # --------------------------------------------------------------------------------------------------------
 #   CHARACTERIZING DATA SETS
 # --------------------------------------------------------------------------------------------------------
 
-TBD
+1) Run `pull_char_uuids.R` to enumerate jobs as:
+   > Rscript pull_char_uuids.R --p=100 --file=input
+
+2) Run `batch_char.pl`, setting P and JOB START and END LINE NUBMERS in the script.
+   This will put the results in the `temp` folder.
+
+3) Run `store_char_results.R`
+   This will add ANY results that exist in files in the `temp` directory to the DB!
 
 # --------------------------------------------------------------------------------------------------------
 #   OLDER SETUP STUFF

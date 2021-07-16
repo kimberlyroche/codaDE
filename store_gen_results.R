@@ -21,7 +21,7 @@ if(!file.exists(dir)) {
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 insertions <- 0
-file_list <- list.files(dir)
+file_list <- list.files(dir, pattern = "output_gen")
 for(file in file_list) {
   results <- read.table(file.path(dir, file), header = TRUE)
   for(i in 1:nrow(results)) {

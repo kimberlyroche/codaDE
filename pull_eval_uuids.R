@@ -6,20 +6,14 @@ library(optparse)
 
 option_list = list(
   make_option(c("--p"), type = "numeric", default = NULL,
-              help = "number of features", metavar = "numeric"),
-  make_option(c("--file"), type = "character", default = NULL,
-              help = "save file name", metavar = "character")
+              help = "number of features", metavar = "numeric")
 );
 
 opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
 
 p <- opt$p
-file <- opt$file
-
-if(is.null(file) | file == "") {
-  stop("Invalid save file name!\n")
-}
+file <- paste0("input_eval_", p, ".txt")
 
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
@@ -55,4 +49,4 @@ for(u in 1:length(all_uuids)) {
 
 dbDisconnect(conn)
 
-write.table(wishlist, file = paste0(file, "_", p, ".txt"))
+write.table(wishlist, file)
