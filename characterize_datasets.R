@@ -63,17 +63,21 @@ for(i in 1:nrow(wishlist)) {
   job <- wishlist[i,]
   data <- readRDS(file.path(output_dir, paste0(job$uuid, ".rds")))
 
+  abundances <- data$simulation$abundances
   if(job$partial_info == 1) {
     counts <- data$simulation$observed_counts2
   } else {
     counts <- data$simulation$observed_counts1
   }
   
+  med_abs <- mean(rowSums(abundances))
+  med_rel <- mean(rowSums(counts))
+
   n <- nrow(counts)/2
   counts_A <- counts[1:n,]
   counts_B <- counts[(n+1):(n*2),]
   
-  results_row <- cbind(job, characterize_dataset(counts_A, counts_B))
+  results_row <- cbind(job, med_abs, med_rel, characterize_dataset(counts_A, counts_B))
   
   if(is.null(results)) {
     results <- results_row
