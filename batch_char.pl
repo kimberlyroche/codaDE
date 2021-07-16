@@ -28,10 +28,10 @@ while($i <= $end) {
 
   print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
-  print $fh 'srun Rscript evaluate_methods.R --input='.$input.
-                                           ' --output='.$output.
-                                           ' --start='.$i.
-                                           ' --end='.$j."\n\n";
+  print $fh 'srun Rscript characterize_datasets.R --input='.$input.
+                                                ' --output='.$output.
+                                                ' --start='.$i.
+                                                ' --end='.$j."\n\n";
 
   close $fh;
 

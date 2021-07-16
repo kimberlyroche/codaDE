@@ -3,14 +3,10 @@ use warnings;
 use POSIX;
 use List::Util qw(min);
 
-# generate_data.R needs: input, output, start, end
-
 my $p = 100;
 my $input = "input_".$p.".txt";
 my $ln = 375;
 my $chunks = 5;
-
-# ----------------------------------------------------------------------------------------
 
 my $filename = "job.slurm";
 

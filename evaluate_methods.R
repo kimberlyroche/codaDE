@@ -81,35 +81,47 @@ for(i in 1:nrow(wishlist)) {
   }
 
   if(job$partial_info == 0) {
-    all_calls <- DA_wrapper(data$simulation$abundances,
-                            data$simulation$observed_counts1,
-                            data$simulation$groups,
-                            method = job$method,
-                            oracle_calls = oracle_calls)
+    all_calls <- tryCatch({
+      DA_wrapper(data$simulation$abundances,
+                 data$simulation$observed_counts1,
+                 data$simulation$groups,
+                 method = job$method,
+                 oracle_calls = oracle_calls)
+    },
+    error = function(cond) { NULL },
+    warning = function(cond) { NULL },
+    finally = { })
   } else if(job$partial_info == 1) {
-    all_calls <- DA_wrapper(data$simulation$abundances,
-                            data$simulation$observed_counts2,
-                            data$simulation$groups,
-                            method = job$method,
-                            oracle_calls = oracle_calls)
+    all_calls <- tryCatch({
+      DA_wrapper(data$simulation$abundances,
+                 data$simulation$observed_counts2,
+                 data$simulation$groups,
+                 method = job$method,
+                 oracle_calls = oracle_calls)
+    },
+    error = function(cond) { NULL },
+    warning = function(cond) { NULL },
+    finally = { })
   }
   
-  if(job$baseline == "oracle") {
-    # The baseline calls are already present in the datasets table. In the interest of not
-    # keeping multiple copies of these - which could get out of sync - we'll force ourselves
-    # to refer back to the datasets table to find the oracle calls.
-    results_row <- cbind(job, baseline_calls = NA,
-                         calls = paste0(round(all_calls$calls, 10), collapse = ";"))
-  } else {
-    results_row <- cbind(job,
-                         baseline_calls = paste0(round(all_calls$oracle_calls, 10), collapse = ";"),
-                         calls = paste0(round(all_calls$calls, 10), collapse = ";"))
-  }
-  
-  if(is.null(results)) {
-    results <- results_row
-  } else {
-    results <- rbind(results, results_row)
+  if(!is.null(all_calls)) {
+    if(job$baseline == "oracle") {
+      # The baseline calls are already present in the datasets table. In the interest of not
+      # keeping multiple copies of these - which could get out of sync - we'll force ourselves
+      # to refer back to the datasets table to find the oracle calls.
+      results_row <- cbind(job, baseline_calls = NA,
+                           calls = paste0(round(all_calls$calls, 10), collapse = ";"))
+    } else {
+      results_row <- cbind(job,
+                           baseline_calls = paste0(round(all_calls$oracle_calls, 10), collapse = ";"),
+                           calls = paste0(round(all_calls$calls, 10), collapse = ";"))
+    }
+    
+    if(is.null(results)) {
+      results <- results_row
+    } else {
+      results <- rbind(results, results_row)
+    }
   }
 }
 

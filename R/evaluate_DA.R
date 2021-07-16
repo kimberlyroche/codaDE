@@ -402,37 +402,64 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
 #' Calculates the discrepancy between differential abundance calls made on
 #' absolute and relative abundances
 #'
-#' @param calls calls (p-value vector) made on relative abundances (the observed 
-#' data)
-#' @param oracle_calls calls (p-value vector) made on the absolute abundances
-#' @return named list of true positive rate, false positive rate with and
-#' without multiple test correction
+#' @param calls calls (as a numeric vector of p-values or a character string 
+#' that can be parsed into one) made on relative abundances (the observed data)
+#' @param oracle_calls calls (as a numeric vector of p-values or a character 
+#' string that can be parsed into one) made on the absolute abundances
+#' @param adjusted flag indicating whether or not to perform multiple test
+#' correction
+#' @return named list of ???
 #' @export
-calc_DA_discrepancy <- function(calls, oracle_calls) {
-  de <- calls < 0.05
-  sim_de <- oracle_calls < 0.05
+calc_DA_discrepancy <- function(calls, oracle_calls, adjusted = TRUE) {
+  if(typeof(calls) == "character") {
+    calls <- as.numeric(strsplit(calls, ";")[[1]])
+  }
+  if(typeof(oracle_calls) == "character") {
+    oracle_calls <- as.numeric(strsplit(oracle_calls, ";")[[1]])
+  }
   
-  TP <- sum(de & sim_de)
-  FP <- sum(de & !sim_de)
-  TN <- sum(!de & !sim_de)
-  FN <- sum(!de & sim_de)
-  tpr_unadjusted <- TP/(TP+FN)
-  fpr_unadjusted <- FP/(FP+TN)
+  if(adjusted) {
+    # Calls on observed
+    de <- p.adjust(calls, method = "BH") < 0.05
+    # Calls on original abundances
+    sim_de <- p.adjust(oracle_calls, method = "BH") < 0.05
+  } else {
+    de <- calls < 0.05
+    sim_de <- oracle_calls < 0.05
+  }
 
-  de <- p.adjust(calls) < 0.05
-  sim_de <- p.adjust(oracle_calls) < 0.05
+  TP_calls <- de & sim_de
+  TP <- sum(TP_calls)
+  FP_calls <- de & !sim_de
+  FP <- sum(FP_calls)
+  TN_calls <- !de & !sim_de
+  TN <- sum(TN_calls)
+  FN_calls <- !de & sim_de
+  FN <- sum(FN_calls)
   
-  TP <- sum(de & sim_de)
-  FP <- sum(de & !sim_de)
-  TN <- sum(!de & !sim_de)
-  FN <- sum(!de & sim_de)
-  tpr_adjusted <- TP/(TP+FN)
-  fpr_adjusted <- FP/(FP+TN)
+  # Occasionally all hits are spurious! Prevent NaN's here by interpreting the
+  # TPR as zero when this happens.
+  if(TP == 0 && FN == 0) {
+    TPR <- 0
+  } else {
+    TPR <- TP/(TP+FN)
+  }
+  FPR <- FP/(FP+TN)
+
+  # Special case: if there is no detectable differential abundance in the
+  # reference, exclude this case altogether.
+  if(sum(sim_de) == 0) {
+    TPR <- NA
+    FPR <- NA
+  }
   
-  return(list(tpr_unadjusted = tpr_unadjusted,
-              fpr_unadjusted = fpr_unadjusted,
-              tpr_adjusted = tpr_adjusted,
-              fpr_adjusted = fpr_adjusted))
+  return(list(TP_calls = TP_calls,
+              FP_calls = FP_calls,
+              TN_calls = TN_calls,
+              FN_calls = FN_calls,
+              TPR = TPR,
+              FPR = FPR,
+              percent_DA = sum(sim_de)/length(sim_de)))
 }
 
 #' Threshold to generate calls on differentially abundant features
