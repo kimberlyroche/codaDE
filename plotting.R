@@ -7,22 +7,29 @@ library(codaDE)
 library(RSQLite)
 library(gridExtra)
 library(RColorBrewer)
+library(randomForest)
 
 source("ggplot_fix.R")
+
+label_combo <- function(data, logical_vec) {
+  data$flag <- FALSE
+  data$flag[logical_vec] <- TRUE
+  plot_ROC(data, "flag", "selected")
+}
 
 plot_ROC <- function(data, fill_var = NULL, fill_var_label = NULL) {
   if(is.null(fill_var)) {
     fill_var <- "METHOD"
     fill_var_label <- "Method"
   }
-  data$fpr <- 1 - data$fpr
+  data$FPR <- 1 - data$FPR
   if(fill_var == "flag") {
     # Layer the points
-    p <- ggplot() +
+    pl <- ggplot() +
       geom_point(data = data[data$flag == FALSE,],
-                 mapping = aes_string(x = "fpr", y = "tpr"), size = 2, shape = 21, fill = "#dddddd") +
+                 mapping = aes_string(x = "FPR", y = "TPR"), size = 2, shape = 21, fill = "#dddddd") +
       geom_point(data = data[data$flag == TRUE,],
-                 mapping = aes_string(x = "fpr", y = "tpr"), size = 3, shape = 21, fill = "#1ab079") +
+                 mapping = aes_string(x = "FPR", y = "TPR"), size = 3, shape = 21, fill = "#1ab079") +
       xlim(c(0,1)) +
       ylim(c(0,1)) +
       labs(x = "specificity (1 - FPR)",
@@ -31,7 +38,7 @@ plot_ROC <- function(data, fill_var = NULL, fill_var_label = NULL) {
       theme_bw() +
       facet_wrap(. ~ METHOD, ncol = 4)
   } else {
-    p <- ggplot(data, aes_string(x = "fpr", y = "tpr", fill = fill_var)) +
+    pl <- ggplot(data, aes_string(x = "FPR", y = "TPR", fill = fill_var)) +
       geom_point(size = 2, shape = 21) +
       xlim(c(0,1)) +
       ylim(c(0,1)) +
@@ -42,23 +49,24 @@ plot_ROC <- function(data, fill_var = NULL, fill_var_label = NULL) {
       facet_wrap(. ~ METHOD, ncol = 4)
   }
   if(is.numeric(data[[fill_var]])) {
-    p <- p +
+    pl <- pl +
       scale_fill_distiller(palette = "RdYlBu")
   }
   if(is.factor(data[[fill_var]])) {
-    p <- p +
+    pl <- pl +
       scale_fill_brewer(palette = "RdYlBu")
   }
   if(fill_var == "METHOD") {
-    p <- p +
+    pl <- pl +
       scale_fill_manual(values = palette)
   }
-  # ggsave(file.path("output", "images", paste0(fill_var, ".png")),
-  #        dpi = 100,
-  #        units = "in",
-  #        height = 3,
-  #        width = 10)
-  p
+  ggsave(file.path("output", "images", paste0(fill_var, "_", data$P[1], ".png")),
+         plot = pl,
+         dpi = 100,
+         units = "in",
+         height = 3,
+         width = 10)
+  show(pl)
 }
 
 # Select global palette for 5 methods
@@ -128,31 +136,53 @@ for(p in ps) {
                                      "FC_ABSOLUTE, ",
                                      "FC_RELATIVE, ",
                                      "FC_PARTIAL, ",
-                                     "results.BASELINE_CALLS AS SELF_BASELINE ",
+                                     "results.BASELINE_CALLS AS SELF_BASELINE, ",
+                                     "MED_ABS_TOTAL, ",
+                                     "PERCENT_DIFF, ",
+                                     "TPR, ",
+                                     "FPR ",
                                      "FROM results LEFT JOIN datasets ON ",
                                      "results.UUID=datasets.UUID WHERE ",
                                      "P=", p,
-                                     # " AND CORRP=", corrp,
                                      " AND PARTIAL_INFO=", partial,
-                                     # " AND METHOD='", method, "'",
                                      " AND BASELINE_TYPE='",reference,"'",
                                      " AND CALLS IS NOT NULL"))
       
       # Manually calculate TPR and FPR
-      res$tpr <- NA
-      res$fpr <- NA
-      res$percent_diff <- NA
-      for(i in 1:nrow(res)) {
+      missing_rows <- unique(c(which(is.na(res$TPR)),
+                               which(is.na(res$FPR)),
+                               which(is.na(res$PERCENT_DIFF))))
+      for(mr_idx in 1:length(missing_rows)) {
+        cat(paste0("Updating incomplete results ", mr_idx, " / ", length(missing_rows), "\n"))
+        i <- missing_rows[mr_idx]
         if(res[i,]$BASELINE_TYPE == "oracle") {
           rates <- calc_DA_discrepancy(res[i,]$CALLS, res[i,]$ORACLE_BASELINE)
         } else {
           rates <- calc_DA_discrepancy(res[i,]$CALLS, res[i,]$SELF_BASELINE)
         }
-        res[i,]$tpr <- rates$TPR
-        res[i,]$fpr <- rates$FPR
-        res[i,]$percent_diff <- rates$percent_DA
+        if(!is.na(rates$TPR) && !is.na(rates$FPR)) {
+          discard <- dbExecute(conn, paste0("UPDATE results SET ",
+                                            "TPR=", rates$TPR, ", ",
+                                            "FPR=", rates$FPR,
+                                            " WHERE ",
+                                            "UUID='", res$UUID[i], "' AND ",
+                                            "METHOD='", res$METHOD[i], "' AND ",
+                                            "PARTIAL_INFO=", res$PARTIAL_INFO[i], " AND ",
+                                            "BASELINE_TYPE='", res$BASELINE_TYPE[i], "';"))
+        } else {
+          cat("\tNo detectable differential abundance!\n")
+        }
+        discard <- dbExecute(conn, paste0("UPDATE datasets SET ",
+                                          "PERCENT_DIFF=", rates$percent_DA,
+                                          " WHERE UUID='", res$UUID[i], "';"))
+        res[i,]$TPR <- rates$TPR
+        res[i,]$FPR <- rates$FPR
+        res[i,]$PERCENT_DIFF <- rates$percent_DA
       }
-      str(res)
+      
+      # Strip "result-less" entries
+      res <- res %>%
+        filter(!is.na(TPR) & !is.na(FPR) & !is.na(MED_ABS_TOTAL))
       
       # Generate a fold change labeling
       res$FC_plot <- sapply(res$FC_ABSOLUTE, function(x) {
@@ -165,73 +195,68 @@ for(p in ps) {
       res$FC_plot <- cut(res$FC_plot, breaks = qq)
       levels(res$FC_plot) <- c("low", "moderate", "high")
       
+      res$LOG_MAT <- log(res$MED_ABS_TOTAL)
+      
       # Hard to know what role changes in sequencing depth plan in this...
       
-      plot_ROC(res)
+      # plot_ROC(res)
+      # plot_ROC(res %>% filter(PERCENT_DIFF < 0.5))
       plot_ROC(res, "FC_plot", "Fold change") # Look at no. features DE?
-      plot_ROC(res, "percent_diff", "Percent DA features")
-      plot_ROC(res, "CORRP", "Correlation level")
-      plot_ROC(res, "LOG_MEAN", "Log mean abundance")
-      plot_ROC(res, "PERTURBATION", "Log mean perturbation")
+      plot_ROC(res, "LOG_MAT", "Log median total abundance")
+      # plot_ROC(res, "percent_diff", "Percent DA features")
+      # plot_ROC(res, "CORRP", "Correlation level")
+      # plot_ROC(res, "LOG_MEAN", "Log mean abundance")
+      # plot_ROC(res, "PERTURBATION", "Log mean perturbation")
       plot_ROC(res, "REP_NOISE", "Noise within condition")
       
-      # Find simulations where DESeq2 had huge FPR
+      # Does high abundance and high replicate noise yield big FPR?
+      # label_combo(res, res$LOG_MAT > 17 & res$FC_plot == "high")
+      # label_combo(res, res$LOG_MAT > 16 & res$REP_NOISE < 0.25)
+      # label_combo(res, res$PERCENT_DIFF > 0.5)
+      
+      # LM test - What explains the high FPR in some samples?
+      # Answer - Surprisingly, it's having a high starting abundance. These are
+      #          generally scenarios where you've got a big downsampling
+      
+      # lm_res <- res %>%
+      #   select(TPR, FPR, METHOD, CORRP, LOG_MEAN, PERTURBATION, REP_NOISE, FC_ABSOLUTE, FC_RELATIVE, PERCENT_DIFF, MED_ABS_TOTAL) %>%
+      #   mutate(FC_ABSOLUTE = log(FC_ABSOLUTE)) %>%
+      #   mutate(MED_ABS_TOTAL = log(MED_ABS_TOTAL))
+      # fit_fpr <- randomForest(FPR ~ ., data = lm_res %>% select(-TPR))
+      # varImpPlot(fit_fpr)
+      # ggplot(data.frame(x = lm_res$FPR, y = fit_fpr$predicted),
+      #        aes(x = x, y = y, fill = lm_res$MED_ABS_TOTAL)) +
+      #   geom_point(size = 2, shape = 21) +
+      #   scale_fill_distiller(palette = "RdYlBu") + # continuous
+      #   # scale_fill_brewer(palette = "RdYlBu") + # discrete
+      #   labs(x = "True FPR",
+      #        y = "Predicted FPR",
+      #        fill = "MED_ABS_TOTAL")
+      
+      # Find "interesting" simulations and visualize them as stacked bar plots
       temp <- res %>%
-        filter(METHOD == "DESeq2") %>%
-        filter(!is.na(fpr)) %>%
-        filter(fpr < 0.2) %>%
-        filter(percent_diff > 0.5)
-      str(temp)
-      hist(temp$LOG_MEAN)
+          filter(METHOD == "DESeq2") %>%
+          filter(FPR > 0.5) %>%
+          filter(LOG_MAT > 16) %>%
+          filter(REP_NOISE < 0.25)
       
       temp2 <- temp[sample(1:nrow(temp), size = 1),]
       str(temp2)
+      
       data <- readRDS(file.path("output", "datasets", paste0(temp2$UUID, ".rds")))
-      
-      res$flag <- FALSE
-      # res$flag[res$FC_ABSOLUTE > 4 & res$LOG_MEAN >= 4 & res$CORRP >= 2] <- TRUE
-      # res$flag[res$FC_plot == "low"] <- TRUE
-      res$flag[res$UUID == temp2$UUID] <- TRUE
-      plot_ROC(res, "flag", "selected")
-      
-      m1 <- mean(rowSums(data$simulation$abundances[1:10,]))
-      m2 <- mean(rowSums(data$simulation$abundances[11:20,]))
-      
-      rates <- calc_DA_discrepancy(temp2$CALLS, temp2$ORACLE_BASELINE)
-      fp_idx <- sample(which(rates$FP_calls == TRUE), size = 1)
-      plot_df <- data.frame(x = 1:20,
-                            y = data$simulation$abundances[,fp_idx],
-                            condition = c(rep("A", 10), rep("B", 10)),
-                            type = "abundances")
-      plot_df <- rbind(plot_df,
-                       data.frame(x = 1:20,
-                                  y = data$simulation$observed_counts1[,fp_idx],
-                                  condition = c(rep("A", 10), rep("B", 10)),
-                                  type = "relative abundances"))
-      ggplot(plot_df, aes(x = x, y = y, fill = factor(condition))) +
-        geom_point(size = 2, shape = 21) +
-        facet_wrap(. ~ type, ncol = 2) +
-        labs(x = "sample index", y = "abundance", fill = "Condition")
-      
-      palette <- generate_highcontrast_palette(1000)
+      palette <- generate_highcontrast_palette(5000)
       plot_stacked_bars(data$simulation$abundances, palette = palette)
       plot_stacked_bars(data$simulation$observed_counts1, palette = palette)
       
-      # ggsave(file.path("output",
-      #                  "images",
-      #                  "full_results",
-      #                  ifelse(reference == "self",
-      #                         "self_ref",
-      #                         "threshold_ref"),
-      #                  ifelse(partial == 0,
-      #                         "no_partial",
-      #                         "partial"),
-      #                  paste0("SS_P",p,"_CORRP",corrp,".png")),
-      #        plot = pl,
-      #        dpi = 100,
-      #        units = "in",
-      #        height = 3,
-      #        width = 12)
+      # What do false positive calls look like here vs. true negatives?
+      # Like compositional effects.
+      # But why are they more prevalent where original total abundances are 
+      # high?
+      rates <- calc_DA_discrepancy(temp2$CALLS, temp2$ORACLE_BASELINE)
+      TN_idx <- sample(which(rates$TN_calls == TRUE), size = 1)
+      par(mfrow = c(1, 2))
+      plot(data$simulation$abundances[,TN_idx])
+      plot(data$simulation$observed_counts1[,TN_idx])
     }
   }
 }

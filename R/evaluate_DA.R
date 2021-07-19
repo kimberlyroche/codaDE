@@ -408,7 +408,8 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
 #' string that can be parsed into one) made on the absolute abundances
 #' @param adjusted flag indicating whether or not to perform multiple test
 #' correction
-#' @return named list of ???
+#' @return named list of all calls, TPR, FPR, and percent of features 
+#' differentially abundant (according to the oracle calls)
 #' @export
 calc_DA_discrepancy <- function(calls, oracle_calls, adjusted = TRUE) {
   if(typeof(calls) == "character") {
