@@ -21,7 +21,7 @@ if(!file.exists(dir)) {
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 updates <- 0
-file_list <- list.files(dir)
+file_list <- list.files(dir, pattern = "output_char")
 for(file in file_list) {
   results <- read.table(file.path(dir, file))
   for(i in 1:nrow(results)) {
@@ -30,7 +30,7 @@ for(file in file_list) {
     updates <- updates + dbExecute(conn,
                                    paste0("UPDATE datasets SET ",
                                           "MED_ABS_TOTAL=", job$med_abs, ", ",
-                                          "MED_REL_TOTAL=", job$med_abs, " ",
+                                          "MED_REL_TOTAL=", job$med_rel, " ",
                                           "WHERE UUID='", job$uuid, "';"))
     
     updates <- updates + dbExecute(conn,
