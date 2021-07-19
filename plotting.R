@@ -11,13 +11,13 @@ library(randomForest)
 
 source("ggplot_fix.R")
 
-label_combo <- function(data, logical_vec) {
+label_combo <- function(data, plot_tag, logical_vec) {
   data$flag <- FALSE
   data$flag[logical_vec] <- TRUE
-  plot_ROC(data, "flag", "selected")
+  plot_ROC(data, plot_tag, "flag", "selected")
 }
 
-plot_ROC <- function(data, fill_var = NULL, fill_var_label = NULL) {
+plot_ROC <- function(data, plot_tag, fill_var = NULL, fill_var_label = NULL) {
   if(is.null(fill_var)) {
     fill_var <- "METHOD"
     fill_var_label <- "Method"
@@ -60,7 +60,10 @@ plot_ROC <- function(data, fill_var = NULL, fill_var_label = NULL) {
     pl <- pl +
       scale_fill_manual(values = palette)
   }
-  ggsave(file.path("output", "images", paste0(fill_var, "_", data$P[1], ".png")),
+  ggsave(file.path("output", "images", paste0(fill_var,
+                                              "_",
+                                              plot_tag,
+                                              ".png")),
          plot = pl,
          dpi = 100,
          units = "in",
@@ -90,37 +93,38 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#7E54DE", "#E3C012", "#B95D6E")
 # Create directories manually
 dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
-dir.create(file.path("output", "images", "full_results"), showWarnings = FALSE)
-dir.create(file.path("output", "images", "full_results", "self_ref"), showWarnings = FALSE)
-dir.create(file.path("output", "images", "full_results", "oracle_ref"), showWarnings = FALSE)
-dir.create(file.path("output", "images", "full_results", "self_ref", "partial"), showWarnings = FALSE)
-dir.create(file.path("output", "images", "full_results", "self_ref", "no_partial"), showWarnings = FALSE)
-dir.create(file.path("output", "images", "full_results", "oracle_ref", "partial"), showWarnings = FALSE)
-dir.create(file.path("output", "images", "full_results", "oracle_ref", "no_partial"), showWarnings = FALSE)
+# dir.create(file.path("output", "images", "full_results"), showWarnings = FALSE)
+# dir.create(file.path("output", "images", "full_results", "self_ref"), showWarnings = FALSE)
+# dir.create(file.path("output", "images", "full_results", "oracle_ref"), showWarnings = FALSE)
+# dir.create(file.path("output", "images", "full_results", "self_ref", "partial"), showWarnings = FALSE)
+# dir.create(file.path("output", "images", "full_results", "self_ref", "no_partial"), showWarnings = FALSE)
+# dir.create(file.path("output", "images", "full_results", "oracle_ref", "partial"), showWarnings = FALSE)
+# dir.create(file.path("output", "images", "full_results", "oracle_ref", "no_partial"), showWarnings = FALSE)
 
-conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
+conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations_backup.db"))
 
 ps <- c(100, 1000, 5000)
 partials <- c(0, 1)
 references <- c("oracle", "self")
-# methods <- c("ALDEx2", "DESeq2", "MAST", "scran")
 
-# Build a fold change color scale
-ramped_palette1 <- colorRampPalette(c("#00cc00", "#ffffff", "#fe8b00"))(7)
-res <- dbGetQuery(conn, "SELECT FC_ABSOLUTE FROM datasets")$FC_ABSOLUTE
-res <- sapply(res, function(x) {
+qq_res <- dbGetQuery(conn, "SELECT FC_ABSOLUTE FROM datasets")$FC_ABSOLUTE
+qq_res <- sapply(qq_res, function(x) {
   if(x < 1) {
     1 / x
   } else {
     x
   }
 })
-qq <- quantile(res, probs = seq(from = 0, to = 1, length.out = 4))
-ramped_palette2 <- colorRampPalette(c("#7479c4", "#e63030"))(3)
+qq <- quantile(qq_res, probs = seq(from = 0, to = 1, length.out = 4))
+
+# Build a fold change color scale
+# ramped_palette1 <- colorRampPalette(c("#00cc00", "#ffffff", "#fe8b00"))(7)
+# ramped_palette2 <- colorRampPalette(c("#7479c4", "#e63030"))(3)
 
 for(p in ps) {
   for(partial in partials) {
     for(reference in references) {
+      cat(paste0("Evaluating P=", p, ", PARTIAL=", partial, ", REF=", reference, "\n"))
       res <- dbGetQuery(conn, paste0("SELECT ",
                                      "datasets.UUID AS UUID, ",
                                      "METHOD, ",
@@ -184,7 +188,7 @@ for(p in ps) {
       res <- res %>%
         filter(!is.na(TPR) & !is.na(FPR) & !is.na(MED_ABS_TOTAL))
       
-      # Generate a fold change labeling
+      # Generate a fold change low/med/high factor labeling
       res$FC_plot <- sapply(res$FC_ABSOLUTE, function(x) {
         if(x < 1) {
           1 / x
@@ -195,24 +199,24 @@ for(p in ps) {
       res$FC_plot <- cut(res$FC_plot, breaks = qq)
       levels(res$FC_plot) <- c("low", "moderate", "high")
       
+      # Render median absolute totals on log scale for better visualization
       res$LOG_MAT <- log(res$MED_ABS_TOTAL)
       
-      # Hard to know what role changes in sequencing depth plan in this...
-      
-      # plot_ROC(res)
-      # plot_ROC(res %>% filter(PERCENT_DIFF < 0.5))
-      plot_ROC(res, "FC_plot", "Fold change") # Look at no. features DE?
-      plot_ROC(res, "LOG_MAT", "Log median total abundance")
-      # plot_ROC(res, "percent_diff", "Percent DA features")
-      # plot_ROC(res, "CORRP", "Correlation level")
-      # plot_ROC(res, "LOG_MEAN", "Log mean abundance")
-      # plot_ROC(res, "PERTURBATION", "Log mean perturbation")
-      plot_ROC(res, "REP_NOISE", "Noise within condition")
+      plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference)
+      plot_ROC(res, plot_tag)
+      # plot_ROC(res %>% filter(PERCENT_DIFF < 0.5), plot_tag)
+      plot_ROC(res, plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
+      plot_ROC(res, plot_tag, "LOG_MAT", "Log median total abundance")
+      # plot_ROC(res, plot_tag, "percent_diff", "Percent DA features")
+      # plot_ROC(res, plot_tag, "CORRP", "Correlation level")
+      # plot_ROC(res, plot_tag, "LOG_MEAN", "Log mean abundance")
+      # plot_ROC(res, plot_tag, "PERTURBATION", "Log mean perturbation")
+      # plot_ROC(res, plot_tag, "REP_NOISE", "Noise within condition")
       
       # Does high abundance and high replicate noise yield big FPR?
-      # label_combo(res, res$LOG_MAT > 17 & res$FC_plot == "high")
-      # label_combo(res, res$LOG_MAT > 16 & res$REP_NOISE < 0.25)
-      # label_combo(res, res$PERCENT_DIFF > 0.5)
+      # label_combo(res, plot_tag, res$LOG_MAT > 17 & res$FC_plot == "high")
+      # label_combo(res, plot_tag, res$LOG_MAT > 16 & res$REP_NOISE < 0.25)
+      # label_combo(res, plot_tag, res$PERCENT_DIFF > 0.5)
       
       # LM test - What explains the high FPR in some samples?
       # Answer - Surprisingly, it's having a high starting abundance. These are
@@ -234,29 +238,29 @@ for(p in ps) {
       #        fill = "MED_ABS_TOTAL")
       
       # Find "interesting" simulations and visualize them as stacked bar plots
-      temp <- res %>%
-          filter(METHOD == "DESeq2") %>%
-          filter(FPR > 0.5) %>%
-          filter(LOG_MAT > 16) %>%
-          filter(REP_NOISE < 0.25)
+      # temp <- res %>%
+      #     filter(METHOD == "DESeq2") %>%
+      #     filter(FPR > 0.5) %>%
+      #     filter(LOG_MAT > 16) %>%
+      #     filter(REP_NOISE < 0.25)
+      # 
+      # temp2 <- temp[sample(1:nrow(temp), size = 1),]
+      # str(temp2)
       
-      temp2 <- temp[sample(1:nrow(temp), size = 1),]
-      str(temp2)
-      
-      data <- readRDS(file.path("output", "datasets", paste0(temp2$UUID, ".rds")))
-      palette <- generate_highcontrast_palette(5000)
-      plot_stacked_bars(data$simulation$abundances, palette = palette)
-      plot_stacked_bars(data$simulation$observed_counts1, palette = palette)
+      # data <- readRDS(file.path("output", "datasets", paste0(temp2$UUID, ".rds")))
+      # palette <- generate_highcontrast_palette(5000)
+      # plot_stacked_bars(data$simulation$abundances, palette = palette)
+      # plot_stacked_bars(data$simulation$observed_counts1, palette = palette)
       
       # What do false positive calls look like here vs. true negatives?
       # Like compositional effects.
       # But why are they more prevalent where original total abundances are 
       # high?
-      rates <- calc_DA_discrepancy(temp2$CALLS, temp2$ORACLE_BASELINE)
-      TN_idx <- sample(which(rates$TN_calls == TRUE), size = 1)
-      par(mfrow = c(1, 2))
-      plot(data$simulation$abundances[,TN_idx])
-      plot(data$simulation$observed_counts1[,TN_idx])
+      # rates <- calc_DA_discrepancy(temp2$CALLS, temp2$ORACLE_BASELINE)
+      # TN_idx <- sample(which(rates$TN_calls == TRUE), size = 1)
+      # par(mfrow = c(1, 2))
+      # plot(data$simulation$abundances[,TN_idx])
+      # plot(data$simulation$observed_counts1[,TN_idx])
     }
   }
 }
@@ -265,57 +269,45 @@ for(p in ps) {
 #   Distributions of simulated datasets
 # ------------------------------------------------------------------------------
 
-res <- dbGetQuery(conn, "SELECT P, CORRP, PERCENT_DIFF, FC_ABSOLUTE FROM datasets")
-res$CORRP <- factor(res$CORRP)
-levels(res$CORRP) <- c("independent feature simulations", "correlated feature simulations")
+# res <- dbGetQuery(conn, "SELECT P, CORRP, PERCENT_DIFF, FC_ABSOLUTE FROM datasets")
+# pl <- ggplot(res, aes(x = PERCENT_DIFF, fill = factor(P))) +
+#   geom_density(alpha = 0.6) +
+#   scale_fill_brewer(palette = "RdYlGn") +
+#   facet_wrap(. ~ CORRP) +
+#   xlim(c(0, 1)) +
+#   theme_bw() +
+#   labs(x = "percent differentially abundant features",
+#        fill = "Feature number")
+# show(pl)
+# ggsave(file.path("output",
+#                  "images",
+#                  paste0("PERCENT_DIFF.png")),
+#        plot = pl,
+#        dpi = 100,
+#        units = "in",
+#        height = 3,
+#        width = 6)
 
-pl <- ggplot(res, aes(x = PERCENT_DIFF, fill = factor(P))) +
-  geom_density(alpha = 0.6) +
-  scale_fill_brewer(palette = "RdYlGn") +
-  facet_wrap(. ~ CORRP) +
-  xlim(c(0, 1)) +
-  theme_bw() +
-  labs(x = "percent differentially abundant features",
-       fill = "Feature number")
-show(pl)
-ggsave(file.path("output",
-                 "images",
-                 paste0("PERCENT_DIFF.png")),
-       plot = pl,
-       dpi = 100,
-       units = "in",
-       height = 3,
-       width = 6)
-
-pl <- ggplot(res, aes(x = FC_ABSOLUTE, fill = factor(P))) +
-  geom_density(alpha = 0.6) +
-  scale_fill_brewer(palette = "RdYlGn") +
-  facet_wrap(. ~ CORRP) +
-  xlim(c(0, 25)) +
-  theme_bw() +
-  labs(x = "absolute fold change in abundance",
-       fill = "Feature number")
-show(pl)
-ggsave(file.path("output",
-                 "images",
-                 paste0("FC_ABSOLUTE.png")),
-       plot = pl,
-       dpi = 100,
-       units = "in",
-       height = 3,
-       width = 6)
+# pl <- ggplot(res, aes(x = FC_ABSOLUTE, fill = factor(P))) +
+#   geom_density(alpha = 0.6) +
+#   scale_fill_brewer(palette = "RdYlGn") +
+#   facet_wrap(. ~ CORRP) +
+#   xlim(c(0, 25)) +
+#   theme_bw() +
+#   labs(x = "absolute fold change in abundance",
+#        fill = "Feature number")
+# show(pl)
+# ggsave(file.path("output",
+#                  "images",
+#                  paste0("FC_ABSOLUTE.png")),
+#        plot = pl,
+#        dpi = 100,
+#        units = "in",
+#        height = 3,
+#        width = 6)
 
 # ------------------------------------------------------------------------------
 #   Other / TBD
 # ------------------------------------------------------------------------------
 
 dbDisconnect(conn)
-
-
-
-
-
-
-
-
-
