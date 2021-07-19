@@ -101,7 +101,7 @@ dir.create(file.path("output", "images"), showWarnings = FALSE)
 # dir.create(file.path("output", "images", "full_results", "oracle_ref", "partial"), showWarnings = FALSE)
 # dir.create(file.path("output", "images", "full_results", "oracle_ref", "no_partial"), showWarnings = FALSE)
 
-conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations_backup.db"))
+conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 ps <- c(100, 1000, 5000)
 partials <- c(0, 1)
