@@ -3,10 +3,11 @@ use warnings;
 use POSIX;
 use List::Util qw(min);
 
+# For 5K jobs, typically 10 chunks x 6 hrs works
 my $p = 5000;
 my $input = "input_char_".$p.".txt";
 my $output = "output_char_".$p;
-my $start = 11;
+my $start = 1;
 my $end = 3000;
 my $chunks = 10;
 
