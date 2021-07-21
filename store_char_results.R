@@ -27,12 +27,14 @@ for(file in file_list) {
   for(i in 1:nrow(results)) {
     job <- results[i,]
   
-    updates <- updates + dbExecute(conn,
-                                   paste0("UPDATE datasets SET ",
-                                          "MED_ABS_TOTAL=", job$med_abs, ", ",
-                                          "MED_REL_TOTAL=", job$med_rel, " ",
-                                          "WHERE UUID='", job$uuid, "';"))
-    
+    if(job$partial_info == 0) {
+          updates <- updates + dbExecute(conn,
+                                         paste0("UPDATE datasets SET ",
+                                                "MED_ABS_TOTAL=", job$med_abs, ", ",
+                                                "MED_REL_TOTAL=", job$med_rel, " ",
+                                                "WHERE UUID='", job$uuid, "';"))
+    }
+
     updates <- updates + dbExecute(conn,
                                    paste0("INSERT OR REPLACE INTO characteristics(UUID, PARTIAL, ",
                                           "TOTALS_C_FC, ",

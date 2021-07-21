@@ -232,15 +232,15 @@ characterize_dataset <- function(counts_A, counts_B) {
   
 #' Generate simulated differential expression for two conditions
 #'
-#' @param model options are "linear", "RF" (random forest), "EN" (elastic net),
-#' "GP" (Gaussian process)
-#' @param do_predict flag indicating whether or not to evaluate predictions on a
-#' test set
 #' @param DE_method which DE calling method's results to predict; if "all",
 #' prediction is over all results together
 #' @param plot_weights flag indicating whether or not to plot some visualization
 #' of feature weights
-#' @return fitted model
+#' @param exclude_partials flag indicating whether to exclude simulations with 
+#' partial abundance information
+#' @param exclude_independent flag indicating whether to exclude simulations 
+#' with uncorrelated features
+#' @return NULL (fitted models are saved in output directory)
 #' @import RSQLite
 #' @import mlegp
 #' @import randomForest
@@ -250,16 +250,15 @@ characterize_dataset <- function(counts_A, counts_B) {
 #' @import ggstance
 #' @import broom.mixed
 #' @export
-fit_predictive_model <- function(do_predict = FALSE,
-                                 DE_method = "all",
+fit_predictive_model <- function(DE_method = "all",
                                  plot_weights = FALSE,
                                  exclude_partials = TRUE,
-                                 exclude_indepedent = FALSE) {
-  if(!(DE_method %in% c("all", "ALDEx2", "DESeq2", "MAST", "NBGLM", "scran"))) {
+                                 exclude_independent = FALSE) {
+  if(!(DE_method %in% c("all", "ALDEx2", "DESeq2", "MAST", "scran"))) {
     stop(paste0("Invalid DE calling method: ", DE_method, "!\n"))
   }
 
-  save_path <- list("output", "images", "RF_results", DE_method)
+  save_path <- list("output", "predictive_fits", DE_method)
   for(i in 1:length(save_path)) {
     fp <- do.call(file.path, save_path[1:i])
     if(!dir.exists(fp)) {
@@ -269,42 +268,51 @@ fit_predictive_model <- function(do_predict = FALSE,
   save_dir <- fp
   
   conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
-  
-  results <- dbGetQuery(conn, paste0("SELECT * FROM datasets LEFT JOIN characteristics ",
+
+  results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
+                                     "TOTALS_C_FC, TOTALS_C_D, ",
+                                     "TOTALS_C_MAX_D, TOTALS_C_MED_D, ",
+                                     "TOTALS_C_SD_D, CORR_RA_MED, CORR_RA_SD, ",
+                                     "CORR_RA_SKEW, CORR_LOG_MED, CORR_LOG_SD, ",
+                                     "CORR_LOG_SKEW, CORR_CLR_MED, CORR_CLR_SD, ",
+                                     "CORR_CLR_SKEW, COMP_C_P0_A, COMP_C_P0_B, ",
+                                     "COMP_C_P1_A, COMP_C_P1_B, COMP_C_P5_A, ",
+                                     "COMP_C_P5_B, COMP_RA_P01_A, COMP_RA_P01_B, ",
+                                     "COMP_RA_P1_A, COMP_RA_P1_B, COMP_RA_P5_A, ",
+                                     "COMP_RA_P5_B, COMP_RA_MAX_A, COMP_RA_MED_A, ",
+                                     "COMP_RA_SD_A, COMP_RA_SKEW_A, COMP_RA_MAX_B, ",
+                                     "COMP_RA_MED_B, COMP_RA_SD_B, COMP_RA_SKEW_B, ",
+                                     "COMP_C_ENT_A, COMP_C_ENT_B, FW_RA_MAX_D, ",
+                                     "FW_RA_MED_D, FW_RA_SD_D, FW_RA_PPOS_D, ",
+                                     "FW_RA_PNEG_D, FW_RA_PFC05_D, FW_RA_PFC1_D, ",
+                                     "FW_RA_PFC2_D, FW_LOG_MAX_D, FW_LOG_MED_D, ",
+                                     "FW_LOG_SD_D, FW_LOG_PPOS_D, FW_LOG_PNEG_D, ",
+                                     "FW_LOG_PFC05_D, FW_LOG_PFC1_D, ",
+                                     "FW_LOG_PFC2_D, FW_CLR_MAX_D, FW_CLR_MED_D, ",
+                                     "FW_CLR_SD_D, FW_CLR_PPOS_D, FW_CLR_PNEG_D, ",
+                                     "FW_CLR_PFC05_D, FW_CLR_PFC1_D, ",
+                                     "FW_CLR_PFC2_D, METHOD, PARTIAL_INFO, ",
+                                     "BASELINE_TYPE,TPR, FPR ",
+                                     "FROM datasets LEFT JOIN characteristics ",
                                      "ON datasets.UUID=characteristics.UUID ",
                                      "LEFT JOIN results ",
                                      "ON (characteristics.UUID=results.UUID ",
                                      "AND characteristics.partial=results.PARTIAL_INFO);"))
   
-  # Some columns are duplicated by the shorthand I'm using above. Fix this.
-  bc_idx <- which(names(results) == "BASELINE_CALLS")
-  results <- results[, setdiff(1:ncol(results), bc_idx[2:length(bc_idx)])]
-
-  u_idx <- which(sapply(names(results), function(x) str_detect(x, "^UUID")))
-  results <- results[, setdiff(1:ncol(results), u_idx[2:length(u_idx)])]
-  
-  par_idx <- which(names(results) == "PARTIAL")
-  results <- results[, setdiff(1:ncol(results), par_idx[2:length(par_idx)])]
-  
-  # Eliminate features we won't use
-  results <- results %>%
-    select(-c(LOG_MEAN, PERTURBATION, REP_NOISE, FC_ABSOLUTE,
-              FC_RELATIVE, FC_PARTIAL, MED_ABS_TOTAL, MED_REL_TOTAL, 
-              PERCENT_DIFF))
-  
   dbDisconnect(conn)
   
   if(exclude_partials) {
+    # Filter out results with partial information
     results <- results %>%
-      filter(PARTIAL_INFO == 0)
+      filter(PARTIAL_INFO == 0) %>%
+      select(-PARTIAL_INFO)
   }
-  if(exclude_indepedent) {
+  if(exclude_independent) {
+    # Filter out uncorrelated-feature simulations
     results <- results %>%
       filter(CORRP != 0)
   }
   
-  # Exclude NA results
-  # Make sure TPR and FPR have been calculated by running `plotting.R` first!
   # Strip "result-less" entries
   results <- results %>%
     filter(!is.na(TPR) & !is.na(FPR))
@@ -320,31 +328,25 @@ fit_predictive_model <- function(do_predict = FALSE,
       data <- results %>%
         filter(BASELINE_TYPE == use_baseline)
       
-      if(DE_method != "all") {
-        data <- data %>%
-          filter(METHOD == DE_method)
-      }
-      
       # These predictors appear to be strongly correlated.
       # Let's drop them for now.
       data <- data %>%
         select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
       
-      # Subset for testing
-      # data <- data[sample(1:nrow(data), size = 100),]
-      
-      # Scale the features
+      # Pull out the features we won't predict on
       uuids <- data$UUID
       if(DE_method == "all") {
         features <- data %>%
-          select(-c(UUID, CORRP, BASELINE_CALLS, PARTIAL_INFO, BASELINE_TYPE, CALLS))
+          select(-c(UUID, CORRP, BASELINE_TYPE))
         features$METHOD <- factor(features$METHOD)
       } else {
         features <- data %>%
-          select(-c(UUID, CORRP, BASELINE_CALLS, PARTIAL_INFO, BASELINE_TYPE, CALLS, METHOD))
+          filter(METHOD == DE_method) %>%
+          select(-c(UUID, CORRP, BASELINE_TYPE, METHOD))
       }
       
-      # Remove result type we're not interested in
+      # Remove result type we're not interested in and separate data into a
+      # features and response data.frame
       features <- features %>%
         select(-one_of(ifelse(use_result_type == "TPR", "FPR", "TPR")))
       response <- features %>%
@@ -352,44 +354,34 @@ fit_predictive_model <- function(do_predict = FALSE,
       features <- features %>%
         select(-one_of(use_result_type))
       
-      factors <- which(colnames(features) %in% c("METHOD", "P"))
-      non_factors <- setdiff(1:ncol(features), factors)
-      features_nonfactors <- features[,non_factors]
-      features_nonfactors <- as.data.frame(apply(features_nonfactors, 2, function(x) {
-        # if(sd(x) > 0) {
-        #   scale(x)
-        # } else {
-        #   scale(x, scale = FALSE)
-        # }
-        x
-      }))
+      # factors <- which(colnames(features) %in% c("METHOD", "P"))
+      # non_factors <- setdiff(1:ncol(features), factors)
+      # features_nonfactors <- features[,non_factors]
       # Drop columns with no variation
       # In practice this only happens in testing/subsetting to small samples
-      features_nonfactors <- features_nonfactors[,apply(features_nonfactors, 2, sd) > 0]
-      features <- cbind(features[,factors,drop=F], features_nonfactors)
+      # features_nonfactors <- features_nonfactors[,apply(features_nonfactors, 2, sd) > 0]
+      # features <- cbind(features[,factors,drop=F], features_nonfactors)
       
-      n <- nrow(data)
+      n <- nrow(features)
       
       # Define test/train set for all remaining methods
-      train_idx <- sample(1:nrow(data), size = round(n*0.8))
-      test_idx <- setdiff(1:nrow(data), train_idx)
+      train_idx <- sample(1:n, size = round(n*0.8))
+      test_idx <- setdiff(1:n, train_idx)
       train_uuids <- uuids[train_idx]
       train_features <- features[train_idx,]
-      train_response <- response[train_idx,]
+      train_response <- unname(unlist(response[train_idx,1]))
       if(use_result_type == "FPR") {
         train_response <- 1 - train_response
       }
       test_uuids <- uuids[test_idx]
       test_features <- features[test_idx,]
-      test_response <- response[test_idx,]
+      test_response <- unname(unlist(response[test_idx,1]))
       if(use_result_type == "FPR") {
         test_response <- 1 - test_response
       }
         
       save_fn <- file.path(save_dir,
-                           paste0(model,
-                                  "_",
-                                  DE_method,
+                           paste0(DE_method,
                                   "_",
                                   use_result_type,
                                   "_",
@@ -424,10 +416,9 @@ fit_predictive_model <- function(do_predict = FALSE,
                                   y = reorder(feature, IncNodePurity))) +
           geom_bar(stat = "identity") +
           labs(y = "feature")
-        show(pl)
+        # show(pl)
         ggsave(file.path(save_dir,
-                         paste0(model,
-                                "_betas_",
+                         paste0("betas_",
                                 DE_method,
                                 "_",
                                 use_result_type,
@@ -440,30 +431,11 @@ fit_predictive_model <- function(do_predict = FALSE,
                height = 4,
                width = 6)
       }
-          
-      if(do_predict) {
-        rf_test_data <- cbind(test_features, test_response)
-        prediction <- predict(res, newdata = rf_test_data)
-        test_response <- test_response
-        p_labels <- test_features$P
-      }
+      
+      # To predict do:
+      # rf_test_data <- cbind(test_features, test_response)
+      # prediction <- predict(res, newdata = rf_test_data)
     }
-  }
-
-  fitted_models[[use_baseline]][[use_result_type]] <- res
-  train_feature_sets[[use_baseline]][[use_result_type]] <- train_features
-  if(do_predict) {
-    predictions[[use_baseline]][[use_result_type]] <- list(true = test_response,
-                                           predicted = prediction,
-                                           p_labels = p_labels)
-  }
-  
-  if(do_predict) {
-    return(list(fitted_model = fitted_models,
-                train_features = train_feature_sets,
-                predictions = predictions))
-  } else {
-    return(fitted_models)
   }
 }
 

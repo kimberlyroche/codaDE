@@ -1,5 +1,3 @@
-setwd("C:/Users/kimbe/Documents/codaDE")
-
 source("path_fix.R")
 
 library(tidyverse)
@@ -130,8 +128,9 @@ for(p in ps) {
                                      "METHOD, ",
                                      "PARTIAL_INFO, ",
                                      "BASELINE_TYPE, ",
-                                     "datasets.BASELINE_CALLS AS ORACLE_BASELINE, ",
-                                     "CALLS, ",
+                                     # "datasets.BASELINE_CALLS AS ORACLE_BASELINE, ",
+                                     # "CALLS, ",
+                                     # "results.BASELINE_CALLS AS SELF_BASELINE, ",
                                      "P, ",
                                      "CORRP, ",
                                      "LOG_MEAN, ",
@@ -140,53 +139,28 @@ for(p in ps) {
                                      "FC_ABSOLUTE, ",
                                      "FC_RELATIVE, ",
                                      "FC_PARTIAL, ",
-                                     "results.BASELINE_CALLS AS SELF_BASELINE, ",
                                      "MED_ABS_TOTAL, ",
+                                     "MED_REL_TOTAL, ",
                                      "PERCENT_DIFF, ",
                                      "TPR, ",
                                      "FPR ",
                                      "FROM results LEFT JOIN datasets ON ",
-                                     "results.UUID=datasets.UUID WHERE ",
-                                     "P=", p,
-                                     " AND PARTIAL_INFO=", partial,
-                                     " AND BASELINE_TYPE='",reference,"'",
-                                     " AND CALLS IS NOT NULL"))
-      
-      # Manually calculate TPR and FPR
-      missing_rows <- unique(c(which(is.na(res$TPR)),
-                               which(is.na(res$FPR)),
-                               which(is.na(res$PERCENT_DIFF))))
-      for(mr_idx in 1:length(missing_rows)) {
-        cat(paste0("Updating incomplete results ", mr_idx, " / ", length(missing_rows), "\n"))
-        i <- missing_rows[mr_idx]
-        if(res[i,]$BASELINE_TYPE == "oracle") {
-          rates <- calc_DA_discrepancy(res[i,]$CALLS, res[i,]$ORACLE_BASELINE)
-        } else {
-          rates <- calc_DA_discrepancy(res[i,]$CALLS, res[i,]$SELF_BASELINE)
-        }
-        if(!is.na(rates$TPR) && !is.na(rates$FPR)) {
-          discard <- dbExecute(conn, paste0("UPDATE results SET ",
-                                            "TPR=", rates$TPR, ", ",
-                                            "FPR=", rates$FPR,
-                                            " WHERE ",
-                                            "UUID='", res$UUID[i], "' AND ",
-                                            "METHOD='", res$METHOD[i], "' AND ",
-                                            "PARTIAL_INFO=", res$PARTIAL_INFO[i], " AND ",
-                                            "BASELINE_TYPE='", res$BASELINE_TYPE[i], "';"))
-        } else {
-          cat("\tNo detectable differential abundance!\n")
-        }
-        discard <- dbExecute(conn, paste0("UPDATE datasets SET ",
-                                          "PERCENT_DIFF=", rates$percent_DA,
-                                          " WHERE UUID='", res$UUID[i], "';"))
-        res[i,]$TPR <- rates$TPR
-        res[i,]$FPR <- rates$FPR
-        res[i,]$PERCENT_DIFF <- rates$percent_DA
-      }
+                                     "results.UUID=datasets.UUID ",
+                                     "WHERE P=", p, " ",
+                                     "AND PARTIAL_INFO=", partial, " ",
+                                     "AND BASELINE_TYPE='",reference,"';"))
       
       # Strip "result-less" entries
       res <- res %>%
         filter(!is.na(TPR) & !is.na(FPR) & !is.na(MED_ABS_TOTAL))
+
+      # Remove some of the simulations with huge median abundances
+      res <- res %>%
+        filter(MED_ABS_TOTAL < 1e06)
+      
+      # Remove simulations where > 50% of features are differential
+      # res <- res %>%
+      #   filter(PERCENT_DIFF < 0.5)
       
       # Generate a fold change low/med/high factor labeling
       res$FC_plot <- sapply(res$FC_ABSOLUTE, function(x) {
@@ -203,10 +177,10 @@ for(p in ps) {
       res$LOG_MAT <- log(res$MED_ABS_TOTAL)
       
       plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference)
-      plot_ROC(res, plot_tag)
-      # plot_ROC(res %>% filter(PERCENT_DIFF < 0.5), plot_tag)
-      plot_ROC(res, plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
-      plot_ROC(res, plot_tag, "LOG_MAT", "Log median total abundance")
+      # plot_ROC(res, plot_tag)
+      # plot_ROC(res, plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
+      plot_ROC(res, plot_tag, "LOG_MAT", "Log med.\ntotal (orig.)")
+      # plot_ROC(res, plot_tag, "MED_REL_TOTAL", "Median total relative abundance")
       # plot_ROC(res, plot_tag, "percent_diff", "Percent DA features")
       # plot_ROC(res, plot_tag, "CORRP", "Correlation level")
       # plot_ROC(res, plot_tag, "LOG_MEAN", "Log mean abundance")
@@ -217,6 +191,7 @@ for(p in ps) {
       # label_combo(res, plot_tag, res$LOG_MAT > 17 & res$FC_plot == "high")
       # label_combo(res, plot_tag, res$LOG_MAT > 16 & res$REP_NOISE < 0.25)
       # label_combo(res, plot_tag, res$PERCENT_DIFF > 0.5)
+      # label_combo(res, plot_tag, res$LOG_MAT > 12 & res$MRT < 1e6)
       
       # LM test - What explains the high FPR in some samples?
       # Answer - Surprisingly, it's having a high starting abundance. These are

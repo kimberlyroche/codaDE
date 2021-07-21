@@ -5,17 +5,21 @@
 \title{Calculates the discrepancy between differential abundance calls made on
 absolute and relative abundances}
 \usage{
-calc_DA_discrepancy(calls, oracle_calls)
+calc_DA_discrepancy(calls, oracle_calls, adjusted = TRUE)
 }
 \arguments{
-\item{calls}{calls (p-value vector) made on relative abundances (the observed 
-data)}
+\item{calls}{calls (as a numeric vector of p-values or a character string 
+that can be parsed into one) made on relative abundances (the observed data)}
 
-\item{oracle_calls}{calls (p-value vector) made on the absolute abundances}
+\item{oracle_calls}{calls (as a numeric vector of p-values or a character 
+string that can be parsed into one) made on the absolute abundances}
+
+\item{adjusted}{flag indicating whether or not to perform multiple test
+correction}
 }
 \value{
-named list of true positive rate, false positive rate with and
-without multiple test correction
+named list of all calls, TPR, FPR, and percent of features 
+differentially abundant (according to the oracle calls)
 }
 \description{
 Calculates the discrepancy between differential abundance calls made on

@@ -5,7 +5,6 @@
 \title{Generate simulated differential expression for two conditions}
 \usage{
 fit_predictive_model(
-  model = "linear",
   do_predict = FALSE,
   DE_method = "all",
   plot_weights = FALSE,
@@ -14,9 +13,6 @@ fit_predictive_model(
 )
 }
 \arguments{
-\item{model}{options are "linear", "RF" (random forest), "EN" (elastic net),
-"GP" (Gaussian process)}
-
 \item{do_predict}{flag indicating whether or not to evaluate predictions on a
 test set}
 
@@ -25,6 +21,9 @@ prediction is over all results together}
 
 \item{plot_weights}{flag indicating whether or not to plot some visualization
 of feature weights}
+
+\item{model}{options are "linear", "RF" (random forest), "EN" (elastic net),
+"GP" (Gaussian process)}
 }
 \value{
 fitted model
