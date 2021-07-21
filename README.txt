@@ -34,6 +34,9 @@ only. If CORRP = 1, features are net positively correlated but to varying degree
 3) Run `store_eval_results.R`
    This will add ANY results that exist in files in the `temp` directory to the DB!
 
+4) Run `render_rates.R` to calculate TPR and FPR for all results. Note: This takes about 2 hr. to run if
+all TPR / FPR fields in the database must be updated!
+
 # --------------------------------------------------------------------------------------------------------
 #   CHARACTERIZING DATA SETS
 # --------------------------------------------------------------------------------------------------------
