@@ -15,7 +15,7 @@ label_combo <- function(data, plot_tag, logical_vec) {
   plot_ROC(data, plot_tag, "flag", "selected")
 }
 
-plot_ROC <- function(data, plot_tag, fill_var = NULL, fill_var_label = NULL) {
+plot_ROC <- function(data, plot_tag = NULL, fill_var = NULL, fill_var_label = NULL) {
   if(is.null(fill_var)) {
     fill_var <- "METHOD"
     fill_var_label <- "Method"
@@ -25,9 +25,15 @@ plot_ROC <- function(data, plot_tag, fill_var = NULL, fill_var_label = NULL) {
     # Layer the points
     pl <- ggplot() +
       geom_point(data = data[data$flag == FALSE,],
-                 mapping = aes_string(x = "FPR", y = "TPR"), size = 2, shape = 21, fill = "#dddddd") +
+                 mapping = aes_string(x = "FPR", y = "TPR"),
+                 size = 2,
+                 shape = 21,
+                 fill = "#dddddd") +
       geom_point(data = data[data$flag == TRUE,],
-                 mapping = aes_string(x = "FPR", y = "TPR"), size = 3, shape = 21, fill = "#1ab079") +
+                 mapping = aes_string(x = "FPR", y = "TPR"),
+                 size = 2,
+                 shape = 21,
+                 fill = "#1ab079") +
       xlim(c(0,1)) +
       ylim(c(0,1)) +
       labs(x = "specificity (1 - FPR)",
@@ -58,15 +64,17 @@ plot_ROC <- function(data, plot_tag, fill_var = NULL, fill_var_label = NULL) {
     pl <- pl +
       scale_fill_manual(values = palette)
   }
-  ggsave(file.path("output", "images", paste0(fill_var,
-                                              "_",
-                                              plot_tag,
-                                              ".png")),
-         plot = pl,
-         dpi = 100,
-         units = "in",
-         height = 3,
-         width = 10)
+  if(!is.null(plot_tag)) {
+    ggsave(file.path("output", "images", paste0(fill_var,
+                                                "_",
+                                                plot_tag,
+                                                ".png")),
+           plot = pl,
+           dpi = 100,
+           units = "in",
+           height = 3,
+           width = 10)
+  }
   show(pl)
 }
 
@@ -128,9 +136,9 @@ for(p in ps) {
                                      "METHOD, ",
                                      "PARTIAL_INFO, ",
                                      "BASELINE_TYPE, ",
-                                     # "datasets.BASELINE_CALLS AS ORACLE_BASELINE, ",
-                                     # "CALLS, ",
-                                     # "results.BASELINE_CALLS AS SELF_BASELINE, ",
+                                     "datasets.BASELINE_CALLS AS ORACLE_BASELINE, ",
+                                     "CALLS, ",
+                                     "results.BASELINE_CALLS AS SELF_BASELINE, ",
                                      "P, ",
                                      "CORRP, ",
                                      "LOG_MEAN, ",
@@ -152,11 +160,11 @@ for(p in ps) {
       
       # Strip "result-less" entries
       res <- res %>%
-        filter(!is.na(TPR) & !is.na(FPR) & !is.na(MED_ABS_TOTAL))
+        filter(!is.na(TPR) & !is.na(FPR))
 
       # Remove some of the simulations with huge median abundances
-      res <- res %>%
-        filter(MED_ABS_TOTAL < 1e06)
+      # res <- res %>%
+      #   filter(MED_ABS_TOTAL < 2e06)
       
       # Remove simulations where > 50% of features are differential
       # res <- res %>%
@@ -176,22 +184,25 @@ for(p in ps) {
       # Render median absolute totals on log scale for better visualization
       res$LOG_MAT <- log(res$MED_ABS_TOTAL)
       
+      # Shuffle before plotting
+      res <- res[sample(1:nrow(res)),]
+      
       plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference)
-      # plot_ROC(res, plot_tag)
-      # plot_ROC(res, plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
-      plot_ROC(res, plot_tag, "LOG_MAT", "Log med.\ntotal (orig.)")
+      plot_ROC(res, plot_tag)
+      plot_ROC(res %>% filter(PERCENT_DIFF <= 0.5), plot_tag = NULL, "FC_plot", "Fold change") # Look at no. features DE?
+      plot_ROC(res, plot_tag = NULL, "LOG_MAT", "Log med.\ntotal (orig.)")
       # plot_ROC(res, plot_tag, "MED_REL_TOTAL", "Median total relative abundance")
-      # plot_ROC(res, plot_tag, "percent_diff", "Percent DA features")
-      # plot_ROC(res, plot_tag, "CORRP", "Correlation level")
-      # plot_ROC(res, plot_tag, "LOG_MEAN", "Log mean abundance")
-      # plot_ROC(res, plot_tag, "PERTURBATION", "Log mean perturbation")
+      plot_ROC(res, plot_tag = NULL, "PERCENT_DIFF", "Percent DA features")
+      # plot_ROC(res, plot_tag = NULL, "CORRP", "Correlation level")
+      # plot_ROC(res, plot_tag = NULL, "LOG_MEAN", "Log mean abundance")
+      # plot_ROC(res, plot_tag = NULL, "PERTURBATION", "Log mean perturbation")
       # plot_ROC(res, plot_tag, "REP_NOISE", "Noise within condition")
       
       # Does high abundance and high replicate noise yield big FPR?
       # label_combo(res, plot_tag, res$LOG_MAT > 17 & res$FC_plot == "high")
       # label_combo(res, plot_tag, res$LOG_MAT > 16 & res$REP_NOISE < 0.25)
       # label_combo(res, plot_tag, res$PERCENT_DIFF > 0.5)
-      # label_combo(res, plot_tag, res$LOG_MAT > 12 & res$MRT < 1e6)
+      label_combo(res, plot_tag, res$MED_REL_TOTAL < 500000)
       
       # LM test - What explains the high FPR in some samples?
       # Answer - Surprisingly, it's having a high starting abundance. These are
@@ -214,14 +225,12 @@ for(p in ps) {
       
       # Find "interesting" simulations and visualize them as stacked bar plots
       # temp <- res %>%
-      #     filter(METHOD == "DESeq2") %>%
-      #     filter(FPR > 0.5) %>%
       #     filter(LOG_MAT > 16) %>%
-      #     filter(REP_NOISE < 0.25)
+      #     filter(FPR > 0.65)
       # 
       # temp2 <- temp[sample(1:nrow(temp), size = 1),]
       # str(temp2)
-      
+      # 
       # data <- readRDS(file.path("output", "datasets", paste0(temp2$UUID, ".rds")))
       # palette <- generate_highcontrast_palette(5000)
       # plot_stacked_bars(data$simulation$abundances, palette = palette)
@@ -232,10 +241,10 @@ for(p in ps) {
       # But why are they more prevalent where original total abundances are 
       # high?
       # rates <- calc_DA_discrepancy(temp2$CALLS, temp2$ORACLE_BASELINE)
-      # TN_idx <- sample(which(rates$TN_calls == TRUE), size = 1)
+      # idx <- sample(which(rates$FP_calls == TRUE), size = 1)
       # par(mfrow = c(1, 2))
-      # plot(data$simulation$abundances[,TN_idx])
-      # plot(data$simulation$observed_counts1[,TN_idx])
+      # plot(data$simulation$abundances[,idx])
+      # plot(data$simulation$observed_counts1[,idx])
     }
   }
 }
@@ -244,42 +253,80 @@ for(p in ps) {
 #   Distributions of simulated datasets
 # ------------------------------------------------------------------------------
 
-# res <- dbGetQuery(conn, "SELECT P, CORRP, PERCENT_DIFF, FC_ABSOLUTE FROM datasets")
-# pl <- ggplot(res, aes(x = PERCENT_DIFF, fill = factor(P))) +
-#   geom_density(alpha = 0.6) +
-#   scale_fill_brewer(palette = "RdYlGn") +
-#   facet_wrap(. ~ CORRP) +
-#   xlim(c(0, 1)) +
-#   theme_bw() +
-#   labs(x = "percent differentially abundant features",
-#        fill = "Feature number")
-# show(pl)
-# ggsave(file.path("output",
-#                  "images",
-#                  paste0("PERCENT_DIFF.png")),
-#        plot = pl,
-#        dpi = 100,
-#        units = "in",
-#        height = 3,
-#        width = 6)
+res <- dbGetQuery(conn, "SELECT P, CORRP, PERCENT_DIFF, FC_ABSOLUTE FROM datasets")
+res <- res %>%
+  filter(CORRP %in% c(0, 4))
+res$CORRP <- factor(res$CORRP, levels = c("0", "4"))
+levels(res$CORRP) <- c("Independent features", "Strongly correlated features")
+pl <- ggplot(res, aes(x = PERCENT_DIFF, fill = factor(P))) +
+  geom_density(alpha = 0.6) +
+  scale_fill_brewer(palette = "RdYlGn") +
+  facet_wrap(. ~ CORRP) +
+  xlim(c(0, 1)) +
+  theme_bw() +
+  labs(x = "percent differentially abundant features",
+       fill = "Feature number")
+show(pl)
+ggsave(file.path("output",
+                 "images",
+                 paste0("PERCENT_DIFF.png")),
+       plot = pl,
+       dpi = 100,
+       units = "in",
+       height = 3,
+       width = 6)
 
-# pl <- ggplot(res, aes(x = FC_ABSOLUTE, fill = factor(P))) +
-#   geom_density(alpha = 0.6) +
-#   scale_fill_brewer(palette = "RdYlGn") +
-#   facet_wrap(. ~ CORRP) +
-#   xlim(c(0, 25)) +
-#   theme_bw() +
-#   labs(x = "absolute fold change in abundance",
-#        fill = "Feature number")
-# show(pl)
-# ggsave(file.path("output",
-#                  "images",
-#                  paste0("FC_ABSOLUTE.png")),
-#        plot = pl,
-#        dpi = 100,
-#        units = "in",
-#        height = 3,
-#        width = 6)
+pl <- ggplot(res, aes(x = FC_ABSOLUTE, fill = factor(P))) +
+  geom_density(alpha = 0.6) +
+  scale_fill_brewer(palette = "RdYlGn") +
+  facet_wrap(. ~ CORRP) +
+  xlim(c(0, 10)) +
+  theme_bw() +
+  labs(x = "absolute fold change in abundance",
+       fill = "Feature number")
+show(pl)
+ggsave(file.path("output",
+                 "images",
+                 paste0("FC_ABSOLUTE.png")),
+       plot = pl,
+       dpi = 100,
+       units = "in",
+       height = 3,
+       width = 6)
+
+# ------------------------------------------------------------------------------
+#   Information "restored" in partial case
+#
+#   Whoops, it looks like the "partially informative" totals scenario 
+#   essentially fully restores total abundances!
+# ------------------------------------------------------------------------------
+
+res <- dbGetQuery(conn, paste0("SELECT datasets.UUID, FC_ABSOLUTE, TOTALS_C_FC, PARTIAL FROM ",
+                               "datasets LEFT JOIN characteristics ON ",
+                               "datasets.UUID = characteristics.UUID WHERE ",
+                               "PARTIAL = 1"))
+
+# Make this symmetric, so it's comparable to TOTAL_C_FC
+res$FC_ABSOLUTE <- sapply(res$FC_ABSOLUTE, function(x) {
+  ifelse(x < 1, 1/x, x)
+})
+
+pl <- ggplot(res, aes(x = FC_ABSOLUTE, y = TOTALS_C_FC)) +
+  geom_point(size = 2, shape = 21, fill = "#bbbbbb") +
+  theme_bw() +
+  labs(x = "Absolute fold change in totals (original abundances)",
+       y = "Absolute fold change in totals (observed abundances)")
+show(pl)
+ggsave(file.path("output",
+                 "images",
+                 paste0("PARTIAL_correlation.png")),
+       plot = pl,
+       dpi = 100,
+       units = "in",
+       height = 5,
+       width = 5.5)
+
+cor(res$FC_ABSOLUTE, res$TOTALS_C_FC)**2
 
 # ------------------------------------------------------------------------------
 #   Other / TBD

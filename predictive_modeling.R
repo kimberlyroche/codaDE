@@ -4,8 +4,8 @@ library(codaDE)
 library(tidyverse)
 library(RColorBrewer)
 
-use_methods <- c("ALDEx2", "DESeq2", "MAST", "scran")
-use_methods <- c("DESeq2", "MAST", "scran")
+use_methods <- c("all")
+# use_methods <- c("ALDEx2", "DESeq2", "MAST", "scran")
 
 plot_labels <- list(fpr = "specificity (1 - FPR)", tpr = "sensitivity (TPR)")
 

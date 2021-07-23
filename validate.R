@@ -147,7 +147,7 @@ features$P <- ncol(counts_A)
 #   Make predictions on simulations and real data and visualize these together
 # ------------------------------------------------------------------------------
 
-plot_labels <- list(fpr = "specificity (1 - FPR)", tpr = "sensitivity (TPR)")
+plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 
 for(use_result_type in c("TPR", "FPR")) {
 
@@ -171,7 +171,7 @@ for(use_result_type in c("TPR", "FPR")) {
     }
     
     all_calls <- DA_wrapper(ref_data, data, groups, DE_method, oracle_calls)
-    
+
     rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls)
     
     # --------------------------------------------------------------------------
@@ -207,7 +207,7 @@ for(use_result_type in c("TPR", "FPR")) {
     pred_real <- predict(fit_obj$result, newdata = features_df)
     
     plot_df <- rbind(plot_df,
-                     data.frame(true = ifelse(use_result_type == "tpr", rates$tpr, 1 - rates$fpr),
+                     data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
                                 predicted = pred_real,
                                 type = DE_method))
     
