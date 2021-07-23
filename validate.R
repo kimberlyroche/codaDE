@@ -143,18 +143,25 @@ features <- characterize_dataset(counts_A, counts_B)
 # Add a few more
 features$P <- ncol(counts_A)
 
+#all_calls <- DA_wrapper(ref_data, data, groups, "DESeq2", NULL)
+#rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls, adjust = FALSE)
+#cat(paste0("% DE: ", round(rates$percent_DA, 3)*100, "\n"))
+#rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls)
+#cat(paste0("% DE (MTC): ", round(rates$percent_DA, 3)*100, "\n"))
+#quit()
+
 # ------------------------------------------------------------------------------
 #   Make predictions on simulations and real data and visualize these together
 # ------------------------------------------------------------------------------
 
-plot_labels <- list(fpr = "specificity (1 - FPR)", tpr = "sensitivity (TPR)")
+plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 
 for(use_result_type in c("TPR", "FPR")) {
 
   plot_df <- NULL
   
   for(DE_method in c("ALDEx2", "DESeq2", "MAST", "scran")) {
-    
+
     if(max(table(groups)) < 5 && DE_method == "scran") {
       next
     }
@@ -171,7 +178,7 @@ for(use_result_type in c("TPR", "FPR")) {
     }
     
     all_calls <- DA_wrapper(ref_data, data, groups, DE_method, oracle_calls)
-    
+
     rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls)
     
     # --------------------------------------------------------------------------
@@ -207,11 +214,13 @@ for(use_result_type in c("TPR", "FPR")) {
     pred_real <- predict(fit_obj$result, newdata = features_df)
     
     plot_df <- rbind(plot_df,
-                     data.frame(true = ifelse(use_result_type == "tpr", rates$tpr, 1 - rates$fpr),
+                     data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
                                 predicted = pred_real,
                                 type = DE_method))
     
   }
+
+  print(plot_df)
   
   pl <- ggplot() +
     geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
