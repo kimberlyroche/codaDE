@@ -154,7 +154,11 @@ for(use_result_type in c("TPR", "FPR")) {
   plot_df <- NULL
   
   for(DE_method in c("ALDEx2", "DESeq2", "MAST", "scran")) {
-    
+
+    features$METHOD <- DE_method
+    features$METHOD <- factor(features$METHOD, levels = c("ALDEx2", "DESeq2", "MAST", "scran"))
+    print(features$METHOD)
+
     if(max(table(groups)) < 5 && DE_method == "scran") {
       next
     }
@@ -180,8 +184,10 @@ for(use_result_type in c("TPR", "FPR")) {
     
     model_fn <- file.path("output",
                           "predictive_fits",
-                          DE_method,
-                          paste0(DE_method, "_", use_result_type, "_", use_baseline, ".rds"))
+                          #DE_method,
+                          "all",
+                          #paste0(DE_method, "_", use_result_type, "_", use_baseline, ".rds"))
+                          paste0("all_", use_result_type, "_", use_baseline, ".rds"))
     
     
     if(!file.exists(model_fn)) {
@@ -212,6 +218,8 @@ for(use_result_type in c("TPR", "FPR")) {
                                 type = DE_method))
     
   }
+
+  print(plot_df)
   
   pl <- ggplot() +
     geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),

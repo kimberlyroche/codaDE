@@ -29,9 +29,11 @@ for(file in file_list) {
     if(!any(is.na(job))) {
       insertions <- insertions + dbExecute(conn, paste0(
         "INSERT INTO datasets(UUID, P, CORRP, LOG_MEAN, ",
-                             "PERTURBATION, REP_NOISE, ",
-                             "FC_ABSOLUTE, FC_RELATIVE, ",
-                             "FC_PARTIAL, BASELINE_CALLS) ",
+        "PERTURBATION, REP_NOISE, ",
+        "FC_ABSOLUTE, FC_RELATIVE, ",
+        "FC_PARTIAL, BASELINE_CALLS, ",
+        "MED_ABS_TOTAL, MED_REL_TOTAL, ",
+        "PERCENT_DIFF_SIM, PERCENT_DIFF_REALIZ) ",
         "VALUES(",
         "'", job$UUID, "', ",
         job$P, ", ",
@@ -42,7 +44,11 @@ for(file in file_list) {
         job$FC_ABSOLUTE, ", ",
         job$FC_RELATIVE, ", ",
         job$FC_PARTIAL, ", ",
-        "'", job$BASELINE_CALLS, "'",
+        "'", job$BASELINE_CALLS, "', ",
+        job$MED_ABS_TOTAL, ", ",
+        job$MED_REL_TOTAL, ", ",
+        job$PERCENT_DIFF_SIM, ", ",
+        job$PERCENT_DIFF_REALIZ,
         ")"
       ))
     }

@@ -19,7 +19,8 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 #                                   "BASELINE_CALLS VARCHAR(100000), ",
 #                                   "MED_ABS_TOTAL REAL, ",
 #                                   "MED_REL_TOTAL REAL, ",
-#                                   "PERCENT_DIFF REAL)"))
+#                                   "PERCENT_DIFF_SIM REAL, ",
+#                                   "PERCENT_DIFF_REALIZ REAL)"))
 
 # discard <- dbExecute(conn, "ALTER TABLE datasets ADD COLUMN PERCENT_DIFF REAL;")
 

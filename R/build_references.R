@@ -3,8 +3,8 @@
 #' @param p number of features (genes, taxa) to simulate
 #' @param log_mean log mean for condition 1
 #' @param log_var log variance for condition 1
-#' @param log_noise_var log variance for noise component added to condition 1
-#' to give condition 2
+#' @param perturb_size percent of the log mean to use (on average) as the size 
+#' of the noise component added to condition 1 to give condition 2
 #' @param base_correlation this is the base correlation matrix for simulated
 #' features in log space
 #' @param concentration concentration parameter for sampling the correlation 
@@ -15,8 +15,8 @@
 #' @import CholWishart
 #' @import mvnfast
 #' @export
-build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 4,
-                                      log_noise_var = 4, base_correlation = NULL,
+build_simulated_reference <- function(p = 1000, log_mean = 1, log_var = 4,
+                                      perturb_size = 0.5, base_correlation = NULL,
                                       concentration = 1e6, save_name = NULL) {
   if(is.null(base_correlation)) {
     base_correlation <- diag(p)
@@ -36,6 +36,7 @@ build_simulated_reference <- function(p = 1000, log_mean = 0, log_var = 4,
   # From MASS; pretty slow
   # log_perturbation <- mvrnorm(1, rep(0, p), K*log_noise_var)
   # From mvnfast; faster
+  log_noise_var <- log_mean*perturb_size
   log_perturbation <- rmvn(1, rep(0, p), K*log_noise_var)[1,]
   log_counts2 <- log_counts1 + log_perturbation
 

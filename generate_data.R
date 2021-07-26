@@ -63,7 +63,11 @@ writeLines(paste0(c("UUID",
                     "FC_ABSOLUTE",
                     "FC_RELATIVE",
                     "FC_PARTIAL",
-                    "BASELINE_CALLS"), collapse = "\t"),
+                    "BASELINE_CALLS",
+                    "MED_ABS_TOTAL",
+                    "MED_REL_TOTAL",
+                    "PERCENT_DIFF_SIM",
+                    "PERCENT_DIFF_REALIZ"), collapse = "\t"),
            output_file)
 close(output_file)
 
@@ -113,7 +117,7 @@ for(i in 1:nrow(wishlist)) {
   # Create reference distributions
   data_obj <- build_simulated_reference(p = job$P,
                                         log_mean = job$LOG_MEAN,
-                                        log_noise_var = job$PERTURBATION,
+                                        perturb_size = job$PERTURBATION,
                                         base_correlation = base_correlation,
                                         concentration = concentration)
   
@@ -121,7 +125,8 @@ for(i in 1:nrow(wishlist)) {
   sim_data <- simulate_sequence_counts(n = n,
                                        p = job$P,
                                        data_obj = data_obj,
-                                       replicate_noise = job$REP_NOISE)
+                                       replicate_noise = job$REP_NOISE,
+                                       proportion_da = job$PERCENT_DIFF)
   
   # Visualize via
   # plot_stacked_bars(sim_data$abundances)
@@ -134,6 +139,12 @@ for(i in 1:nrow(wishlist)) {
   fc_par <- calc_fc(sim_data$observed_counts2)
   
   calls <- call_DA_NB(sim_data$abundances, sim_data$groups)$pval
+  
+  med_abs <- mean(rowSums(sim_data$abundances))
+  med_rel <- mean(rowSums(sim_data$observed_counts1))
+  
+  percent_diff_realiz <- sum(p.adjust(calls, method = "BH") < 0.05) / length(calls)
+  
   # baseline_calls <- ifelse(calls < 0.05, 0, 1)
   # baseline_calls_mtc <- ifelse(calls < 0.05/p, 0, 1)
   
@@ -154,10 +165,13 @@ for(i in 1:nrow(wishlist)) {
                          FC_ABSOLUTE = fc_abs,
                          FC_RELATIVE = fc_rel,
                          FC_PARTIAL = fc_par,
-                         BASELINE_CALLS = paste0(round(calls, 10), collapse = ";")),
+                         BASELINE_CALLS = paste0(round(calls, 10), collapse = ";"),
+                         MED_ABS_TOTAL = med_abs,
+                         MED_REL_TOTAL = med_rel,
+                         PERCENT_DIFF_SIM = job$PERCENT_DIFF,
+                         PERCENT_DIFF_REALIZ = percent_diff_realiz),
               output_fn,
               delim = "\t",
               append = TRUE)
-  
 }
 
