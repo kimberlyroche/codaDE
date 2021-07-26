@@ -31,7 +31,7 @@ plot_ROC <- function(data, plot_tag = NULL, fill_var = NULL, fill_var_label = NU
                  fill = "#dddddd") +
       geom_point(data = data[data$flag == TRUE,],
                  mapping = aes_string(x = "FPR", y = "TPR"),
-                 size = 2,
+                 size = 3,
                  shape = 21,
                  fill = "#1ab079") +
       xlim(c(0,1)) +
@@ -188,7 +188,7 @@ for(p in ps) {
       res <- res[sample(1:nrow(res)),]
       
       plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference)
-      plot_ROC(res, plot_tag)
+      plot_ROC(res, plot_tag = NULL)
       plot_ROC(res %>% filter(PERCENT_DIFF <= 0.5), plot_tag = NULL, "FC_plot", "Fold change") # Look at no. features DE?
       plot_ROC(res, plot_tag = NULL, "LOG_MAT", "Log med.\ntotal (orig.)")
       # plot_ROC(res, plot_tag, "MED_REL_TOTAL", "Median total relative abundance")
@@ -202,7 +202,7 @@ for(p in ps) {
       # label_combo(res, plot_tag, res$LOG_MAT > 17 & res$FC_plot == "high")
       # label_combo(res, plot_tag, res$LOG_MAT > 16 & res$REP_NOISE < 0.25)
       # label_combo(res, plot_tag, res$PERCENT_DIFF > 0.5)
-      label_combo(res, plot_tag, res$MED_REL_TOTAL < 500000)
+      label_combo(res, plot_tag, res$PERCENT_DIFF < 0.5)
       
       # LM test - What explains the high FPR in some samples?
       # Answer - Surprisingly, it's having a high starting abundance. These are

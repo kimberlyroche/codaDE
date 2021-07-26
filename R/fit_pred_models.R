@@ -242,7 +242,6 @@ characterize_dataset <- function(counts_A, counts_B) {
 #' with uncorrelated features
 #' @return NULL (fitted models are saved in output directory)
 #' @import RSQLite
-#' @import mlegp
 #' @import randomForest
 #' @import tidyr
 #' @import caret
