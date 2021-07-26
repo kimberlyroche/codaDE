@@ -143,13 +143,6 @@ features <- characterize_dataset(counts_A, counts_B)
 # Add a few more
 features$P <- ncol(counts_A)
 
-#all_calls <- DA_wrapper(ref_data, data, groups, "DESeq2", NULL)
-#rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls, adjust = FALSE)
-#cat(paste0("% DE: ", round(rates$percent_DA, 3)*100, "\n"))
-#rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls)
-#cat(paste0("% DE (MTC): ", round(rates$percent_DA, 3)*100, "\n"))
-#quit()
-
 # ------------------------------------------------------------------------------
 #   Make predictions on simulations and real data and visualize these together
 # ------------------------------------------------------------------------------
@@ -161,6 +154,10 @@ for(use_result_type in c("TPR", "FPR")) {
   plot_df <- NULL
   
   for(DE_method in c("ALDEx2", "DESeq2", "MAST", "scran")) {
+
+    features$METHOD <- DE_method
+    features$METHOD <- factor(features$METHOD, levels = c("ALDEx2", "DESeq2", "MAST", "scran"))
+    print(features$METHOD)
 
     if(max(table(groups)) < 5 && DE_method == "scran") {
       next
@@ -187,8 +184,10 @@ for(use_result_type in c("TPR", "FPR")) {
     
     model_fn <- file.path("output",
                           "predictive_fits",
-                          DE_method,
-                          paste0(DE_method, "_", use_result_type, "_", use_baseline, ".rds"))
+                          #DE_method,
+                          "all",
+                          #paste0(DE_method, "_", use_result_type, "_", use_baseline, ".rds"))
+                          paste0("all_", use_result_type, "_", use_baseline, ".rds"))
     
     
     if(!file.exists(model_fn)) {
