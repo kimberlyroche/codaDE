@@ -6,21 +6,21 @@ library(RSQLite)
 # Create DB (if doesn't exist?)
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
-# discard <- dbExecute(conn, paste0("CREATE TABLE datasets(",
-#                                   "UUID VARCHAR(36) PRIMARY KEY, ",
-#                                   "P INTEGER, ",
-#                                   "CORRP INTEGER, ",
-#                                   "LOG_MEAN REAL, ",
-#                                   "PERTURBATION REAL, ",
-#                                   "REP_NOISE REAL, ",
-#                                   "FC_ABSOLUTE REAL, ",
-#                                   "FC_RELATIVE REAL, ",
-#                                   "FC_PARTIAL REAL, ",
-#                                   "BASELINE_CALLS VARCHAR(100000), ",
-#                                   "MED_ABS_TOTAL REAL, ",
-#                                   "MED_REL_TOTAL REAL, ",
-#                                   "PERCENT_DIFF_SIM REAL, ",
-#                                   "PERCENT_DIFF_REALIZ REAL)"))
+ discard <- dbExecute(conn, paste0("CREATE TABLE datasets(",
+                                   "UUID VARCHAR(36) PRIMARY KEY, ",
+                                   "P INTEGER, ",
+                                   "CORRP INTEGER, ",
+                                   "LOG_MEAN REAL, ",
+                                   "PERTURBATION REAL, ",
+                                   "REP_NOISE REAL, ",
+                                   "FC_ABSOLUTE REAL, ",
+                                   "FC_RELATIVE REAL, ",
+                                   "FC_PARTIAL REAL, ",
+                                   "BASELINE_CALLS VARCHAR(100000), ",
+                                   "MED_ABS_TOTAL REAL, ",
+                                   "MED_REL_TOTAL REAL, ",
+                                   "PERCENT_DIFF_SIM REAL, ",
+                                   "PERCENT_DIFF_REALIZ REAL)"))
 
 # discard <- dbExecute(conn, "ALTER TABLE datasets ADD COLUMN PERCENT_DIFF REAL;")
 

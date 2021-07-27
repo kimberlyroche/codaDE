@@ -5,28 +5,27 @@
 \title{Generate simulated differential expression for two conditions}
 \usage{
 fit_predictive_model(
-  do_predict = FALSE,
   DE_method = "all",
   plot_weights = FALSE,
   exclude_partials = TRUE,
-  exclude_indepedent = FALSE
+  exclude_independent = FALSE
 )
 }
 \arguments{
-\item{do_predict}{flag indicating whether or not to evaluate predictions on a
-test set}
-
 \item{DE_method}{which DE calling method's results to predict; if "all",
 prediction is over all results together}
 
 \item{plot_weights}{flag indicating whether or not to plot some visualization
 of feature weights}
 
-\item{model}{options are "linear", "RF" (random forest), "EN" (elastic net),
-"GP" (Gaussian process)}
+\item{exclude_partials}{flag indicating whether to exclude simulations with 
+partial abundance information}
+
+\item{exclude_independent}{flag indicating whether to exclude simulations 
+with uncorrelated features}
 }
 \value{
-fitted model
+NULL (fitted models are saved in output directory)
 }
 \description{
 Generate simulated differential expression for two conditions

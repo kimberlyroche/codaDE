@@ -6,9 +6,9 @@
 \usage{
 build_simulated_reference(
   p = 1000,
-  log_mean = 0,
+  log_mean = 1,
   log_var = 4,
-  log_noise_var = 4,
+  perturb_size = 0.5,
   base_correlation = NULL,
   concentration = 1e+06,
   save_name = NULL
@@ -21,8 +21,8 @@ build_simulated_reference(
 
 \item{log_var}{log variance for condition 1}
 
-\item{log_noise_var}{log variance for noise component added to condition 1
-to give condition 2}
+\item{perturb_size}{percent of the log mean to use (on average) as the size 
+of the noise component added to condition 1 to give condition 2}
 
 \item{base_correlation}{this is the base correlation matrix for simulated
 features in log space}
