@@ -127,10 +127,11 @@ for(i in 1:nrow(wishlist)) {
                                        data_obj = data_obj,
                                        replicate_noise = job$REP_NOISE,
                                        proportion_da = job$PERCENT_DIFF)
-  
-  # Visualize via
-  # plot_stacked_bars(sim_data$abundances)
 
+  # # Visualize via
+  # plot_stacked_bars(sim_data$abundances)
+  # plot_stacked_bars(sim_data$observed_counts2)
+  
   # Generate an ID for this data set
   uuid <- UUIDgenerate()
   

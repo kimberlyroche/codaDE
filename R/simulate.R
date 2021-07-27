@@ -119,8 +119,44 @@ simulate_sequence_counts <- function(n = 20,
   library_sizes.observed_counts1 <- rnbinom(n*2, mu = runif(1, min = 5000, 2e06), size = 100)
   
   # Choose an average sequencing depth centered on the original
-  library_sizes.observed_counts2 <- c(rnbinom(n, mu = mean(realized_total_counts[1:n]), size = 10),
-                                      rnbinom(n, mu = mean(realized_total_counts[(n+1):(n*2)]), size = 10))
+  # library_sizes.observed_counts2 <- c(rnbinom(n, mu = mean(realized_total_counts[1:n]), size = 0.5),
+  #                                     rnbinom(n, mu = mean(realized_total_counts[(n+1):(n*2)]), size = 0.5))
+  # library_sizes.observed_counts2 <- sapply(library_sizes.observed_counts2, function(x) {
+  #   if(x < 5000) {
+  #     5000
+  #   } else if(x > 2e06) {
+  #     2e06
+  #   } else {
+  #     x
+  #   }
+  # })
+  
+  # Pick a random "depth"
+  depth <- runif(1, min = 5000, 2e06)
+  # Calculate the proportional differential
+  differential <- (mean(realized_total_counts[(n+1):(n*2)]) - mean(realized_total_counts[1:n])) / mean(realized_total_counts)
+  new_differential <- differential*runif(1, min = 0.2, max = 0.8)
+  depth_A <- depth
+  depth_B <- depth + depth*new_differential
+
+  # # Before  
+  # mean(realized_total_counts[1:n])
+  # mean(realized_total_counts[(n+1):(n*2)])
+  # # After
+  # depth_A
+  # depth_B
+  # 
+  library_sizes.observed_counts2 <- c(rnbinom(n, mu = depth_A, size = 10),
+                                      rnbinom(n, mu = depth_B, size = 10))
+  library_sizes.observed_counts2 <- sapply(library_sizes.observed_counts2, function(x) {
+    if(x < 5000) {
+      5000
+    } else if(x > 2e06) {
+      2e06
+    } else {
+      x
+    }
+  })
   
   # Transform to proportions (samples x features)
   sampled_proportions <- t(apply(abundances, 1, function(x) x/sum(x)))
