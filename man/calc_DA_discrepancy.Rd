@@ -18,8 +18,7 @@ string that can be parsed into one) made on the absolute abundances}
 correction}
 }
 \value{
-named list of all calls, TPR, FPR, and percent of features 
-differentially abundant (according to the oracle calls)
+named list of all calls, TPR, and FPR
 }
 \description{
 Calculates the discrepancy between differential abundance calls made on

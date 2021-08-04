@@ -270,11 +270,311 @@ parse_Athanasiadou <- function(absolute = TRUE, which_data = "ciona") {
   # }
 }
 
+#' Parse the Song et al. (2021) nCounter data
+#'
+#' @param absolute flag indicating whether or not to parse absolute abundance
+#' data
+#' @return named list of counts and group labels
+#' @import stringr
+#' @import edgeR
+#' @export
+parse_Song <- function(absolute = TRUE) {
+  file_dir <- file.path("data", "Song_2021")
+  # Had to first remove a pound sign in the Accession No field name
+  headers <- read.table(file.path(file_dir, "GSE161116_series_matrix.txt"),
+                        header = FALSE, skip = 25, nrow = 8, sep = "\t")
+  groups <- unname(unlist(headers[8,2:ncol(headers)]))
+  groups <- factor(groups, levels = c("primary lung cancer", "brain metastasis"))
+  levels(groups) <- c("lung", "brain")
+  
+  mrna <- read.table(file.path(file_dir, "GSE161116_series_matrix.txt"),
+                     header = FALSE, skip = 60, nrow = 779, sep = "\t")
+  rownames(mrna) <- NULL
+  colnames(mrna) <- NULL
+  
+  gene_names <- mrna[,1]
+  mrna <- mrna[,2:ncol(mrna)]
+  
+  ref_idx <- unname(which(sapply(gene_names, function(x) str_detect(x, "^POS_"))))
+  
+  # mRNA are rows 1:770
+  # Negative controls (ERCC spike-ins) are named NEG_A (etc. and have very low
+  #   abundance)
+  # Positive controls (ERCC spike-ins) are named POS_A (etc.)
+  
+  # Use edgeR (for now) to compute the size factor
+  sf <- calcNormFactors(mrna[ref_idx,]) # columns assumed to be samples
+  counts <- mrna[-ref_idx,]
+  if(absolute) {
+    for(j in 1:ncol(counts)) {
+      counts[,j] <- counts[,j] / sf[j]
+    }
+  }
+  counts <- as.matrix(counts)
+  colnames(counts) <- NULL
+  rownames(counts) <- NULL
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  return(parsed_obj)
+}
+
+#' Parse the Muraro et al. (2016) single-cell pancreas data set
+#'
+#' @param absolute flag indicating whether or not to parse absolute abundance
+#' data
+#' @return named list of counts and group labels
+#' @import stringr
+#' @import edgeR
+#' @export
+parse_Muraro <- function(absolute = TRUE) {
+  file_dir <- file.path("data", "Muraro_2016")
+  
+  # Parse data and assignments
+  data_orig <- read.table(file.path(file_dir,
+                                    "GSE85241_cellsystems_dataset_4donors_updated.csv"))
+  
+  # Subset to samples with cluster assignments
+  # The authors of the paper don't give cell type labels in their supplemental
+  # data. They uses a k-medoids clustering algorithm (StemID), then assign 
+  # likely identity to clusters based on marker gene expression.
+  # We'll do a quick and dirty version of the same.
+  assign_fn <- file.path(file_dir, "cluster_assignment.rds")
+  if(!file.exists(assign_fn)) {
+    stop("Cluster assignments not found!")
+  }
+  mapping <- readRDS(assign_fn)
+  data <- data_orig[,mapping %>% filter(!is.na(cluster)) %>% pull(idx)]
+  
+  # Pull GCG and INS sequences
+  gcg_idx <- which(sapply(rownames(data), function(x) str_detect(x, "^GCG__")))
+  ins_idx <- which(sapply(rownames(data), function(x) str_detect(x, "^INS__")))
+  # cd24_idx <- which(sapply(rownames(data), function(x) str_detect(x, "^CD24__")))
+  # tm4sf4_idx <- which(sapply(rownames(data), function(x) str_detect(x, "^TM4SF4__")))
+  
+  # ID clusters with max GCG as alpha cells, max INS as beta cells
+  c1 <- data.frame(expr = unlist(unname(data[gcg_idx,])),
+                   cluster = mapping$cluster[!is.na(mapping$cluster)]) %>%
+    group_by(cluster) %>%
+    summarize(mean_expr = mean(expr)) %>%
+    arrange(desc(mean_expr)) %>%
+    top_n(1) %>%
+    pull(cluster)
+  c2 <- data.frame(expr = unlist(unname(data[ins_idx,])),
+                   cluster = mapping$cluster[!is.na(mapping$cluster)]) %>%
+    group_by(cluster) %>%
+    summarize(mean_expr = mean(expr)) %>%
+    arrange(desc(mean_expr)) %>%
+    top_n(1) %>%
+    pull(cluster)
+  
+  # Pull data per group
+  counts_A <- data_orig[,mapping %>% filter(!is.na(cluster)) %>% filter(cluster %in% c(c1)) %>% pull(idx)]
+  counts_B <- data_orig[,mapping %>% filter(!is.na(cluster)) %>% filter(cluster %in% c(c2)) %>% pull(idx)]
+  counts <- cbind(counts_A, counts_B)
+  
+  # Define group labels
+  groups <- c(rep("alpha", ncol(counts_A)), rep("beta", ncol(counts_B)))
+  
+  # Pull spike-in sequences
+  spikein_seqs <- which(sapply(rownames(data), function(x) str_detect(x, "^ERCC-\\d+")))
+  spikein_counts <- cbind(data_orig[spikein_seqs,
+                                    mapping %>% filter(!is.na(cluster)) %>% filter(cluster %in% c(c1)) %>% pull(idx)],
+                          data_orig[spikein_seqs,
+                                    mapping %>% filter(!is.na(cluster)) %>% filter(cluster %in% c(c2)) %>% pull(idx)])
+  
+  # Use edgeR (for now) to compute the size factor
+  sf <- calcNormFactors(spikein_counts) # columns assumed to be samples
+  counts <- counts[-spikein_seqs,]
+  if(absolute) {
+    for(j in 1:ncol(counts)) {
+      counts[,j] <- counts[,j] / sf[j]
+    }
+  }
+  counts <- as.matrix(counts)
+  colnames(counts) <- NULL
+  rownames(counts) <- NULL
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  return(parsed_obj)
+}
+
+#' Parse the Monaco et al. (2019) immune cell data set
+#'
+#' @param absolute flag indicating whether or not to parse absolute abundance
+#' data
+#' @return named list of counts and group labels
+#' @import stringr
+#' @import edgeR
+#' @export
+parse_Monaco <- function(absolute = TRUE) {
+  file_dir <- file.path("data", "Monaco_2019")
+  
+  # Parse data and assignments
+  data <- read.table(file.path(file_dir,
+                               "GSE107011_Processed_data_TPM.txt"))
+  
+  spike_idx <- which(sapply(rownames(data), function(x) str_detect(x, "^ERCC-")))
+  
+  # Plot spike-in relative abundance by type
+  groups <- sapply(colnames(data), function(x) {
+    pieces <- strsplit(x, "_")[[1]]
+    paste0(pieces[2:length(pieces)], collapse = "_")
+  })
+  
+  # Compute size factor
+  sf <- unname(unlist(calcNormFactors(data[spike_idx,]))) # columns assumed to be samples
+  
+  # Re-normalize
+  counts <- data
+  if(absolute) {
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- counts[,i] / sf[i]
+    }
+  }
+  counts <- as.matrix(counts)
+  colnames(counts) <- NULL
+  rownames(counts) <- NULL
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  return(parsed_obj)
+}
+
+#' Parse the Hashimshony et al. (2016) mouse fibroblast data set
+#'
+#' @param absolute flag indicating whether or not to parse absolute abundance
+#' data
+#' @param use_spike_ins optional flag indicating whether or not to normalize
+#' against spike-ins
+#' @return named list of counts and group labels
+#' @import stringr
+#' @import edgeR
+#' @export
+parse_Hashimshony <- function(absolute = TRUE, use_spike_ins = FALSE) {
+  file_dir <- file.path("data", "Hashimshony_2016")
+  
+  # Parse data and assignments
+  data <- read.table(file.path(file_dir,
+                               "GSE78779_Expression_C1_96_cells.txt"),
+                     sep = "\t",
+                     header = TRUE)
+  
+  groups <- sapply(colnames(data)[2:ncol(data)], function(x) {
+    strsplit(x, "_")[[1]][2]
+  })
+  # Eliminate samples with missing/ambiguous cell cycle markers
+  retain_idx <- which(!(groups %in% c(".", "n.a.")))
+  data <- data[,c(1, retain_idx+1)]
+  groups <- groups[retain_idx]
+  groups <- factor(unname(groups), levels = c("0", "0.3", "0.5", "1"))
+  
+  spike_idx <- which(sapply(data$Sample, function(x) str_detect(x, "^ERCC-")))
+  data <- data[,2:ncol(data)]
+  
+  # Here total abundances look pretty informative. Use:
+  #   gapdh_idx <- which(data$Sample == "ENSMUSG00000057666")
+  # which returns 16179
+  
+  # Re-normalize
+  counts <- data
+  if(absolute & use_spike_ins) {
+    # Compute size factor
+    sf <- unname(unlist(calcNormFactors(counts[spike_idx,]))) # columns assumed to be samples
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- counts[,i] / sf[i]
+    }
+  } else if(!absolute) {
+    # Shuffle observed abundances
+    set.seed(1001)
+    new_totals <- sample(round(colSums(counts)))
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- rmultinom(1, size = new_totals[i], prob = counts[,i] / sum(counts[,i]))
+    }
+  }
+  counts <- as.matrix(counts)
+  colnames(counts) <- NULL
+  rownames(counts) <- NULL
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  return(parsed_obj)
+}
+
+#' Parse the Kimmerling et al. (2018) fibroblast data set
+#'
+#' @param absolute flag indicating whether or not to parse absolute abundance
+#' data
+#' @return named list of counts and group labels
+#' @import stringr
+#' @export
+parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE) {
+  file_dir <- file.path("data", "Kimmerling_2018")
+
+  data <- read.table(file.path(file_dir, "fl5_serial_rsem3.txt"),
+                     sep = "\t",
+                     header = TRUE,
+                     row.names = 1)
+  meta <- read.table(file.path(file_dir, "qc_fl5_serial3.txt"),
+                     sep = "\t",
+                     header = TRUE,
+                     row.names = 1)
+  
+  # Column names in `data` appear to match the rownames in `meta`
+  # Rows (samples) in `meta` are alphabetically ordered; arrange `data` columns
+  # to match
+  reorder <- order(colnames(data))
+  data <- data[,reorder]
+  
+  # QC as in the author's analysis
+  qc_samples <- meta$mass >= 0 & meta$gene_count >= 500
+  # qc_samples <- meta$mass >= 0
+  
+  data <- data[,qc_samples]
+  meta <- meta[qc_samples,]
+
+  # The rationale for this squick and dirty renormalization is that I want a
+  # size factor generated from the distribution of mass, centered at 1, with
+  # a SD of around 0.1
+  sf <- scale(meta$mass/(sd(meta$mass)*10), scale = F) + 1
+  
+  counts <- data
+  if(absolute) {
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- counts[,i] * sf[i]
+    }
+  }
+  
+  # We'll separate groups into highest and lowest thirds by mass
+  thresholds <- quantile(meta$mass, probs = c(1/3, 2/3))
+  groups <- numeric(ncol(counts))
+  groups[meta$mass < thresholds[1]] <- 1
+  groups[meta$mass > thresholds[2]] <- 2
+  
+  counts <- counts[,groups != 0]
+  meta <- meta[groups != 0,]
+  groups <- groups[groups != 0]
+  
+  # Reorder the data and metadata
+  reorder <- order(groups)
+  counts <- counts[,reorder]
+  meta <- meta[reorder,]
+  groups <- groups[reorder]
+  
+  counts <- as.matrix(counts)
+  colnames(counts) <- NULL
+  rownames(counts) <- NULL
+
+  groups <- factor(groups, levels = c("1", "2"))
+  levels(groups) <- c("low_mass", "high_mass")
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  return(parsed_obj)
+}
+
 #' Parse the TCGA ESCA RNA-seq data
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
 #' @return named list of counts and group labels
+#' @import stringr
 #' @export
 parse_ESCA <- function(absolute = TRUE) {
   file_dir <- file.path("data", "TCGA_ESCA")
@@ -292,10 +592,14 @@ parse_ESCA <- function(absolute = TRUE) {
                                "Human__TCGA_ESCA__UNC__RNAseq__HiSeq_RNA__01_28_2016__BI__Gene__Firehose_RSEM_log2.cct"))
   colnames(esca)[1] <- "gene_name"
   
-  # Find spike-ins and separate into spike-in and all other sequence data sets
   spikein_idx <- unname(which(sapply(esca$gene_name, function(x) {
-    str_detect(x, "^ERCC")
+    x == "GAPDH"
   })))
+
+  # Find spike-ins and separate into spike-in and all other sequence data sets
+  # spikein_idx <- unname(which(sapply(esca$gene_name, function(x) {
+  #   str_detect(x, "^ERCC")
+  # })))
   esca_spike <- esca[spikein_idx,2:ncol(esca)]
   esca <- esca[-spikein_idx,2:ncol(esca)]
   
@@ -342,3 +646,72 @@ parse_ESCA <- function(absolute = TRUE) {
   # saveRDS(parsed_obj, file = parsed_data_fn)
   return(parsed_obj)
 }
+
+
+#' Parse the Vieira-Silva et al. (2019) QMP data set
+#'
+#' @param absolute flag indicating whether or not to parse absolute abundance
+#' data
+#' @return named list of counts and group labels
+#' @import stringr
+#' @export
+parse_VieiraSilva <- function(absolute = TRUE) {
+  file_dir <- file.path("data", "Vieira-Silva_2019")
+  
+  data <- read.table(file.path(file_dir, "QMP.matrix.tsv"))
+  data <- as.matrix(data)
+  lowest_observed <- min(data[data != 0])
+  data <- data / lowest_observed
+  
+  meta <- read.table(file.path(file_dir, "41564_2019_483_MOESM3_ESM.txt"),
+                     sep = "\t",
+                     skip = 1,
+                     header = FALSE)
+  meta <- data.frame(sample_id = meta$V1, cohort = meta$V2)
+  meta <- meta %>%
+    filter(sample_id %in% rownames(data)) %>%
+    arrange(cohort)
+  meta$idx_in_meta <- 1:nrow(meta)
+  
+  # Get the samples in the QMP matrix into agreement
+  mapping <- meta %>%
+    left_join(data.frame(sample_id = rownames(data), idx_in_data = 1:nrow(data)), by = "sample_id")
+  data <- data[mapping$idx_in_data,]
+  data <- t(data)
+
+  # Columns (samples) in `data` now match identity of rows in `meta`
+  # Difference in total abundance is predictably largest between Crohn's disease
+  # cohort (CD) and healthy controls (mHC)
+  # library(ggplot)
+  # ggplot(data.frame(y = colSums(counts), x = meta$cohort), aes(x = x, y = y)) +
+  #   geom_boxplot()
+  
+  counts <- round(data)
+  if(!absolute) {
+    # Shuffle observed abundances
+    set.seed(1001)
+    new_totals <- sample(round(colSums(counts)))
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- rmultinom(1, size = new_totals[i], prob = counts[,i] / sum(counts[,i]))
+    }
+  }
+  counts <- as.matrix(counts)
+  colnames(counts) <- NULL
+  rownames(counts) <- NULL
+  
+  groups <- factor(meta$cohort)
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  return(parsed_obj)
+}
+
+
+
+
+
+
+
+
+
+
+

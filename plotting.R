@@ -113,7 +113,9 @@ ps <- c(100, 1000, 5000)
 partials <- c(0, 1)
 references <- c("oracle", "self")
 
-qq_res <- dbGetQuery(conn, "SELECT FC_ABSOLUTE FROM datasets")$FC_ABSOLUTE
+qq_res <- dbGetQuery(conn, paste0("SELECT FC_ABSOLUTE FROM datasets ",
+                                  "WHERE FC_ABSOLUTE <= 10 AND ",
+                                  "FC_ABSOLUTE >= 0.1"))$FC_ABSOLUTE
 qq_res <- sapply(qq_res, function(x) {
   if(x < 1) {
     1 / x
@@ -149,19 +151,21 @@ for(p in ps) {
                                      "FC_PARTIAL, ",
                                      "MED_ABS_TOTAL, ",
                                      "MED_REL_TOTAL, ",
-                                     "PERCENT_DIFF, ",
+                                     "PERCENT_DIFF_REALIZ, ",
                                      "TPR, ",
                                      "FPR ",
                                      "FROM results LEFT JOIN datasets ON ",
                                      "results.UUID=datasets.UUID ",
                                      "WHERE P=", p, " ",
                                      "AND PARTIAL_INFO=", partial, " ",
-                                     "AND BASELINE_TYPE='",reference,"';"))
+                                     "AND BASELINE_TYPE='",reference,"' ",
+                                     "AND FC_ABSOLUTE <= 10 ",
+                                     "AND FC_ABSOLUTE >= 0.1;"))
       
       # Strip "result-less" entries
       res <- res %>%
         filter(!is.na(TPR) & !is.na(FPR))
-
+      
       # Remove some of the simulations with huge median abundances
       # res <- res %>%
       #   filter(MED_ABS_TOTAL < 2e06)
@@ -181,18 +185,20 @@ for(p in ps) {
       res$FC_plot <- cut(res$FC_plot, breaks = qq)
       levels(res$FC_plot) <- c("low", "moderate", "high")
       
-      # Render median absolute totals on log scale for better visualization
-      res$LOG_MAT <- log(res$MED_ABS_TOTAL)
-      
       # Shuffle before plotting
       res <- res[sample(1:nrow(res)),]
       
-      plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference)
-      plot_ROC(res, plot_tag = NULL)
-      plot_ROC(res %>% filter(PERCENT_DIFF <= 0.5), plot_tag = NULL, "FC_plot", "Fold change") # Look at no. features DE?
-      plot_ROC(res, plot_tag = NULL, "LOG_MAT", "Log med.\ntotal (orig.)")
+      # plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference)
+      # plot_ROC(res, plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
+
+      plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference, "_max50")
+      plot_ROC(res %>% filter(PERCENT_DIFF_REALIZ < 0.5), plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
+      
+      # plot_ROC(res, plot_tag)
+      # plot_ROC(res, plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
+      # plot_ROC(res, plot_tag = NULL, "LOG_MAT", "Log med.\ntotal (orig.)")
       # plot_ROC(res, plot_tag, "MED_REL_TOTAL", "Median total relative abundance")
-      plot_ROC(res, plot_tag = NULL, "PERCENT_DIFF", "Percent DA features")
+      # plot_ROC(res, plot_tag = NULL, "PERCENT_DIFF", "Percent DA features")
       # plot_ROC(res, plot_tag = NULL, "CORRP", "Correlation level")
       # plot_ROC(res, plot_tag = NULL, "LOG_MEAN", "Log mean abundance")
       # plot_ROC(res, plot_tag = NULL, "PERTURBATION", "Log mean perturbation")
@@ -202,26 +208,11 @@ for(p in ps) {
       # label_combo(res, plot_tag, res$LOG_MAT > 17 & res$FC_plot == "high")
       # label_combo(res, plot_tag, res$LOG_MAT > 16 & res$REP_NOISE < 0.25)
       # label_combo(res, plot_tag, res$PERCENT_DIFF > 0.5)
-      label_combo(res, plot_tag, res$PERCENT_DIFF < 0.5)
+      # label_combo(res, plot_tag, res$PERCENT_DIFF < 0.5)
       
       # LM test - What explains the high FPR in some samples?
       # Answer - Surprisingly, it's having a high starting abundance. These are
       #          generally scenarios where you've got a big downsampling
-      
-      # lm_res <- res %>%
-      #   select(TPR, FPR, METHOD, CORRP, LOG_MEAN, PERTURBATION, REP_NOISE, FC_ABSOLUTE, FC_RELATIVE, PERCENT_DIFF, MED_ABS_TOTAL) %>%
-      #   mutate(FC_ABSOLUTE = log(FC_ABSOLUTE)) %>%
-      #   mutate(MED_ABS_TOTAL = log(MED_ABS_TOTAL))
-      # fit_fpr <- randomForest(FPR ~ ., data = lm_res %>% select(-TPR))
-      # varImpPlot(fit_fpr)
-      # ggplot(data.frame(x = lm_res$FPR, y = fit_fpr$predicted),
-      #        aes(x = x, y = y, fill = lm_res$MED_ABS_TOTAL)) +
-      #   geom_point(size = 2, shape = 21) +
-      #   scale_fill_distiller(palette = "RdYlBu") + # continuous
-      #   # scale_fill_brewer(palette = "RdYlBu") + # discrete
-      #   labs(x = "True FPR",
-      #        y = "Predicted FPR",
-      #        fill = "MED_ABS_TOTAL")
       
       # Find "interesting" simulations and visualize them as stacked bar plots
       # temp <- res %>%
@@ -236,10 +227,44 @@ for(p in ps) {
       # plot_stacked_bars(data$simulation$abundances, palette = palette)
       # plot_stacked_bars(data$simulation$observed_counts1, palette = palette)
       
-      # What do false positive calls look like here vs. true negatives?
-      # Like compositional effects.
-      # But why are they more prevalent where original total abundances are 
-      # high?
+      # res <- res %>%
+      #   filter(METHOD == 'DESeq2' & FPR > 0.6)
+      # uuid <- sample(res$UUID, size = 1) # Pull this dataset
+      # 
+      # res2 <- dbGetQuery(conn, paste0("SELECT datasets.UUID, BASELINE_TYPE, CALLS, ",
+      #                                 "datasets.BASELINE_CALLS AS ORACLE_CALLS, ",
+      #                                 "results.BASELINE_CALLS AS SELF_CALLS ",
+      #                                 "FROM results LEFT JOIN datasets ",
+      #                                 "ON results.UUID=datasets.UUID WHERE ",
+      #                                 "METHOD='DESeq2' AND ",
+      #                                 "datasets.UUID='", uuid, "' AND ",
+      #                                 "PARTIAL_INFO=0"))
+      # 
+      # oracle_calls <- as.numeric(str_split(res2 %>%
+      #                                        filter(is.na(SELF_CALLS)) %>%
+      #                                        pull(ORACLE_CALLS), ";")[[1]])
+      # self_calls <- as.numeric(str_split(res2 %>%
+      #                                      filter(!is.na(SELF_CALLS)) %>%
+      #                                      pull(SELF_CALLS), ";")[[1]])
+      # 
+      # oracle_adj <- p.adjust(oracle_calls, method = "BH")
+      # self_adj <- p.adjust(self_calls, method = "BH")
+      # 
+      # idx <- which(oracle_adj >= 0.05 & self_adj < 0.05)
+      # 
+      # data <- readRDS(file.path("output", "datasets", paste0(uuid, ".rds")))
+      # abundances <- data$simulation$abundances
+      # 
+      # # What does a random disagreement (NO by oracle, YES by DESeq2) look like?
+      # ggplot(data.frame(x = 1:nrow(abundances),
+      #                   y = abundances[,sample(idx, size = 1)],
+      #                   group = factor(data$simulation$groups)),
+      #        aes(x = x, y = y, fill = group)) +
+      #   geom_point(size = 2, shape = 21) +
+      #   theme_bw() +
+      #   labs(x = "sample index",
+      #        y = "abundance")
+      
       # rates <- calc_DA_discrepancy(temp2$CALLS, temp2$ORACLE_BASELINE)
       # idx <- sample(which(rates$FP_calls == TRUE), size = 1)
       # par(mfrow = c(1, 2))
@@ -248,88 +273,5 @@ for(p in ps) {
     }
   }
 }
-
-# ------------------------------------------------------------------------------
-#   Distributions of simulated datasets
-# ------------------------------------------------------------------------------
-
-res <- dbGetQuery(conn, "SELECT P, CORRP, PERCENT_DIFF, FC_ABSOLUTE FROM datasets")
-res <- res %>%
-  filter(CORRP %in% c(0, 4))
-res$CORRP <- factor(res$CORRP, levels = c("0", "4"))
-levels(res$CORRP) <- c("Independent features", "Strongly correlated features")
-pl <- ggplot(res, aes(x = PERCENT_DIFF, fill = factor(P))) +
-  geom_density(alpha = 0.6) +
-  scale_fill_brewer(palette = "RdYlGn") +
-  facet_wrap(. ~ CORRP) +
-  xlim(c(0, 1)) +
-  theme_bw() +
-  labs(x = "percent differentially abundant features",
-       fill = "Feature number")
-show(pl)
-ggsave(file.path("output",
-                 "images",
-                 paste0("PERCENT_DIFF.png")),
-       plot = pl,
-       dpi = 100,
-       units = "in",
-       height = 3,
-       width = 6)
-
-pl <- ggplot(res, aes(x = FC_ABSOLUTE, fill = factor(P))) +
-  geom_density(alpha = 0.6) +
-  scale_fill_brewer(palette = "RdYlGn") +
-  facet_wrap(. ~ CORRP) +
-  xlim(c(0, 10)) +
-  theme_bw() +
-  labs(x = "absolute fold change in abundance",
-       fill = "Feature number")
-show(pl)
-ggsave(file.path("output",
-                 "images",
-                 paste0("FC_ABSOLUTE.png")),
-       plot = pl,
-       dpi = 100,
-       units = "in",
-       height = 3,
-       width = 6)
-
-# ------------------------------------------------------------------------------
-#   Information "restored" in partial case
-#
-#   Whoops, it looks like the "partially informative" totals scenario 
-#   essentially fully restores total abundances!
-# ------------------------------------------------------------------------------
-
-res <- dbGetQuery(conn, paste0("SELECT datasets.UUID, FC_ABSOLUTE, TOTALS_C_FC, PARTIAL FROM ",
-                               "datasets LEFT JOIN characteristics ON ",
-                               "datasets.UUID = characteristics.UUID WHERE ",
-                               "PARTIAL = 1"))
-
-# Make this symmetric, so it's comparable to TOTAL_C_FC
-res$FC_ABSOLUTE <- sapply(res$FC_ABSOLUTE, function(x) {
-  ifelse(x < 1, 1/x, x)
-})
-
-pl <- ggplot(res, aes(x = FC_ABSOLUTE, y = TOTALS_C_FC)) +
-  geom_point(size = 2, shape = 21, fill = "#bbbbbb") +
-  theme_bw() +
-  labs(x = "Absolute fold change in totals (original abundances)",
-       y = "Absolute fold change in totals (observed abundances)")
-show(pl)
-ggsave(file.path("output",
-                 "images",
-                 paste0("PARTIAL_correlation.png")),
-       plot = pl,
-       dpi = 100,
-       units = "in",
-       height = 5,
-       width = 5.5)
-
-cor(res$FC_ABSOLUTE, res$TOTALS_C_FC)**2
-
-# ------------------------------------------------------------------------------
-#   Other / TBD
-# ------------------------------------------------------------------------------
 
 dbDisconnect(conn)

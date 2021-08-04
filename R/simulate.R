@@ -131,21 +131,26 @@ simulate_sequence_counts <- function(n = 20,
   #   }
   # })
   
-  # Pick a random "depth"
-  depth <- runif(1, min = 5000, 2e06)
   # Calculate the proportional differential
-  differential <- (mean(realized_total_counts[(n+1):(n*2)]) - mean(realized_total_counts[1:n])) / mean(realized_total_counts)
-  new_differential <- differential*runif(1, min = 0.2, max = 0.8)
-  depth_A <- depth
-  depth_B <- depth + depth*new_differential
-
-  # # Before  
-  # mean(realized_total_counts[1:n])
-  # mean(realized_total_counts[(n+1):(n*2)])
-  # # After
-  # depth_A
-  # depth_B
-  # 
+  FC <- (mean(realized_total_counts[(n+1):(n*2)]) - mean(realized_total_counts[1:n])) / mean(realized_total_counts)
+  # percent_FC_retained <- runif(1, min = 0.2, max = 0.8)
+  percent_FC_retained <- 0.9
+  print(percent_FC_retained)
+  sampled_FC <- FC*percent_FC_retained
+  
+  new_baseline_depth <- runif(1, min = 5000, 1e06)
+  new_differential <- new_baseline_depth * sampled_FC
+  
+  if(new_differential > 0) {
+    # B larger than A
+    depth_A <- new_baseline_depth
+    depth_B <- depth_A + new_differential
+  } else {
+    # B smaller than A
+    depth_B <- new_baseline_depth
+    depth_A <- depth_B + abs(new_differential)
+  }
+  
   library_sizes.observed_counts2 <- c(rnbinom(n, mu = depth_A, size = 10),
                                       rnbinom(n, mu = depth_B, size = 10))
   library_sizes.observed_counts2 <- sapply(library_sizes.observed_counts2, function(x) {

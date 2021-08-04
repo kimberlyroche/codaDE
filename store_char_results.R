@@ -23,7 +23,7 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 updates <- 0
 file_list <- list.files(dir, pattern = "output_char")
 for(file in file_list) {
-  results <- read.table(file.path(dir, file))
+  results <- read.table(file.path(dir, file), header = TRUE)
   for(i in 1:nrow(results)) {
     job <- results[i,]
   
