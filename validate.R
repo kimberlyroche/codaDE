@@ -72,43 +72,13 @@ if(dataset_name == "Athanasiadou_yeast") {
   # rel_data$counts <- rel_data$counts[sample_idx,]
 }
 if(dataset_name == "Song") {
-  # Add this to a function later if we end up using it
-  file_dir <- file.path("data", "Song_2021")
-  # Had to first remove a pound sign in the Accession No field name
-  headers <- read.table(file.path(file_dir, "GSE161116_series_matrix.txt"),
-                        header = FALSE, skip = 25, nrow = 8, sep = "\t")
-  status <- unname(unlist(headers[8,2:ncol(headers)]))
-  status <- factor(status, levels = c("primary lung cancer", "brain metastasis"))
-  levels(status) <- c("lung", "brain")
-  
-  mrna <- read.table(file.path(file_dir, "GSE161116_series_matrix.txt"),
-                     header = FALSE, skip = 60, nrow = 779, sep = "\t")
-  rownames(mrna) <- NULL
-  colnames(mrna) <- NULL
-  
-  gene_names <- mrna[,1]
-  mrna <- mrna[,2:ncol(mrna)]
-  
-  ref_idx <- unname(which(sapply(gene_names, function(x) str_detect(x, "^POS_"))))
-  
-  # mRNA are rows 1:770
-  # Negative controls (ERCC spike-ins) are named NEG_A (etc. and have very low
-  #   abundance)
-  # Positive controls (ERCC spike-ins) are named POS_A (etc.)
-  
-  # Normalize as using the spike-ins via an estimate from DESeq2
-  countData <- round(mrna[ref_idx,])
-  ed <- DESeqDataSetFromMatrix(countData, DataFrame(status), ~ status)
-  ed <- estimateSizeFactors(ed)
-  
-  # Visualize the roughly-normalized data
-  adjusted_mrna <- mrna[-ref_idx,]
-  for(j in 1:ncol(adjusted_mrna)) {
-    adjusted_mrna[,j] <- adjusted_mrna[,j] / sizeFactors(ed)[j]
-  }
-  
-  abs_data <- list(counts = adjusted_mrna, groups = status, tax = NULL)
-  rel_data <- list(counts = mrna[-ref_idx,], groups = status, tax = NULL)
+  abs_data <- parse_Song(absolute = TRUE)
+  rel_data <- parse_Song(absolute = FALSE)
+  # Downsample for testing
+  # k <- 1000
+  # sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
+  # abs_data$counts <- abs_data$counts[sample_idx,]
+  # rel_data$counts <- rel_data$counts[sample_idx,]
 }
 if(dataset_name == "Muraro") {
   # Parse data and assignments
@@ -216,8 +186,8 @@ ref_data <- apply(ref_data, c(1,2), as.integer)
 data <- apply(data, c(1,2), as.integer)
 
 # Look at sparsity; filter out too-low features
-# retain_features <- colSums(ref_data) > 10 & colSums(data) > 10
-retain_features <- colSums(ref_data) > 2 & colSums(data) > 2 # Loosened for Song et al.
+retain_features <- colSums(ref_data) > 10 & colSums(data) > 10
+# retain_features <- colSums(ref_data) > 2 & colSums(data) > 2 # Loosened for Song et al.
 ref_data <- ref_data[,retain_features]
 data <- data[,retain_features]
 
@@ -269,8 +239,10 @@ plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 for(use_result_type in c("TPR", "FPR")) {
 
   plot_df <- NULL
-  
+
   for(DE_method in c("ALDEx2", "DESeq2", "MAST", "scran")) {
+    
+    cat(paste0("Evaluating ", use_result_type, " x ", DE_method, "\n"))
 
     features$METHOD <- DE_method
     features$METHOD <- factor(features$METHOD, levels = c("ALDEx2", "DESeq2", "MAST", "scran"))

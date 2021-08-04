@@ -17,9 +17,9 @@ save_dir <- fp
 
 use_baseline <- "self"
 use_result_type <- "fpr"
-testing <- FALSE
+testing <- TRUE
 
-save_fn <- "saved_query_results.rds"
+save_fn <- "temp.rds"
 if(file.exists(save_fn)) {
   data <- readRDS(save_fn)
 } else {
@@ -134,11 +134,12 @@ if(testing) {
 }
 
 features <- cbind(METHOD = features[,factors], features_nonfactors)
-features$METHOD <- as.numeric(features$METHOD)
 
-#write.table(features, "features.txt", col.names = F, row.names = F)
-#write.table(data %>% select(TPR), "response_TPR.txt", col.names = F, row.names = F)
-#write.table(data %>% select(FPR), "response_FPR.txt", col.names = F, row.names = F)
+write.table(features, "features.txt")
+write.table(data %>% select(TPR), "response_TPR.txt")
+write.table(data %>% select(FPR), "response_FPR.txt")
+
+quit()
 
 if(use_result_type == "tpr") {
   response <- data %>%
@@ -176,6 +177,7 @@ save_fn <- file.path(save_dir,
                             ".rds"))
 if(!file.exists(save_fn)) {
   start <- Sys.time()
+  train_features$METHOD <- as.numeric(train_features$METHOD)
   res <- mlegp(train_features, train_response)
   cat(paste0("Elapsed fit time: ", Sys.time() - start, "\n"))
   saveRDS(list(result = res,
@@ -227,5 +229,3 @@ ggsave(file.path(save_dir,
 # Calculate R^2
 cat(paste0("R^2 (",toupper(use_result_type),"): ",
            round(cor(plot_df$true, plot_df$predicted)^2, 3), "\n"))
-
-

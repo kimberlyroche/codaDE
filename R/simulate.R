@@ -133,7 +133,10 @@ simulate_sequence_counts <- function(n = 20,
   
   # Calculate the proportional differential
   FC <- (mean(realized_total_counts[(n+1):(n*2)]) - mean(realized_total_counts[1:n])) / mean(realized_total_counts)
-  sampled_FC <- FC*runif(1, min = 0.2, max = 0.8)
+  # percent_FC_retained <- runif(1, min = 0.2, max = 0.8)
+  percent_FC_retained <- 0.9
+  print(percent_FC_retained)
+  sampled_FC <- FC*percent_FC_retained
   
   new_baseline_depth <- runif(1, min = 5000, 1e06)
   new_differential <- new_baseline_depth * sampled_FC

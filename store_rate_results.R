@@ -28,8 +28,8 @@ for(file in file_list) {
     job <- results[i,]
     updates <- updates + dbExecute(conn,
                                    paste0("UPDATE RESULTS SET ",
-                                          "TPR = ",ifelse(is.na(job$tpr), "NULL", job$tpr), ", ",
-                                          "FPR = ",ifelse(is.na(job$fpr), "NULL", job$fpr), " ",
+                                          "TPR = ",job$tpr, ", ",
+                                          "FPR = ", job$fpr, " ",
                                           "WHERE ",
                                           "UUID = '", job$uuid, "' AND ",
                                           "METHOD = '", job$method, "' AND ",

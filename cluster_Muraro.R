@@ -1,5 +1,3 @@
-source("path_fix.R")
-
 library(tidyverse)
 library(codaDE)
 
@@ -14,7 +12,7 @@ source("RaceID2_StemID_class.R")
 data_orig <- read.table("GSE85241_cellsystems_dataset_4donors_updated.csv")
 
 # Subset the data: 3000 features x 3072 samples (cells)
-# data <- data_orig[1:3000,]
+# data <- data_orig[1:5000,]
 data <- data_orig
 
 # Filter and cluster using StemID (Gruen et al.) as in Muraro et al.
@@ -47,7 +45,8 @@ mapping <- data.frame(sample_name = colnames(data), idx = 1:ncol(data)) %>%
   left_join(data.frame(sample_name = names(assignments), cluster = unname(assignments)), by = "sample_name")
 head(mapping)
 
-saveRDS(mapping, "Muraro_cluster_assignment.rds")
+assign_fn <- file.path("data", "Muraro_2016", "cluster_assignments.rds")
+saveRDS(mapping, assign_fn)
 quit()
 
 # Pull spike-in sequences
@@ -74,16 +73,3 @@ res <- call_DA_DESeq2(t(round(counts)), groups)
 x <- length(res$pval)
 y <- sum(p.adjust(res$pval, method = "BH") < 0.05)
 cat(paste0("Differential: ", round(y, 3), " / ", x, "\n"))
-
-
-
-
-
-
-
-
-
-
-
-
-
