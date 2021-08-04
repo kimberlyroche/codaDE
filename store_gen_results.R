@@ -28,7 +28,7 @@ for(file in file_list) {
     job <- results[i,]
     if(!any(is.na(job))) {
       insertions <- insertions + dbExecute(conn, paste0(
-        "INSERT INTO datasets(UUID, P, CORRP, LOG_MEAN, ",
+        "INSERT OR REPLACE INTO datasets(UUID, P, CORRP, LOG_MEAN, ",
         "PERTURBATION, REP_NOISE, ",
         "FC_ABSOLUTE, FC_RELATIVE, ",
         "FC_PARTIAL, BASELINE_CALLS, ",

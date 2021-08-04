@@ -5,8 +5,8 @@
 1) Run `generate_settings.R --p=XXX` first to find missing datasets/parameterizations. This script sweeps 
 through and enumerates all parameter settings, saving them to a file.
 
-2) Run `batch_gen.pl`, setting P and TOTAL JOB NUMBER in the script. This will put the results in the 
-`temp` folder.
+2) Run `batch_gen.pl`, setting P and JOB START and END LINE NUMBERS in the script. This will put the 
+results in the `temp` folder.
 
     This calls `generate_data.R --input=XXX --output=XXX --start=XXX --end=XXX`, which generates the new 
     data sets in chunks and makes baseline differential abundance calls on the absolute values, writing
@@ -18,17 +18,23 @@ through and enumerates all parameter settings, saving them to a file.
 #   EVALUATING JOBS
 # --------------------------------------------------------------------------------------------------------
 
-1) Run `pull_eval_uuids.R` to enumerate jobs as:
-   > Rscript pull_eval_uuids.R --p=100
+1) Run `pull_eval_uuids.R --p=XXX` to enumerate remaining jobs.
 
-2) Run `batch_eval.pl`, setting P and JOB START and END LINE NUBMERS in the script.
-   This will put the results in the `temp` folder.
+2) Run `batch_eval.pl`, setting P and JOB START and END LINE NUMBERS in the script. This will put the 
+results in the `temp` folder.
 
-3) Run `store_eval_results.R`
-   This will add ANY results that exist in files in the `temp` directory to the DB!
+3) Run `store_eval_results.R` to write results (in `temp`) to the database.
 
-4) Run `render_rates.R` to calculate TPR and FPR for all results. Note: This takes about 2 hr. to run if
-all TPR / FPR fields in the database must be updated!
+# --------------------------------------------------------------------------------------------------------
+#   CALCULATE TPR / FPR (DISCREPANCIES)
+# --------------------------------------------------------------------------------------------------------
+
+1) Run `pull_rate_uuids.R --p=XXX` to enumerate remaining jobs.
+
+2) Run `batch_rate.pl`, setting P and JOB START and END LINE NUMBERS in the script. This will put the 
+results in the `temp` folder.
+
+3) Run `store_rate_results.R` to write results (in `temp`) to the database.
 
 # --------------------------------------------------------------------------------------------------------
 #   CHARACTERIZING DATA SETS

@@ -37,6 +37,35 @@ if(end < 1) {
   stop("Invalid end row!")
 }
 
+output_fn <- file.path("temp", paste0(output, "_", start, "-", end, ".txt"))
+
+# Initialize output
+output_file <- file(output_fn)
+writeLines(paste0(c("ID", "uuid", "partial_info", "med_abs", "med_rel",
+                    "TOTALS_C_FC", "TOTALS_C_D", "TOTALS_C_MAX_D",
+                    "TOTALS_C_MED_D", "TOTALS_C_SD_D", "CORR_RA_MED",
+                    "CORR_RA_SD", "CORR_RA_SKEW", "CORR_LOG_MED",
+                    "CORR_LOG_SD", "CORR_LOG_SKEW", "CORR_CLR_MED",
+                    "CORR_CLR_SD", "CORR_CLR_SKEW", "COMP_C_P0_A",
+                    "COMP_C_P0_B", "COMP_C_P1_A", "COMP_C_P1_B",
+                    "COMP_C_P5_A", "COMP_C_P5_B", "COMP_RA_P01_A",
+                    "COMP_RA_P01_B", "COMP_RA_P1_A", "COMP_RA_P1_B",
+                    "COMP_RA_P5_A", "COMP_RA_P5_B", "COMP_RA_MAX_A",
+                    "COMP_RA_MED_A", "COMP_RA_SD_A", "COMP_RA_SKEW_A",
+                    "COMP_RA_MAX_B", "COMP_RA_MED_B", "COMP_RA_SD_B",
+                    "COMP_RA_SKEW_B", "COMP_C_ENT_A", "COMP_C_ENT_B",
+                    "FW_RA_MAX_D", "FW_RA_MED_D", "FW_RA_SD_D",
+                    "FW_RA_PPOS_D", "FW_RA_PNEG_D", "FW_RA_PFC05_D",
+                    "FW_RA_PFC1_D", "FW_RA_PFC2_D", "FW_LOG_MAX_D",
+                    "FW_LOG_MED_D", "FW_LOG_SD_D", "FW_LOG_PPOS_D",
+                    "FW_LOG_PNEG_D", "FW_LOG_PFC05_D", "FW_LOG_PFC1_D",
+                    "FW_LOG_PFC2_D", "FW_CLR_MAX_D", "FW_CLR_MED_D",
+                    "FW_CLR_SD_D", "FW_CLR_PPOS_D", "FW_CLR_PNEG_D",
+                    "FW_CLR_PFC05_D", "FW_CLR_PFC1_D", "FW_CLR_PFC2_D"),
+                  collapse = "\t"),
+           output_file)
+close(output_file)
+
 # ------------------------------------------------------------------------------
 #  Pull jobs to run, then run 'em!
 # ------------------------------------------------------------------------------
@@ -56,6 +85,7 @@ if(any(!(wishlist$partial_info %in% c(0, 1)))) {
 output_dir <- file.path("output", "datasets")
 results <- NULL
 
+counter <- 1
 for(i in 1:nrow(wishlist)) {
   cat(paste0("Processing job ", i, " / ", nrow(wishlist), "\n"))
 
@@ -79,12 +109,6 @@ for(i in 1:nrow(wishlist)) {
   
   results_row <- cbind(job, med_abs, med_rel, characterize_dataset(counts_A, counts_B))
   
-  if(is.null(results)) {
-    results <- results_row
-  } else {
-    results <- rbind(results, results_row)
-  }
+  write_delim(results_row, output_fn, delim = "\t", append = TRUE)
+  counter <- counter + 1
 }
-
-output_fn <- file.path("temp", paste0(output, "_", start, "-", end, ".txt"))
-write.table(results, file = output_fn)

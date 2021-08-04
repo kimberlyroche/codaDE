@@ -30,11 +30,11 @@ for(u in 1:length(all_uuids)) {
                                    "WHERE UUID = '",uuid,"' AND ",
                                    "PARTIAL=", par, ";"))
     # Look for any missing fields
-#    if(nrow(res) == 0 || any(is.na(res %>% select(-c(UUID, PARTIAL))))) {
+    if(nrow(res) == 0 || any(is.na(res %>% select(-c(UUID, PARTIAL))))) {
       wishlist <- rbind(wishlist,
                         data.frame(ID = counter, uuid = uuid, partial_info = par))
       counter <- counter + 1
-#    }
+    }
   }
 }
 

@@ -8,8 +8,8 @@ use List::Util qw(min);
 my $p = 5000;
 my $input = "input_eval_".$p.".txt";
 my $output = "output_eval_".$p;
-my $start = 10001;
-my $end = 24000;
+my $start = 1;
+my $end = 298;
 my $chunks = 20;
 
 my $filename = "job.slurm";
@@ -25,7 +25,7 @@ while($i <= $end) {
   print $fh '#SBATCH -J eval_'.$i.'-'.$j."\n";
   print $fh '#SBATCH --mem=32GB'."\n";
   print $fh '#SBATCH --get-user-env'."\n";
-  print $fh '#SBATCH --time=16:00:00'."\n";
+  print $fh '#SBATCH --time=1:00:00'."\n";
   print $fh '#'."\n\n";
 
   print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";

@@ -17,12 +17,12 @@ p <- opt$p
 
 corrp_sweep <- c(0, 1, 2, 3, 4)
 log_mean_sweep <- c(2, 3, 4, 5, 6)
-perturbation_sweep <- c(0.2, 0.4, 0.6, 0.8, 1) # percent log mean
+perturbation_sweep <- c(0.6, 0.8, 1, 1.2, 1.4) # percent log mean
 # perturbation_sweep <- c(0.5, 1, 2, 3, 4)
 # perturbation_sweep <- c(0.1, 0.2, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4)
 rep_noise_sweep <- c(0.2, 0.6, 1)
 # rep_noise_sweep <- c(0, 0.2, 0.4, 0.6, 0.8, 1)
-diff_sweep <- c(0.1, 0.3, 0.5, 0.7)
+diff_sweep <- c(0.2, 0.3, 0.5, 0.7, 0.9)
 
 n_combos <- length(corrp_sweep)*length(log_mean_sweep)*length(perturbation_sweep)*length(rep_noise_sweep)*length(diff_sweep)
 
