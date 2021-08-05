@@ -4,14 +4,11 @@
 \alias{parse_Hashimshony}
 \title{Parse the Hashimshony et al. (2016) mouse fibroblast data set}
 \usage{
-parse_Hashimshony(absolute = TRUE, use_spike_ins = FALSE)
+parse_Hashimshony(absolute = TRUE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance
 data}
-
-\item{use_spike_ins}{optional flag indicating whether or not to normalize
-against spike-ins}
 }
 \value{
 named list of counts and group labels
