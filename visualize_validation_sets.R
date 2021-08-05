@@ -195,7 +195,7 @@ plot_relab(monaco$counts, monaco$group, k = 5000, save_name = "monaco_03.png", h
 #   Hashimshony et al. data
 # ------------------------------------------------------------------------------
 
-hashim <- parse_Hashimshony(absolute = TRUE, use_spike_ins = FALSE)
+hashim <- parse_Hashimshony(absolute = TRUE)
 nrow(hashim$counts[rowMeans(hashim$counts) >= 1,])
 plot_PCA(hashim$counts, hashim$groups, save_name = "hashimshony_01.png")
 calc_prop_DA(hashim$counts, hashim$groups, use_groups = c("0", "1"))

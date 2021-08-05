@@ -443,13 +443,11 @@ parse_Monaco <- function(absolute = TRUE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
-#' @param use_spike_ins optional flag indicating whether or not to normalize
-#' against spike-ins
 #' @return named list of counts and group labels
 #' @import stringr
 #' @import edgeR
 #' @export
-parse_Hashimshony <- function(absolute = TRUE, use_spike_ins = FALSE) {
+parse_Hashimshony <- function(absolute = TRUE) {
   file_dir <- file.path("data", "Hashimshony_2016")
   
   # Parse data and assignments
@@ -476,18 +474,11 @@ parse_Hashimshony <- function(absolute = TRUE, use_spike_ins = FALSE) {
   
   # Re-normalize
   counts <- data
-  if(absolute & use_spike_ins) {
-    # Compute size factor
+  if(absolute) {
+    # Compute size factor from spike-ins
     sf <- unname(unlist(calcNormFactors(counts[spike_idx,]))) # columns assumed to be samples
     for(i in 1:ncol(counts)) {
       counts[,i] <- counts[,i] / sf[i]
-    }
-  } else if(!absolute) {
-    # Shuffle observed abundances
-    set.seed(1001)
-    new_totals <- sample(round(colSums(counts)))
-    for(i in 1:ncol(counts)) {
-      counts[,i] <- rmultinom(1, size = new_totals[i], prob = counts[,i] / sum(counts[,i]))
     }
   }
   counts <- as.matrix(counts)
