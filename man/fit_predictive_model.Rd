@@ -8,7 +8,9 @@ fit_predictive_model(
   DE_method = "all",
   plot_weights = FALSE,
   exclude_partials = TRUE,
-  exclude_independent = FALSE
+  exclude_independent = FALSE,
+  train_percent = 0.8,
+  save_tag = ""
 )
 }
 \arguments{
@@ -23,6 +25,10 @@ partial abundance information}
 
 \item{exclude_independent}{flag indicating whether to exclude simulations 
 with uncorrelated features}
+
+\item{train_percent}{percent of simulated datasets to train on}
+
+\item{save_tag}{optional tag to append to file name for saved predictive model}
 }
 \value{
 NULL (fitted models are saved in output directory)
