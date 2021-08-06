@@ -227,43 +227,43 @@ for(p in ps) {
       # plot_stacked_bars(data$simulation$abundances, palette = palette)
       # plot_stacked_bars(data$simulation$observed_counts1, palette = palette)
       
-      # res <- res %>%
-      #   filter(METHOD == 'DESeq2' & FPR > 0.6)
-      # uuid <- sample(res$UUID, size = 1) # Pull this dataset
-      # 
-      # res2 <- dbGetQuery(conn, paste0("SELECT datasets.UUID, BASELINE_TYPE, CALLS, ",
-      #                                 "datasets.BASELINE_CALLS AS ORACLE_CALLS, ",
-      #                                 "results.BASELINE_CALLS AS SELF_CALLS ",
-      #                                 "FROM results LEFT JOIN datasets ",
-      #                                 "ON results.UUID=datasets.UUID WHERE ",
-      #                                 "METHOD='DESeq2' AND ",
-      #                                 "datasets.UUID='", uuid, "' AND ",
-      #                                 "PARTIAL_INFO=0"))
-      # 
-      # oracle_calls <- as.numeric(str_split(res2 %>%
-      #                                        filter(is.na(SELF_CALLS)) %>%
-      #                                        pull(ORACLE_CALLS), ";")[[1]])
-      # self_calls <- as.numeric(str_split(res2 %>%
-      #                                      filter(!is.na(SELF_CALLS)) %>%
-      #                                      pull(SELF_CALLS), ";")[[1]])
-      # 
-      # oracle_adj <- p.adjust(oracle_calls, method = "BH")
-      # self_adj <- p.adjust(self_calls, method = "BH")
-      # 
-      # idx <- which(oracle_adj >= 0.05 & self_adj < 0.05)
-      # 
-      # data <- readRDS(file.path("output", "datasets", paste0(uuid, ".rds")))
-      # abundances <- data$simulation$abundances
-      # 
-      # # What does a random disagreement (NO by oracle, YES by DESeq2) look like?
-      # ggplot(data.frame(x = 1:nrow(abundances),
-      #                   y = abundances[,sample(idx, size = 1)],
-      #                   group = factor(data$simulation$groups)),
-      #        aes(x = x, y = y, fill = group)) +
-      #   geom_point(size = 2, shape = 21) +
-      #   theme_bw() +
-      #   labs(x = "sample index",
-      #        y = "abundance")
+      res <- res %>%
+        filter(METHOD == 'DESeq2' & FPR > 0.6)
+      uuid <- sample(res$UUID, size = 1) # Pull this dataset
+
+      res2 <- dbGetQuery(conn, paste0("SELECT datasets.UUID, BASELINE_TYPE, CALLS, ",
+                                      "datasets.BASELINE_CALLS AS ORACLE_CALLS, ",
+                                      "results.BASELINE_CALLS AS SELF_CALLS ",
+                                      "FROM results LEFT JOIN datasets ",
+                                      "ON results.UUID=datasets.UUID WHERE ",
+                                      "METHOD='DESeq2' AND ",
+                                      "datasets.UUID='", uuid, "' AND ",
+                                      "PARTIAL_INFO=0"))
+
+      oracle_calls <- as.numeric(str_split(res2 %>%
+                                             filter(is.na(SELF_CALLS)) %>%
+                                             pull(ORACLE_CALLS), ";")[[1]])
+      self_calls <- as.numeric(str_split(res2 %>%
+                                           filter(!is.na(SELF_CALLS)) %>%
+                                           pull(SELF_CALLS), ";")[[1]])
+
+      oracle_adj <- p.adjust(oracle_calls, method = "BH")
+      self_adj <- p.adjust(self_calls, method = "BH")
+
+      idx <- which(oracle_adj >= 0.05 & self_adj < 0.05)
+
+      data <- readRDS(file.path("output", "datasets", paste0(uuid, ".rds")))
+      abundances <- data$simulation$abundances
+
+      # What does a random disagreement (NO by oracle, YES by DESeq2) look like?
+      ggplot(data.frame(x = 1:nrow(abundances),
+                        y = abundances[,sample(idx, size = 1)],
+                        group = factor(data$simulation$groups)),
+             aes(x = x, y = y, fill = group)) +
+        geom_point(size = 2, shape = 21) +
+        theme_bw() +
+        labs(x = "sample index",
+             y = "abundance")
       
       # rates <- calc_DA_discrepancy(temp2$CALLS, temp2$ORACLE_BASELINE)
       # idx <- sample(which(rates$FP_calls == TRUE), size = 1)
