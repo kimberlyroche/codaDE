@@ -240,6 +240,8 @@ characterize_dataset <- function(counts_A, counts_B) {
 #' partial abundance information
 #' @param exclude_independent flag indicating whether to exclude simulations 
 #' with uncorrelated features
+#' @param train_percent percent of simulated datasets to train on
+#' @param save_tag optional tag to append to file name for saved predictive model
 #' @return NULL (fitted models are saved in output directory)
 #' @import RSQLite
 #' @import randomForest
@@ -252,7 +254,9 @@ characterize_dataset <- function(counts_A, counts_B) {
 fit_predictive_model <- function(DE_method = "all",
                                  plot_weights = FALSE,
                                  exclude_partials = TRUE,
-                                 exclude_independent = FALSE) {
+                                 exclude_independent = FALSE,
+                                 train_percent = 0.8,
+                                 save_tag = "") {
   if(!(DE_method %in% c("all", "ALDEx2", "DESeq2", "MAST", "scran"))) {
     stop(paste0("Invalid DE calling method: ", DE_method, "!\n"))
   }
@@ -364,7 +368,7 @@ fit_predictive_model <- function(DE_method = "all",
       n <- nrow(features)
       
       # Define test/train set for all remaining methods
-      train_idx <- sample(1:n, size = round(n*0.8))
+      train_idx <- sample(1:n, size = round(n*train_percent))
       test_idx <- setdiff(1:n, train_idx)
       train_uuids <- uuids[train_idx]
       train_features <- features[train_idx,]
@@ -378,14 +382,16 @@ fit_predictive_model <- function(DE_method = "all",
       if(use_result_type == "FPR") {
         test_response <- 1 - test_response
       }
-        
+
       save_fn <- file.path(save_dir,
                            paste0(DE_method,
                                   "_",
                                   use_result_type,
                                   "_",
                                   use_baseline,
+                                  save_tag,
                                   ".rds"))
+      cat(paste0("Predictive model saving/saved to: ", save_fn, "\n"))
       if(!file.exists(save_fn)) {
         rf_train_data <- cbind(train_features, train_response)
         res <- randomForest(train_response ~ ., data = rf_train_data)

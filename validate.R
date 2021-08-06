@@ -75,8 +75,8 @@ if(dataset_name == "Kimmerling") {
   rel_data <- parse_Kimmerling(absolute = FALSE)
 }
 
-if(testing) {
-  k <- 1000
+if(testing & nrow(abs_data$counts) > 500) {
+  k <- 500
   sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
   abs_data$counts <- abs_data$counts[sample_idx,]
   rel_data$counts <- rel_data$counts[sample_idx,]
@@ -165,7 +165,11 @@ features$P <- ncol(counts_A)
 
 plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 
-for(use_result_type in c("TPR", "FPR")) {
+# For the Kimmerling data, scran throws this error:
+# "inter-cluster rescaling factors are not strictly positive"
+
+#for(use_result_type in c("TPR", "FPR")) {
+for(use_result_type in c("FPR")) {
 
   plot_df <- NULL
 
@@ -176,7 +180,7 @@ for(use_result_type in c("TPR", "FPR")) {
     features$METHOD <- DE_method
     features$METHOD <- factor(features$METHOD, levels = c("ALDEx2", "DESeq2", "MAST", "scran"))
 
-    if(max(table(groups)) < 5 && DE_method == "scran") {
+    if((max(table(groups)) < 5 | dataset_name == "Kimmerling") && DE_method == "scran") {
       next
     }
     
