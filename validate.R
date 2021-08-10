@@ -19,8 +19,8 @@ option_list = list(
               metavar = "character"),
   make_option(c("--range"),
               type = "logical",
-              default = "FALSE",
-              help = "use bootstrapped predictions to generate an interval",
+              default = "TRUE",
+              help = "generate interval predictions",
               metavar = "logical")
 );
 

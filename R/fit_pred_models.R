@@ -283,6 +283,7 @@ fit_predictive_model <- function(DE_method = "all",
   conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
   results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
+                                     "FC_ABSOLUTE, FC_PARTIAL, FC_RELATIVE, ",
                                      "TOTALS_C_FC, TOTALS_C_D, ",
                                      "TOTALS_C_MAX_D, TOTALS_C_MED_D, ",
                                      "TOTALS_C_SD_D, CORR_RA_MED, CORR_RA_SD, ",
@@ -317,9 +318,33 @@ fit_predictive_model <- function(DE_method = "all",
   if(exclude_partials) {
     # Filter out results with partial information
     results <- results %>%
-      filter(PARTIAL_INFO == 0) %>%
-      select(-PARTIAL_INFO)
+      filter(PARTIAL_INFO == 0)
+  } else {
+    # Filter simulations with partial abundances to those that are "informative"
+    # i.e. those with an a fold change intermediate between the observed FC (~1)
+    # and the true FC
+    results$include <- FALSE
+    results$include[results$PARTIAL_INFO == 0] <- TRUE
+    # Decreases
+    results$include[(results$PARTIAL_INFO == 1 &
+                       results$FC_ABSOLUTE > 0.5 &
+                       results$FC_ABSOLUTE < 1 &
+                       results$FC_ABSOLUTE < results$FC_PARTIAL &
+                       results$FC_PARTIAL < results$FC_RELATIVE)] <- TRUE
+    # Increases
+    results$include[(results$PARTIAL_INFO == 1 &
+                       results$FC_ABSOLUTE < 2 &
+                       results$FC_ABSOLUTE > 1 &
+                       results$FC_ABSOLUTE > results$FC_PARTIAL &
+                       results$FC_PARTIAL > results$FC_RELATIVE)] <- TRUE
+    results <- results %>%
+      filter(include) %>%
+      select(!c("include"))
   }
+  
+  results <- results %>%
+    select(!c("FC_ABSOLUTE", "FC_PARTIAL", "FC_RELATIVE", "PARTIAL_INFO"))
+  
   if(exclude_independent) {
     # Filter out uncorrelated-feature simulations
     results <- results %>%
@@ -330,134 +355,134 @@ fit_predictive_model <- function(DE_method = "all",
   results <- results %>%
     filter(!is.na(TPR) & !is.na(FPR))
   
-  fitted_models <- list(self = list(), threshold = list())
-  train_feature_sets <- list(self = list(), threshold = list())
-  predictions <- list(self = list(), threshold = list())
-
-  # for(use_baseline in c("self", "oracle")) {
-    for(use_result_type in c("FPR", "TPR")) {
-      cat(paste0("Modeling ", use_result_type, " w/ DE method ", DE_method, "\n"))
-      
-      data <- results %>%
-        filter(BASELINE_TYPE == use_baseline)
-      
-      # These predictors appear to be strongly correlated.
-      # Let's drop them for now.
-      data <- data %>%
-        select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
-      
-      # Pull out the features we won't predict on
-      uuids <- data$UUID
-      if(DE_method == "all") {
-        features <- data %>%
-          select(-c(UUID, CORRP, BASELINE_TYPE))
-        features$METHOD <- factor(features$METHOD)
-      } else {
-        features <- data %>%
-          filter(METHOD == DE_method) %>%
-          select(-c(UUID, CORRP, BASELINE_TYPE, METHOD))
-      }
-      
-      # Remove result type we're not interested in and separate data into a
-      # features and response data.frame
-      features <- features %>%
-        select(-one_of(ifelse(use_result_type == "TPR", "FPR", "TPR")))
-      response <- features %>%
-        select(one_of(use_result_type))
-      features <- features %>%
-        select(-one_of(use_result_type))
-      
-      # factors <- which(colnames(features) %in% c("METHOD", "P"))
-      # non_factors <- setdiff(1:ncol(features), factors)
-      # features_nonfactors <- features[,non_factors]
-      # Drop columns with no variation
-      # In practice this only happens in testing/subsetting to small samples
-      # features_nonfactors <- features_nonfactors[,apply(features_nonfactors, 2, sd) > 0]
-      # features <- cbind(features[,factors,drop=F], features_nonfactors)
-      
-      n <- nrow(features)
-      
-      # Define test/train set for all remaining methods
-      train_idx <- sample(1:n, size = round(n*train_percent))
-      test_idx <- setdiff(1:n, train_idx)
-      train_uuids <- uuids[train_idx]
-      train_features <- features[train_idx,]
-      train_response <- unname(unlist(response[train_idx,1]))
-      if(use_result_type == "FPR") {
-        train_response <- 1 - train_response
-      }
-      test_uuids <- uuids[test_idx]
-      test_features <- features[test_idx,]
-      test_response <- unname(unlist(response[test_idx,1]))
-      if(use_result_type == "FPR") {
-        test_response <- 1 - test_response
-      }
-
-      if(is.null(save_slug)) {
-        save_fn <- file.path(save_dir,
-                             paste0(DE_method,
-                                    "_",
-                                    use_baseline,
-                                    "_",
-                                    use_result_type,
-                                    ".rds"))
-      } else {
-        save_fn <- paste0(save_slug, "_", use_result_type, ".rds")
-      }
-      cat(paste0("Predictive model saving/saved to: ", save_fn, "\n"))
-      if(!file.exists(save_fn)) {
-        rf_train_data <- cbind(train_features, train_response)
-        res <- randomForest(train_response ~ ., data = rf_train_data)
-        if(save_training_data) {
-          saveRDS(list(result = res,
-                       train_features = train_features,
-                       train_response = train_response,
-                       test_features = test_features,
-                       test_response = test_response), save_fn)
-        } else {
-          saveRDS(list(result = res), save_fn)
-        }
-      } else {
-        res_obj <- readRDS(save_fn)
-        res <- res_obj$result
-        train_features <- res_obj$train_features
-        train_response <- res_obj$train_response
-        test_features <- res_obj$test_features
-        test_response <- res_obj$test_response
-      }
-
-      if(plot_weights) {
-        plot_df <- varImpPlot(res)
-        plot_df <- data.frame(feature = rownames(plot_df),
-                              "IncNodePurity" = plot_df[,1])
-        rownames(plot_df) <- NULL
-        plot_df <- plot_df %>%
-          arrange(desc(IncNodePurity)) %>%
-          slice(1:20)
-        pl <- ggplot(plot_df, aes(x = IncNodePurity,
-                                  y = reorder(feature, IncNodePurity))) +
-          geom_bar(stat = "identity") +
-          labs(y = "feature")
-        # show(pl)
-        ggsave(file.path(save_dir,
-                         paste0("betas_",
-                                DE_method,
-                                "_",
-                                use_result_type,
-                                "_",
-                                use_baseline,
-                                ".png")),
-               plot = pl,
-               dpi = 100,
-               units = "in",
-               height = 4,
-               width = 6)
-      }
-      
-      # To predict do:
-      # rf_test_data <- cbind(test_features, test_response)
-      # prediction <- predict(res, newdata = rf_test_data)
+  # Testing; REMOVE LATER
+  results <- results[sample(1:nrow(results), size = 1000),]
+  
+  for(use_result_type in c("TPR", "FPR")) {
+    cat(paste0("Modeling ", use_result_type, " w/ DE method ", DE_method, "\n"))
+    
+    data <- results %>%
+      filter(BASELINE_TYPE == use_baseline)
+    
+    # These predictors appear to be strongly correlated.
+    # Let's drop them for now.
+    data <- data %>%
+      select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
+    
+    # Pull out the features we won't predict on
+    uuids <- data$UUID
+    if(DE_method == "all") {
+      features <- data %>%
+        select(-c(UUID, CORRP, BASELINE_TYPE))
+      features$METHOD <- factor(features$METHOD)
+    } else {
+      features <- data %>%
+        filter(METHOD == DE_method) %>%
+        select(-c(UUID, CORRP, BASELINE_TYPE, METHOD))
     }
-  # }
+    
+    # Remove result type we're not interested in and separate data into a
+    # features and response data.frame
+    features <- features %>%
+      select(-one_of(ifelse(use_result_type == "TPR", "FPR", "TPR")))
+    response <- features %>%
+      select(one_of(use_result_type))
+    features <- features %>%
+      select(-one_of(use_result_type))
+    
+    # factors <- which(colnames(features) %in% c("METHOD", "P"))
+    # non_factors <- setdiff(1:ncol(features), factors)
+    # features_nonfactors <- features[,non_factors]
+    # Drop columns with no variation
+    # In practice this only happens in testing/subsetting to small samples
+    # features_nonfactors <- features_nonfactors[,apply(features_nonfactors, 2, sd) > 0]
+    # features <- cbind(features[,factors,drop=F], features_nonfactors)
+    
+    n <- nrow(features)
+    
+    # Define test/train set for all remaining methods
+    train_idx <- sample(1:n, size = round(n*train_percent))
+    test_idx <- setdiff(1:n, train_idx)
+    train_uuids <- uuids[train_idx]
+    train_features <- features[train_idx,]
+    train_response <- unname(unlist(response[train_idx,1]))
+    if(use_result_type == "FPR") {
+      train_response <- 1 - train_response
+    }
+    test_uuids <- uuids[test_idx]
+    test_features <- features[test_idx,]
+    test_response <- unname(unlist(response[test_idx,1]))
+    if(use_result_type == "FPR") {
+      test_response <- 1 - test_response
+    }
+
+    if(is.null(save_slug)) {
+      save_fn <- file.path(save_dir,
+                           paste0(DE_method,
+                                  "_",
+                                  use_baseline,
+                                  "_",
+                                  use_result_type,
+                                  ".rds"))
+    } else {
+      save_fn <- paste0(save_slug, "_", use_result_type, ".rds")
+    }
+    cat(paste0("Predictive model saving/saved to: ", save_fn, "\n"))
+    if(!file.exists(save_fn)) {
+      cat("Training model...\n")
+      rf_train_data <- cbind(train_features, response = train_response)
+      res <- randomForest(response ~ ., data = rf_train_data)
+      if(save_training_data) {
+        saveRDS(list(result = res,
+                     train_features = train_features,
+                     train_response = train_response,
+                     test_features = test_features,
+                     test_response = test_response), save_fn)
+      } else {
+        saveRDS(list(result = res), save_fn)
+      }
+    } else {
+      cat("Loading existing model...\n")
+      res_obj <- readRDS(save_fn)
+      res <- res_obj$result
+      train_features <- res_obj$train_features
+      train_response <- res_obj$train_response
+      test_features <- res_obj$test_features
+      test_response <- res_obj$test_response
+    }
+
+    if(plot_weights) {
+      # Need to find out if there's a similar function for rfinterval
+      plot_df <- varImpPlot(res)
+      plot_df <- data.frame(feature = rownames(plot_df),
+                            "IncNodePurity" = plot_df[,1])
+      rownames(plot_df) <- NULL
+      plot_df <- plot_df %>%
+        arrange(desc(IncNodePurity)) %>%
+        slice(1:20)
+      pl <- ggplot(plot_df, aes(x = IncNodePurity,
+                                y = reorder(feature, IncNodePurity))) +
+        geom_bar(stat = "identity") +
+        labs(y = "feature")
+      # show(pl)
+      ggsave(file.path(save_dir,
+                       paste0("betas_",
+                              DE_method,
+                              "_",
+                              use_result_type,
+                              "_",
+                              use_baseline,
+                              ".png")),
+             plot = pl,
+             dpi = 100,
+             units = "in",
+             height = 4,
+             width = 6)
+    }
+    
+    # To predict do:
+    # rf_test_data <- cbind(test_features, test_response)
+    # prediction <- predict(res, newdata = rf_test_data)
+  }
 }
 
