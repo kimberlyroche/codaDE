@@ -8,7 +8,7 @@ use_methods <- c("all")
 # use_methods <- c("ALDEx2", "DESeq2", "MAST", "scran")
 
 plot_labels <- list(fpr = "specificity (1 - FPR)", tpr = "sensitivity (TPR)")
-save_tag <- paste0("_", sample(as.numeric(Sys.time())))
+save_tag <- paste0("_", as.numeric(Sys.time()))
 
 for(DE_method in use_methods) {
 #  for(use_baseline in c("self", "oracle")) {

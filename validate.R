@@ -16,7 +16,12 @@ option_list = list(
               type = "character",
               default = "self",
               help = "calls to use as a reference: self, threshold",
-              metavar = "character")
+              metavar = "character"),
+  make_option(c("--range"),
+              type = "logical",
+              default = "FALSE",
+              help = "use bootstrapped predictions to generate an interval",
+              metavar = "logical")
 );
 
 opt_parser = OptionParser(option_list = option_list);
@@ -24,6 +29,7 @@ opt = parse_args(opt_parser);
 
 dataset_name <- opt$dataset
 use_baseline <- opt$baseline
+use_range <- opt$range
 testing <- FALSE
 
 if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song", "Monaco", 
@@ -168,11 +174,44 @@ plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 # For the Kimmerling data, scran throws this error:
 # "inter-cluster rescaling factors are not strictly positive"
 
-#for(use_result_type in c("TPR", "FPR")) {
-for(use_result_type in c("FPR")) {
+for(use_result_type in c("TPR", "FPR")) {
 
   plot_df <- NULL
 
+  # Load predictive model
+  if(use_range) {
+    model_fn <- file.path("output",
+                          "predictive_fits",
+                          "all",
+                          paste0("all_", use_baseline, "_combined_", use_result_type, ".rds"))
+    if(file.exists(model_fn)) {
+      fit_obj_list <- readRDS(model_fn)
+    } else {
+      fit_files <- list.files(file.path("output", "predictive_fits", "all"),
+                              pattern = "all_self_.*?_TPR\\.rds",
+                              full.names = TRUE)
+      if(length(fit_files) == 0) {
+        stop(paste0("Predictive model fits not found!\n"))
+      }
+      fit_obj_list <- list()
+      for(i in 1:length(fit_files)) {
+        cat(paste0("Loading predictive model ", i, " / ", length(fit_files), "\n"))
+        fit_fn <- fit_files[i]
+        fit_obj_list[[i]] <- readRDS(fit_fn)$result
+      }
+      saveRDS(model_fn, fit_obj_list)
+    }
+  } else {
+    model_fn <- file.path("output",
+                          "predictive_fits",
+                          "all",
+                          paste0("all_", use_result_type, "_", use_baseline, ".rds"))
+    if(!file.exists(model_fn)) {
+      stop(paste0("Predictive model fit not found: ", model_fn, "!\n"))
+    }
+    fit_obj <- readRDS(model_fn)
+  }
+  
   for(DE_method in c("ALDEx2", "DESeq2", "MAST", "scran")) {
     
     cat(paste0("Evaluating ", use_result_type, " x ", DE_method, "\n"))
@@ -200,23 +239,6 @@ for(use_result_type in c("FPR")) {
     rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls)
     
     # --------------------------------------------------------------------------
-    #   Iterate TPR, FPR predictions
-    # --------------------------------------------------------------------------
-    
-    model_fn <- file.path("output",
-                          "predictive_fits",
-                          #DE_method,
-                          "all",
-                          #paste0(DE_method, "_", use_result_type, "_", use_baseline, ".rds"))
-                          paste0("all_", use_result_type, "_", use_baseline, ".rds"))
-    
-    
-    if(!file.exists(model_fn)) {
-      stop(paste0("Predictive model fit not found: ", model_fn, "!\n"))
-    }
-    fit_obj <- readRDS(model_fn) # Need to iterate DE_method too!
-    
-    # --------------------------------------------------------------------------
     #   Finish feature wrangling
     # --------------------------------------------------------------------------
 
@@ -231,41 +253,83 @@ for(use_result_type in c("FPR")) {
     #   Make predictions on simulated and real
     # --------------------------------------------------------------------------
     
-    pred_real <- predict(fit_obj$result, newdata = features_df)
-    
-    plot_df <- rbind(plot_df,
-                     data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
-                                predicted = pred_real,
-                                type = DE_method))
+    if(use_range) {
+      for(fit_obj in fit_obj_list) {
+        pred_real <- predict(fit_obj, newdata = features_df)
+        
+        plot_df <- rbind(plot_df,
+                         data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
+                                    predicted = pred_real,
+                                    type = DE_method))
+      }
+    } else {
+      pred_real <- predict(fit_obj$result, newdata = features_df)
+      
+      plot_df <- rbind(plot_df,
+                       data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
+                                  predicted = pred_real,
+                                  type = DE_method))
+    }
     
   }
 
-  pl <- ggplot() +
-    geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
-                 mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
-    geom_point(data = plot_df,
-               mapping = aes(x = true, y = predicted, fill = type),
-               shape = 21,
-               size = 3) +
-    scale_fill_manual(values = palette) + 
-    xlim(c(0,1)) +
-    ylim(c(0,1)) +
-    labs(x = paste0("observed ", plot_labels[[use_result_type]]),
-         y = paste0("predicted ", plot_labels[[use_result_type]]),
-         fill = "Data type")
-  show(pl)
-  ggsave(file.path("output",
-                   "images",
-                   paste0("validations_",
-                          use_result_type,
-                          "_",
-                          use_baseline,
-                          "-",
-                          dataset_name,
-                          ".png")),
-         plot = pl,
-         dpi = 100,
-         units = "in",
-         height = 4,
-         width = 5.5)
+  if(use_range) {
+    pl <- ggplot() +
+      geom_boxplot(data = plot_df,
+                   mapping = aes(x = factor(type), y = predicted)) +
+      geom_point(data = plot_df,
+                 mapping = aes(x = factor(type), y = true, fill = type),
+                 shape = 21,
+                 size = 3) +
+      scale_fill_manual(values = palette) +
+      ylim(c(0,1)) +
+      labs(x = paste0("observed ", plot_labels[[use_result_type]]),
+           y = paste0("predicted ", plot_labels[[use_result_type]]),
+           fill = "Data type") +
+      theme(legend.position = "none")
+    show(pl)
+    ggsave(file.path("output",
+                     "images",
+                     paste0("range-validations_",
+                            use_result_type,
+                            "_",
+                            use_baseline,
+                            "-",
+                            dataset_name,
+                            ".png")),
+           plot = pl,
+           dpi = 100,
+           units = "in",
+           height = 4,
+           width = 4)
+  } else {
+    pl <- ggplot() +
+      geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
+                   mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
+      geom_point(data = plot_df,
+                 mapping = aes(x = true, y = predicted, fill = type),
+                 shape = 21,
+                 size = 3) +
+      scale_fill_manual(values = palette) + 
+      xlim(c(0,1)) +
+      ylim(c(0,1)) +
+      labs(x = paste0("observed ", plot_labels[[use_result_type]]),
+           y = paste0("predicted ", plot_labels[[use_result_type]]),
+           fill = "Data type")
+    # show(pl)
+    ggsave(file.path("output",
+                     "images",
+                     paste0("validations_",
+                            use_result_type,
+                            "_",
+                            use_baseline,
+                            "-",
+                            dataset_name,
+                            ".png")),
+           plot = pl,
+           dpi = 100,
+           units = "in",
+           height = 4,
+           width = 5.5)
+  }
 }

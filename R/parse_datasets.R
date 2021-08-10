@@ -304,13 +304,21 @@ parse_Song <- function(absolute = TRUE) {
   
   # Use edgeR (for now) to compute the size factor
   sf <- calcNormFactors(mrna[ref_idx,]) # columns assumed to be samples
-  counts <- mrna[-ref_idx,]
-  if(absolute) {
-    for(j in 1:ncol(counts)) {
-      counts[,j] <- counts[,j] / sf[j]
+  counts <- as.matrix(mrna[-ref_idx,])
+  if(!absolute) {
+    # Shuffle observed abundances
+    set.seed(1000)
+    new_totals <- sample(round(colSums(counts)))
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- rmultinom(1, size = new_totals[i], prob = counts[,i] / sum(counts[,i]))
     }
   }
-  counts <- as.matrix(counts)
+  # Spike-in renormalization
+  # if(absolute) {
+  #   for(j in 1:ncol(counts)) {
+  #     counts[,j] <- counts[,j] / sf[j]
+  #   }
+  # }
   colnames(counts) <- NULL
   rownames(counts) <- NULL
   
