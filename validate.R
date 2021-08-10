@@ -179,39 +179,15 @@ for(use_result_type in c("TPR", "FPR")) {
   plot_df <- NULL
 
   # Load predictive model
-  if(use_range) {
-    model_fn <- file.path("output",
-                          "predictive_fits",
-                          "all",
-                          paste0("all_", use_baseline, "_combined_", use_result_type, ".rds"))
-    if(file.exists(model_fn)) {
-      fit_obj_list <- readRDS(model_fn)
-    } else {
-      fit_files <- list.files(file.path("output", "predictive_fits", "all"),
-                              pattern = "all_self_.*?_TPR\\.rds",
-                              full.names = TRUE)
-      if(length(fit_files) == 0) {
-        stop(paste0("Predictive model fits not found!\n"))
-      }
-      fit_obj_list <- list()
-      for(i in 1:length(fit_files)) {
-        cat(paste0("Loading predictive model ", i, " / ", length(fit_files), "\n"))
-        fit_fn <- fit_files[i]
-        fit_obj_list[[i]] <- readRDS(fit_fn)$result
-      }
-      saveRDS(model_fn, fit_obj_list)
-    }
-  } else {
-    model_fn <- file.path("output",
-                          "predictive_fits",
-                          "all",
-                          paste0("all_", use_result_type, "_", use_baseline, ".rds"))
-    if(!file.exists(model_fn)) {
-      stop(paste0("Predictive model fit not found: ", model_fn, "!\n"))
-    }
-    fit_obj <- readRDS(model_fn)
+  model_fn <- file.path("output",
+                        "predictive_fits",
+                        "all",
+                        paste0("all_", use_baseline, "_", use_result_type, ".rds"))
+  if(!file.exists(model_fn)) {
+    stop(paste0("Predictive model fit not found: ", model_fn, "!\n"))
   }
-  
+  fit_obj <- readRDS(model_fn)
+
   for(DE_method in c("ALDEx2", "DESeq2", "MAST", "scran")) {
     
     cat(paste0("Evaluating ", use_result_type, " x ", DE_method, "\n"))
@@ -254,14 +230,18 @@ for(use_result_type in c("TPR", "FPR")) {
     # --------------------------------------------------------------------------
     
     if(use_range) {
-      for(fit_obj in fit_obj_list) {
-        pred_real <- predict(fit_obj, newdata = features_df)
-        
-        plot_df <- rbind(plot_df,
-                         data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
-                                    predicted = pred_real,
-                                    type = DE_method))
-      }
+      pred_real <- predict(fit_obj$result, newdata = features_df, predict.all = TRUE)
+      
+      plot_df <- rbind(plot_df,
+                       data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
+                                  predicted = pred_real$aggregate,
+                                  type = DE_method,
+                                  pred_type = "aggregate"))
+      plot_df <- rbind(plot_df,
+                       data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
+                                  predicted = pred_real$individual[1,],
+                                  type = DE_method,
+                                  pred_type = "individual"))
     } else {
       pred_real <- predict(fit_obj$result, newdata = features_df)
       
@@ -274,14 +254,21 @@ for(use_result_type in c("TPR", "FPR")) {
   }
 
   if(use_range) {
+    # Subset to 50% intervals for each setting
     pl <- ggplot() +
-      geom_boxplot(data = plot_df,
-                   mapping = aes(x = factor(type), y = predicted)) +
-      geom_point(data = plot_df,
+      # geom_violin(data = plot_df[plot_df$pred_type == "individual",],
+      #             mapping = aes(x = factor(type), y = predicted),
+      #             width = 1) +
+      geom_boxplot(data = plot_df[plot_df$pred_type == "individual",],
+                   mapping = aes(x = factor(type), y = predicted),
+                   width = 0.25,
+                   outlier.shape = NA) +
+      geom_point(data = plot_df[plot_df$pred_type == "aggregate",],
                  mapping = aes(x = factor(type), y = true, fill = type),
                  shape = 21,
-                 size = 3) +
+                 size = 5) +
       scale_fill_manual(values = palette) +
+      theme_bw() +
       ylim(c(0,1)) +
       labs(x = paste0("observed ", plot_labels[[use_result_type]]),
            y = paste0("predicted ", plot_labels[[use_result_type]]),
@@ -316,7 +303,7 @@ for(use_result_type in c("TPR", "FPR")) {
       labs(x = paste0("observed ", plot_labels[[use_result_type]]),
            y = paste0("predicted ", plot_labels[[use_result_type]]),
            fill = "Data type")
-    # show(pl)
+    show(pl)
     ggsave(file.path("output",
                      "images",
                      paste0("validations_",

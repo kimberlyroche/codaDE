@@ -75,8 +75,3 @@ for(use_result_type in c("TPR", "FPR")) {
          height = 4,
          width = 6)
 }
-
-
-
-
-

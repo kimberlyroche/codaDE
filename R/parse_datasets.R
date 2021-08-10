@@ -303,7 +303,7 @@ parse_Song <- function(absolute = TRUE) {
   # Positive controls (ERCC spike-ins) are named POS_A (etc.)
   
   # Use edgeR (for now) to compute the size factor
-  sf <- calcNormFactors(mrna[ref_idx,]) # columns assumed to be samples
+  # sf <- calcNormFactors(mrna[ref_idx,]) # columns assumed to be samples
   counts <- as.matrix(mrna[-ref_idx,])
   if(!absolute) {
     # Shuffle observed abundances
@@ -395,7 +395,7 @@ parse_Muraro <- function(absolute = TRUE) {
   counts <- counts[-spikein_seqs,]
   if(absolute) {
     for(j in 1:ncol(counts)) {
-      counts[,j] <- counts[,j] / sf[j]
+      counts[,j] <- counts[,j] * sf[j]
     }
   }
   counts <- as.matrix(counts)
@@ -436,7 +436,7 @@ parse_Monaco <- function(absolute = TRUE) {
   counts <- data
   if(absolute) {
     for(i in 1:ncol(counts)) {
-      counts[,i] <- counts[,i] / sf[i]
+      counts[,i] <- counts[,i] * sf[i]
     }
   }
   counts <- as.matrix(counts)
@@ -486,7 +486,7 @@ parse_Hashimshony <- function(absolute = TRUE) {
     # Compute size factor from spike-ins
     sf <- unname(unlist(calcNormFactors(counts[spike_idx,]))) # columns assumed to be samples
     for(i in 1:ncol(counts)) {
-      counts[,i] <- counts[,i] / sf[i]
+      counts[,i] <- counts[,i] * sf[i]
     }
   }
   counts <- as.matrix(counts)
