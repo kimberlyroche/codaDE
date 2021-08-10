@@ -355,9 +355,6 @@ fit_predictive_model <- function(DE_method = "all",
   results <- results %>%
     filter(!is.na(TPR) & !is.na(FPR))
   
-  # Testing; REMOVE LATER
-  results <- results[sample(1:nrow(results), size = 1000),]
-  
   for(use_result_type in c("TPR", "FPR")) {
     cat(paste0("Modeling ", use_result_type, " w/ DE method ", DE_method, "\n"))
     

@@ -133,7 +133,7 @@ calc_FC <- function(counts, groups, use_groups = NULL) {
 #   Vieira-Silva et al. data
 # ------------------------------------------------------------------------------
 
-vs <- parse_VieiraSilva(absolute = FALSE)
+vs <- parse_VieiraSilva(absolute = TRUE)
 nrow(vs$counts[rowMeans(vs$counts) >= 1,])
 plot_PCA(vs$counts, vs$groups, save_name = "vieirasilva_01.png")
 calc_prop_DA(vs$counts, vs$groups, use_groups = c("mHC", "CD"))
@@ -142,19 +142,19 @@ plot_totals(vs$counts, vs$groups, save_name = "vieirasilva_02.png")
 # Subset to CD vs. mHC samples
 idx_subset <- c(sample(which(vs$groups == "mHC"), size = 20),
                 sample(which(vs$groups == "CD"), size = 20))
-plot_relab(vs$counts[,idx_subset], vs$groups[idx_subset], use_props = FALSE, save_name = "vieirasilva_03.png")
+plot_relab(vs$counts[,idx_subset], vs$groups[idx_subset], use_props = TRUE, save_name = "vieirasilva_03.png")
 
 # ------------------------------------------------------------------------------
 #   Barlow et al. data
 # ------------------------------------------------------------------------------
 
-barlow <- parse_Barlow(absolute = FALSE)
+barlow <- parse_Barlow(absolute = TRUE)
 nrow(barlow$counts[rowMeans(barlow$counts) >= 1,])
 plot_PCA(barlow$counts, barlow$groups, save_name = "barlow_01.png")
 calc_prop_DA(barlow$counts, barlow$groups)
 calc_FC(barlow$counts, barlow$groups)
 plot_totals(barlow$counts, barlow$groups, save_name = "barlow_02.png")
-plot_relab(barlow$counts, barlow$groups, use_props = FALSE, save_name = "barlow_03.png")
+plot_relab(barlow$counts, barlow$groups, use_props = TRUE, save_name = "barlow_03.png")
 
 # ------------------------------------------------------------------------------
 #   Morton et al. data
