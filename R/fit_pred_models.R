@@ -234,6 +234,7 @@ characterize_dataset <- function(counts_A, counts_B) {
 #'
 #' @param DE_method which DE calling method's results to predict; if "all",
 #' prediction is over all results together
+#' @param use_baseline "self" or "oracle"
 #' @param plot_weights flag indicating whether or not to plot some visualization
 #' of feature weights
 #' @param exclude_partials flag indicating whether to exclude simulations with 
@@ -241,7 +242,10 @@ characterize_dataset <- function(counts_A, counts_B) {
 #' @param exclude_independent flag indicating whether to exclude simulations 
 #' with uncorrelated features
 #' @param train_percent percent of simulated datasets to train on
-#' @param save_tag optional tag to append to file name for saved predictive model
+#' @param save_slug optional file path and name for saved predictive model (e.g.
+#' /output/allmethods_oracle, to which _TPR.rds and _FPR.rds will be appended
+#' @param save_training_data flag indicating whether or not to save training data
+#' with the saved model output
 #' @return NULL (fitted models are saved in output directory)
 #' @import RSQLite
 #' @import randomForest
@@ -252,11 +256,17 @@ characterize_dataset <- function(counts_A, counts_B) {
 #' @import broom.mixed
 #' @export
 fit_predictive_model <- function(DE_method = "all",
+                                 use_baseline = "self",
                                  plot_weights = FALSE,
                                  exclude_partials = TRUE,
                                  exclude_independent = FALSE,
                                  train_percent = 0.8,
-                                 save_tag = "") {
+                                 save_slug = NULL,
+                                 save_training_data = TRUE) {
+  if(!(use_baseline %in% c("self", "oracle"))) {
+    stop(paste0("Invalid baseline: ", use_baseline, "!\n"))
+  }
+
   if(!(DE_method %in% c("all", "ALDEx2", "DESeq2", "MAST", "scran"))) {
     stop(paste0("Invalid DE calling method: ", DE_method, "!\n"))
   }
@@ -324,7 +334,7 @@ fit_predictive_model <- function(DE_method = "all",
   train_feature_sets <- list(self = list(), threshold = list())
   predictions <- list(self = list(), threshold = list())
 
-  for(use_baseline in c("self", "oracle")) {
+  # for(use_baseline in c("self", "oracle")) {
     for(use_result_type in c("FPR", "TPR")) {
       cat(paste0("Modeling ", use_result_type, " w/ DE method ", DE_method, "\n"))
       
@@ -383,23 +393,30 @@ fit_predictive_model <- function(DE_method = "all",
         test_response <- 1 - test_response
       }
 
-      save_fn <- file.path(save_dir,
-                           paste0(DE_method,
-                                  "_",
-                                  use_result_type,
-                                  "_",
-                                  use_baseline,
-                                  save_tag,
-                                  ".rds"))
+      if(is.null(save_slug)) {
+        save_fn <- file.path(save_dir,
+                             paste0(DE_method,
+                                    "_",
+                                    use_baseline,
+                                    "_",
+                                    use_result_type,
+                                    ".rds"))
+      } else {
+        save_fn <- paste0(save_slug, "_", use_result_type, ".rds")
+      }
       cat(paste0("Predictive model saving/saved to: ", save_fn, "\n"))
       if(!file.exists(save_fn)) {
         rf_train_data <- cbind(train_features, train_response)
         res <- randomForest(train_response ~ ., data = rf_train_data)
-        saveRDS(list(result = res,
-                     train_features = train_features,
-                     train_response = train_response,
-                     test_features = test_features,
-                     test_response = test_response), save_fn)
+        if(save_training_data) {
+          saveRDS(list(result = res,
+                       train_features = train_features,
+                       train_response = train_response,
+                       test_features = test_features,
+                       test_response = test_response), save_fn)
+        } else {
+          saveRDS(list(result = res), save_fn)
+        }
       } else {
         res_obj <- readRDS(save_fn)
         res <- res_obj$result
@@ -441,6 +458,6 @@ fit_predictive_model <- function(DE_method = "all",
       # rf_test_data <- cbind(test_features, test_response)
       # prediction <- predict(res, newdata = rf_test_data)
     }
-  }
+  # }
 }
 

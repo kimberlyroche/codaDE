@@ -6,16 +6,20 @@
 \usage{
 fit_predictive_model(
   DE_method = "all",
+  use_baseline = "self",
   plot_weights = FALSE,
   exclude_partials = TRUE,
   exclude_independent = FALSE,
   train_percent = 0.8,
-  save_tag = ""
+  save_slug = NULL,
+  save_training_data = TRUE
 )
 }
 \arguments{
 \item{DE_method}{which DE calling method's results to predict; if "all",
 prediction is over all results together}
+
+\item{use_baseline}{"self" or "oracle"}
 
 \item{plot_weights}{flag indicating whether or not to plot some visualization
 of feature weights}
@@ -28,7 +32,11 @@ with uncorrelated features}
 
 \item{train_percent}{percent of simulated datasets to train on}
 
-\item{save_tag}{optional tag to append to file name for saved predictive model}
+\item{save_slug}{optional file path and name for saved predictive model (e.g.
+/output/allmethods_oracle, to which _TPR.rds and _FPR.rds will be appended}
+
+\item{save_training_data}{flag indicating whether or not to save training data
+with the saved model output}
 }
 \value{
 NULL (fitted models are saved in output directory)
