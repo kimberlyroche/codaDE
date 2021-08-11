@@ -229,59 +229,28 @@ characterize_dataset <- function(counts_A, counts_B) {
               "FW_CLR_PFC1_D" = FW_CLR_PFC1_D,
               "FW_CLR_PFC2_D" = FW_CLR_PFC2_D))
 }
-  
+
 #' Generate simulated differential expression for two conditions
 #'
-#' @param DE_method which DE calling method's results to predict; if "all",
-#' prediction is over all results together
-#' @param use_baseline "self" or "oracle"
-#' @param plot_weights flag indicating whether or not to plot some visualization
-#' of feature weights
 #' @param exclude_partials flag indicating whether to exclude simulations with 
 #' partial abundance information
 #' @param exclude_independent flag indicating whether to exclude simulations 
 #' with uncorrelated features
-#' @param train_percent percent of simulated datasets to train on
-#' @param save_slug optional file path and name for saved predictive model (e.g.
-#' /output/allmethods_oracle, to which _TPR.rds and _FPR.rds will be appended
-#' @param save_training_data flag indicating whether or not to save training data
-#' with the saved model output
-#' @return NULL (fitted models are saved in output directory)
+#' @param fit_full fit model with true fold change information
+#' @return data.frame with predictive model training features
 #' @import RSQLite
-#' @import randomForest
-#' @import tidyr
-#' @import caret
-#' @import jtools
-#' @import ggstance
-#' @import broom.mixed
 #' @export
-fit_predictive_model <- function(DE_method = "all",
-                                 use_baseline = "self",
-                                 plot_weights = FALSE,
-                                 exclude_partials = TRUE,
-                                 exclude_independent = FALSE,
-                                 train_percent = 0.8,
-                                 save_slug = NULL,
-                                 save_training_data = TRUE) {
-  if(!(use_baseline %in% c("self", "oracle"))) {
-    stop(paste0("Invalid baseline: ", use_baseline, "!\n"))
-  }
+pull_features <- function(DE_method = "all",
+                          use_baseline = "self",
+                          exclude_partials = TRUE,
+                          exclude_independent = FALSE,
+                          fit_full = FALSE) {
 
-  if(!(DE_method %in% c("all", "ALDEx2", "DESeq2", "MAST", "scran"))) {
-    stop(paste0("Invalid DE calling method: ", DE_method, "!\n"))
-  }
-
-  save_path <- list("output", "predictive_fits", DE_method)
-  for(i in 1:length(save_path)) {
-    fp <- do.call(file.path, save_path[1:i])
-    if(!dir.exists(fp)) {
-      dir.create(fp)
-    }
-  }
-  save_dir <- fp
-  
   conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
-
+  
+  # Note: I'm not pulling FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D
+  # because these predictors appear to be strongly correlated.
+  
   results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
                                      "FC_ABSOLUTE, FC_PARTIAL, FC_RELATIVE, ",
                                      "TOTALS_C_FC, TOTALS_C_D, ",
@@ -298,12 +267,12 @@ fit_predictive_model <- function(DE_method = "all",
                                      "COMP_RA_MED_B, COMP_RA_SD_B, COMP_RA_SKEW_B, ",
                                      "COMP_C_ENT_A, COMP_C_ENT_B, FW_RA_MAX_D, ",
                                      "FW_RA_MED_D, FW_RA_SD_D, FW_RA_PPOS_D, ",
-                                     "FW_RA_PNEG_D, FW_RA_PFC05_D, FW_RA_PFC1_D, ",
+                                     "FW_RA_PNEG_D, FW_RA_PFC05_D, ",
                                      "FW_RA_PFC2_D, FW_LOG_MAX_D, FW_LOG_MED_D, ",
                                      "FW_LOG_SD_D, FW_LOG_PPOS_D, FW_LOG_PNEG_D, ",
                                      "FW_LOG_PFC05_D, FW_LOG_PFC1_D, ",
-                                     "FW_LOG_PFC2_D, FW_CLR_MAX_D, FW_CLR_MED_D, ",
-                                     "FW_CLR_SD_D, FW_CLR_PPOS_D, FW_CLR_PNEG_D, ",
+                                     "FW_LOG_PFC2_D, FW_CLR_MAX_D, ",
+                                     "FW_CLR_PPOS_D, ",
                                      "FW_CLR_PFC05_D, FW_CLR_PFC1_D, ",
                                      "FW_CLR_PFC2_D, METHOD, PARTIAL_INFO, ",
                                      "BASELINE_TYPE,TPR, FPR ",
@@ -311,7 +280,8 @@ fit_predictive_model <- function(DE_method = "all",
                                      "ON datasets.UUID=characteristics.UUID ",
                                      "LEFT JOIN results ",
                                      "ON (characteristics.UUID=results.UUID ",
-                                     "AND characteristics.partial=results.PARTIAL_INFO);"))
+                                     "AND characteristics.partial=results.PARTIAL_INFO) ",
+                                     "WHERE BASELINE_TYPE='", use_baseline, "';"))
   
   dbDisconnect(conn)
   
@@ -343,7 +313,12 @@ fit_predictive_model <- function(DE_method = "all",
   }
   
   results <- results %>%
-    select(!c("FC_ABSOLUTE", "FC_PARTIAL", "FC_RELATIVE", "PARTIAL_INFO"))
+    select(!c("FC_PARTIAL", "FC_RELATIVE", "PARTIAL_INFO"))
+  
+  if(!fit_full) {
+    results <- results %>%
+      select(!c("FC_ABSOLUTE"))
+  }
   
   if(exclude_independent) {
     # Filter out uncorrelated-feature simulations
@@ -355,59 +330,123 @@ fit_predictive_model <- function(DE_method = "all",
   results <- results %>%
     filter(!is.na(TPR) & !is.na(FPR))
   
+  # Pull out the features we won't predict on
+  uuids <- results$UUID
+  if(DE_method == "all") {
+    results <- results %>%
+      select(-c(UUID, CORRP, BASELINE_TYPE))
+    results$METHOD <- factor(results$METHOD)
+  } else {
+    results <- results %>%
+      filter(METHOD == DE_method) %>%
+      select(-c(UUID, CORRP, BASELINE_TYPE, METHOD))
+  }
+  
+  return(results)
+}
+
+#' Generate simulated differential expression for two conditions
+#'
+#' @param model_type either "RF", "LM", or "EN"
+#' @param DE_method which DE calling method's results to predict; if "all",
+#' prediction is over all results together
+#' @param use_baseline "self" or "oracle"
+#' @param plot_weights flag indicating whether or not to plot some visualization
+#' of feature weights
+#' @param exclude_partials flag indicating whether to exclude simulations with 
+#' partial abundance information
+#' @param exclude_independent flag indicating whether to exclude simulations 
+#' with uncorrelated features
+#' @param train_percent percent of simulated datasets to train on
+#' @param fit_full fit model with true fold change information
+#' @param save_slug optional file path and name for saved predictive model (e.g.
+#' /output/allmethods_oracle, to which _TPR.rds and _FPR.rds will be appended
+#' @param save_training_data flag indicating whether or not to save training data
+#' with the saved model output
+#' @return NULL (fitted models are saved in output directory)
+#' @import randomForest
+#' @import tidyr
+#' @import caret
+#' @import jtools
+#' @import ggstance
+#' @import broom.mixed
+#' @export
+fit_predictive_model <- function(model_type = "RF",
+                                 DE_method = "all",
+                                 use_baseline = "self",
+                                 plot_weights = FALSE,
+                                 exclude_partials = TRUE,
+                                 exclude_independent = FALSE,
+                                 train_percent = 0.8,
+                                 fit_full = FALSE,
+                                 save_slug = NULL,
+                                 save_training_data = TRUE) {
+  
+  if(!(model_type %in% c("RF", "LM", "EN"))) {
+    stop(paste0("Invalid model type: ", model_type, "!\n"))
+  }
+  
+  if(!(use_baseline %in% c("self", "oracle"))) {
+    stop(paste0("Invalid baseline: ", use_baseline, "!\n"))
+  }
+  
+  if(!(DE_method %in% c("all", "ALDEx2", "DESeq2", "MAST", "scran"))) {
+    stop(paste0("Invalid DE calling method: ", DE_method, "!\n"))
+  }
+
+  save_path <- list("output", "predictive_fits", DE_method)
+  for(i in 1:length(save_path)) {
+    fp <- do.call(file.path, save_path[1:i])
+    if(!dir.exists(fp)) {
+      dir.create(fp)
+    }
+  }
+  save_dir <- fp
+  
+  features <- pull_features(use_baseline = use_baseline,
+                            exclude_partials = exclude_partials,
+                            exclude_independent = exclude_independent,
+                            fit_full = fit_full)
+  
+  features <- features[sample(1:nrow(features), size = 1000),]
+  
+  # for(use_result_type in c("TPR", "FPR")) {
   for(use_result_type in c("TPR", "FPR")) {
     cat(paste0("Modeling ", use_result_type, " w/ DE method ", DE_method, "\n"))
     
-    data <- results %>%
-      filter(BASELINE_TYPE == use_baseline)
-    
-    # These predictors appear to be strongly correlated.
-    # Let's drop them for now.
-    data <- data %>%
-      select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
-    
     # Pull out the features we won't predict on
-    uuids <- data$UUID
-    if(DE_method == "all") {
-      features <- data %>%
-        select(-c(UUID, CORRP, BASELINE_TYPE))
-      features$METHOD <- factor(features$METHOD)
-    } else {
-      features <- data %>%
-        filter(METHOD == DE_method) %>%
-        select(-c(UUID, CORRP, BASELINE_TYPE, METHOD))
-    }
-    
+    uuids <- features$UUID
+
     # Remove result type we're not interested in and separate data into a
     # features and response data.frame
-    features <- features %>%
+    features_result_type <- features %>%
       select(-one_of(ifelse(use_result_type == "TPR", "FPR", "TPR")))
-    response <- features %>%
+    response <- features_result_type %>%
       select(one_of(use_result_type))
-    features <- features %>%
+    features_result_type <- features_result_type %>%
       select(-one_of(use_result_type))
     
-    # factors <- which(colnames(features) %in% c("METHOD", "P"))
-    # non_factors <- setdiff(1:ncol(features), factors)
-    # features_nonfactors <- features[,non_factors]
-    # Drop columns with no variation
-    # In practice this only happens in testing/subsetting to small samples
-    # features_nonfactors <- features_nonfactors[,apply(features_nonfactors, 2, sd) > 0]
-    # features <- cbind(features[,factors,drop=F], features_nonfactors)
-    
-    n <- nrow(features)
+    factors <- which(colnames(features_result_type) %in% c("METHOD"))
+    non_factors <- setdiff(1:ncol(features_result_type), factors)
+
+    # Scale non-factor features    
+    for(f in non_factors) {
+      features_result_type[,f] <- scale(features_result_type[,f])
+    }
+
+    n <- nrow(features_result_type)
     
     # Define test/train set for all remaining methods
     train_idx <- sample(1:n, size = round(n*train_percent))
     test_idx <- setdiff(1:n, train_idx)
     train_uuids <- uuids[train_idx]
-    train_features <- features[train_idx,]
+    train_features <- features_result_type[train_idx,]
     train_response <- unname(unlist(response[train_idx,1]))
     if(use_result_type == "FPR") {
       train_response <- 1 - train_response
     }
     test_uuids <- uuids[test_idx]
-    test_features <- features[test_idx,]
+    test_features <- features_result_type[test_idx,]
     test_response <- unname(unlist(response[test_idx,1]))
     if(use_result_type == "FPR") {
       test_response <- 1 - test_response
@@ -419,16 +458,31 @@ fit_predictive_model <- function(DE_method = "all",
                                   "_",
                                   use_baseline,
                                   "_",
+                                  model_type,
+                                  "_",
                                   use_result_type,
                                   ".rds"))
     } else {
-      save_fn <- paste0(save_slug, "_", use_result_type, ".rds")
+      save_fn <- paste0(save_slug, "_", model_type, "_", use_result_type, ".rds")
     }
     cat(paste0("Predictive model saving/saved to: ", save_fn, "\n"))
     if(!file.exists(save_fn)) {
       cat("Training model...\n")
-      rf_train_data <- cbind(train_features, response = train_response)
-      res <- randomForest(response ~ ., data = rf_train_data)
+      train_data <- cbind(train_features, response = train_response)
+      if(model_type == "RF") {
+        res <- randomForest(response ~ ., data = train_data)
+      } else if(model_type == "LM") {
+        res <- lm(response ~ ., data = train_data)
+      } else {
+        res <- train(response ~ .,
+                     data = train_data,
+                     method = "glmnet",
+                     trControl = trainControl(method = "cv",
+                                              number = 5,
+                                              p = 0.8),
+                     tuneGrid = expand.grid(alpha = seq(0.2, 1, by = 0.2),
+                                            lambda = seq(0.01, 1, by = 0.05)))
+      }
       if(save_training_data) {
         saveRDS(list(result = res,
                      train_features = train_features,
@@ -438,18 +492,19 @@ fit_predictive_model <- function(DE_method = "all",
       } else {
         saveRDS(list(result = res), save_fn)
       }
-    } else {
-      cat("Loading existing model...\n")
-      res_obj <- readRDS(save_fn)
-      res <- res_obj$result
-      train_features <- res_obj$train_features
-      train_response <- res_obj$train_response
-      test_features <- res_obj$test_features
-      test_response <- res_obj$test_response
     }
 
-    if(plot_weights) {
-      # Need to find out if there's a similar function for rfinterval
+    if(plot_weights & model_type == "RF") {
+      if(file.exists(save_fn)) {
+        res_obj <- readRDS(save_fn)
+        res <- res_obj$result
+        train_features <- res_obj$train_features
+        train_response <- res_obj$train_response
+        test_features <- res_obj$test_features
+        test_response <- res_obj$test_response
+      } else {
+        stop(paste0("Model not found at: ", save_fn, "!\n"))
+      }
       plot_df <- varImpPlot(res)
       plot_df <- data.frame(feature = rownames(plot_df),
                             "IncNodePurity" = plot_df[,1])
@@ -460,15 +515,18 @@ fit_predictive_model <- function(DE_method = "all",
       pl <- ggplot(plot_df, aes(x = IncNodePurity,
                                 y = reorder(feature, IncNodePurity))) +
         geom_bar(stat = "identity") +
-        labs(y = "feature")
-      # show(pl)
+        labs(y = "feature") +
+        theme_bw()
+      show(pl)
       ggsave(file.path(save_dir,
                        paste0("betas_",
                               DE_method,
                               "_",
-                              use_result_type,
-                              "_",
                               use_baseline,
+                              "_",
+                              model_type,
+                              "_",
+                              use_result_type,
                               ".png")),
              plot = pl,
              dpi = 100,
@@ -478,8 +536,8 @@ fit_predictive_model <- function(DE_method = "all",
     }
     
     # To predict do:
-    # rf_test_data <- cbind(test_features, test_response)
-    # prediction <- predict(res, newdata = rf_test_data)
+    # test_data <- cbind(test_features, test_response)
+    # prediction <- predict(res, newdata = test_data)
   }
 }
 

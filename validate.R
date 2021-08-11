@@ -16,6 +16,11 @@ option_list = list(
               type = "character",
               default = "self",
               help = "calls to use as a reference: self, threshold",
+              metavar = "character"),
+  make_option(c("--model"),
+              type = "character",
+              default = "RF",
+              help = "predictive model type to use: RF, LM, or EN",
               metavar = "character")
 );
 
@@ -24,6 +29,7 @@ opt = parse_args(opt_parser);
 
 dataset_name <- opt$dataset
 use_baseline <- opt$baseline
+model_type <- opt$model
 testing <- FALSE
 
 if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song", "Monaco", 
@@ -33,6 +39,10 @@ if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song", "Monaco",
 
 if(!(use_baseline %in% c("self", "threshold"))) {
   stop(paste0("Invalid DA baseline: ", use_baseline, "!\n"))
+}
+
+if(!(model_type %in% c("RF", "LM", "EN"))) {
+  stop(paste0("Invalid model type: ", model_type, "!\n"))
 }
 
 palette <- list(ALDEx2 = "#46A06B",
@@ -168,6 +178,12 @@ plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 # For the Kimmerling data, scran throws this error:
 # "inter-cluster rescaling factors are not strictly positive"
 
+# Pull features from existing simulations
+# We'll need to scale against these later
+features_sims <- pull_features(use_baseline = use_baseline,
+                               exclude_partials = FALSE)
+features_sims <- features_sims[sample(1:nrow(features_sims), size = 5000),]
+
 for(use_result_type in c("TPR", "FPR")) {
 
   plot_df_point <- NULL
@@ -177,7 +193,13 @@ for(use_result_type in c("TPR", "FPR")) {
   model_fn <- file.path("output",
                         "predictive_fits",
                         "all",
-                        paste0("all_", use_baseline, "_", use_result_type, ".rds"))
+                        paste0("all_",
+                               use_baseline,
+                               "_",
+                               model_type,
+                               "_",
+                               use_result_type,
+                               ".rds"))
   if(!file.exists(model_fn)) {
     stop(paste0("Predictive model fit not found: ", model_fn, "!\n"))
   }
@@ -187,8 +209,10 @@ for(use_result_type in c("TPR", "FPR")) {
     
     cat(paste0("Evaluating ", use_result_type, " x ", DE_method, "\n"))
 
-    features$METHOD <- DE_method
-    features$METHOD <- factor(features$METHOD, levels = c("ALDEx2", "DESeq2", "MAST", "scran"))
+    features_new <- features # we'll alter this for each result type
+    features_new$METHOD <- DE_method
+    features_new$METHOD <- factor(features_new$METHOD,
+                                  levels = c("ALDEx2", "DESeq2", "MAST", "scran"))
 
     if((max(table(groups)) < 5 | dataset_name == "Kimmerling") && DE_method == "scran") {
       next
@@ -214,17 +238,50 @@ for(use_result_type in c("TPR", "FPR")) {
     # --------------------------------------------------------------------------
 
     # Convert to data.frame
-    features_df <- as.data.frame(features)
+    features_new <- as.data.frame(features_new)
     
     # Remove some features we're no longer using (too correlated with others)
-    features_df <- features_df %>%
+    features_new <- features_new %>%
       select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
     
+    # Scale features
+    # 1) Pull features from simulations
+    # 2) Add this new data point
+    # 3) Rescale all
+    # 4) Extract this new data point
+    #
+    # This is tedious but I can't think of a better, simple way...
+
+    # Remove result type we're not interested in and separate data into a
+    # features and response data.frame
+    features_sims2 <- features_sims %>%
+      select(-one_of(ifelse(use_result_type == "TPR", "FPR", "TPR")))
+    response <- features_sims2 %>%
+      select(one_of(use_result_type))
+    features_sims2 <- features_sims2 %>%
+      select(-one_of(use_result_type))
+    
+    # Map in new feature
+    reorder_idx <- data.frame(names = colnames(features_sims2)) %>%
+      left_join(data.frame(names = colnames(features_new), idx_ds = 1:ncol(features_new)), by = "names")
+    features_new <- features_new[,reorder_idx$idx_ds]
+    
+    features_sims2 <- rbind(features_sims2, features_new)
+    
+    # Scale non-factors
+    factors <- which(colnames(features_sims2) %in% c("METHOD"))
+    non_factors <- setdiff(1:ncol(features_sims2), factors)
+    for(f in non_factors) {
+      features_sims2[,f] <- scale(features_sims2[,f])
+    }
+    
+    features_new <- features_sims2[nrow(features_sims2),]
+
     # --------------------------------------------------------------------------
     #   Make point predictions on simulated and real
     # --------------------------------------------------------------------------
     
-    pred_real <- predict(fit_obj$result, newdata = features_df)
+    pred_real <- predict(fit_obj$result, newdata = features_new)
     
     plot_df_point <- rbind(plot_df_point,
                            data.frame(true = ifelse(use_result_type == "TPR",
@@ -237,22 +294,24 @@ for(use_result_type in c("TPR", "FPR")) {
     #   Make range predictions on simulated and real
     # --------------------------------------------------------------------------
 
-    pred_real <- predict(fit_obj$result, newdata = features_df, predict.all = TRUE)
-    
-    plot_df_range <- rbind(plot_df_range,
-                           data.frame(true = ifelse(use_result_type == "TPR",
-                                                    rates$TPR,
-                                                    1 - rates$FPR),
-                                      predicted = pred_real$aggregate,
-                                      type = DE_method,
-                                      pred_type = "aggregate"))
-    plot_df_range <- rbind(plot_df_range,
-                           data.frame(true = ifelse(use_result_type == "TPR",
-                                                    rates$TPR,
-                                                    1 - rates$FPR),
-                                      predicted = pred_real$individual[1,],
-                                      type = DE_method,
-                                      pred_type = "individual"))
+    if(model_type == "RF") {
+      pred_real <- predict(fit_obj$result, newdata = features_new, predict.all = TRUE)
+      
+      plot_df_range <- rbind(plot_df_range,
+                             data.frame(true = ifelse(use_result_type == "TPR",
+                                                      rates$TPR,
+                                                      1 - rates$FPR),
+                                        predicted = pred_real$aggregate,
+                                        type = DE_method,
+                                        pred_type = "aggregate"))
+      plot_df_range <- rbind(plot_df_range,
+                             data.frame(true = ifelse(use_result_type == "TPR",
+                                                      rates$TPR,
+                                                      1 - rates$FPR),
+                                        predicted = pred_real$individual[1,],
+                                        type = DE_method,
+                                        pred_type = "individual"))
+    }
   }
 
   # --------------------------------------------------------------------------
@@ -262,7 +321,7 @@ for(use_result_type in c("TPR", "FPR")) {
   pl <- ggplot() +
     geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
                  mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
-    geom_point(data = plot_df,
+    geom_point(data = plot_df_point,
                mapping = aes(x = true, y = predicted, fill = type),
                shape = 21,
                size = 3) +
@@ -292,35 +351,37 @@ for(use_result_type in c("TPR", "FPR")) {
   #   Visualize interval predictions
   # --------------------------------------------------------------------------
   
-  pl <- ggplot() +
-    geom_boxplot(data = plot_df[plot_df$pred_type == "individual",],
-                 mapping = aes(x = factor(type), y = predicted),
-                 width = 0.25,
-                 outlier.shape = NA) +
-    geom_point(data = plot_df[plot_df$pred_type == "aggregate",],
-               mapping = aes(x = factor(type), y = true, fill = type),
-               shape = 21,
-               size = 5) +
-    scale_fill_manual(values = palette) +
-    theme_bw() +
-    ylim(c(0,1)) +
-    labs(x = paste0("observed ", plot_labels[[use_result_type]]),
-         y = paste0("predicted ", plot_labels[[use_result_type]]),
-         fill = "Data type") +
-    theme(legend.position = "none")
-  show(pl)
-  ggsave(file.path("output",
-                   "images",
-                   paste0("range-validations_",
-                          use_result_type,
-                          "_",
-                          use_baseline,
-                          "-",
-                          dataset_name,
-                          ".png")),
-         plot = pl,
-         dpi = 100,
-         units = "in",
-         height = 4,
-         width = 4)
+  if(model_type == "RF") {
+    pl <- ggplot() +
+      geom_boxplot(data = plot_df_range[plot_df_range$pred_type == "individual",],
+                   mapping = aes(x = factor(type), y = predicted),
+                   width = 0.25,
+                   outlier.shape = NA) +
+      geom_point(data = plot_df_range[plot_df_range$pred_type == "aggregate",],
+                 mapping = aes(x = factor(type), y = true, fill = type),
+                 shape = 21,
+                 size = 5) +
+      scale_fill_manual(values = palette) +
+      theme_bw() +
+      ylim(c(0,1)) +
+      labs(x = paste0("observed ", plot_labels[[use_result_type]]),
+           y = paste0("predicted ", plot_labels[[use_result_type]]),
+           fill = "Data type") +
+      theme(legend.position = "none")
+    show(pl)
+    ggsave(file.path("output",
+                     "images",
+                     paste0("range-validations_",
+                            use_result_type,
+                            "_",
+                            use_baseline,
+                            "-",
+                            dataset_name,
+                            ".png")),
+           plot = pl,
+           dpi = 100,
+           units = "in",
+           height = 4,
+           width = 4)
+  }
 }

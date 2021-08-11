@@ -5,17 +5,21 @@
 \title{Generate simulated differential expression for two conditions}
 \usage{
 fit_predictive_model(
+  model_type = "RF",
   DE_method = "all",
   use_baseline = "self",
   plot_weights = FALSE,
   exclude_partials = TRUE,
   exclude_independent = FALSE,
   train_percent = 0.8,
+  fit_full = FALSE,
   save_slug = NULL,
   save_training_data = TRUE
 )
 }
 \arguments{
+\item{model_type}{either "RF", "LM", or "EN"}
+
 \item{DE_method}{which DE calling method's results to predict; if "all",
 prediction is over all results together}
 
@@ -31,6 +35,8 @@ partial abundance information}
 with uncorrelated features}
 
 \item{train_percent}{percent of simulated datasets to train on}
+
+\item{fit_full}{fit model with true fold change information}
 
 \item{save_slug}{optional file path and name for saved predictive model (e.g.
 /output/allmethods_oracle, to which _TPR.rds and _FPR.rds will be appended}
