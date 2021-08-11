@@ -1,3 +1,21 @@
+#' Compute reference derived per-sample scale factor
+#' 
+#' @param ref_data count matrix of spike-ins (etc.) in feature x sample 
+#' orientation
+#' @return per-sample size factors
+#' @export
+compute_sf <- function(ref_data) {
+  if(!is.null(dim(ref_data))) {
+    # Eliminate low-count references
+    # ref_data <- ref_data[rowMeans(ref_data) > 100,]
+    ref_mean <- colMeans(ref_data)
+  } else {
+    ref_mean <- ref_data
+  }
+  ref_mean <- ref_mean / mean(ref_mean)
+  return(ref_mean)
+}
+
 #' Parse the Barlow et al. (2020) 16S data
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
@@ -391,11 +409,13 @@ parse_Muraro <- function(absolute = TRUE) {
                                     mapping %>% filter(!is.na(cluster)) %>% filter(cluster %in% c(c2)) %>% pull(idx)])
   
   # Use edgeR (for now) to compute the size factor
-  sf <- calcNormFactors(spikein_counts) # columns assumed to be samples
+  # sf <- calcNormFactors(spikein_counts) # columns assumed to be samples
+  sf <- compute_sf(spikein_counts)
+  
   counts <- counts[-spikein_seqs,]
   if(absolute) {
     for(j in 1:ncol(counts)) {
-      counts[,j] <- counts[,j] * sf[j]
+      counts[,j] <- counts[,j] / sf[j]
     }
   }
   counts <- as.matrix(counts)
@@ -422,7 +442,14 @@ parse_Monaco <- function(absolute = TRUE) {
                                "GSE107011_Processed_data_TPM.txt"))
   
   spike_idx <- which(sapply(rownames(data), function(x) str_detect(x, "^ERCC-")))
+  spike_counts <- data[spike_idx,]
   
+  # Eliminate some samples where spike-in counts are super low. These look like
+  # fishy, low quality samples.
+  spike_sums <- colSums(spike_counts)
+  retain_idx <- which(spike_sums >= quantile(spike_sums, probs = c(0.05)))
+  data <- data[,retain_idx]
+
   # Plot spike-in relative abundance by type
   groups <- sapply(colnames(data), function(x) {
     pieces <- strsplit(x, "_")[[1]]
@@ -430,18 +457,21 @@ parse_Monaco <- function(absolute = TRUE) {
   })
   
   # Compute size factor
-  sf <- unname(unlist(calcNormFactors(data[spike_idx,]))) # columns assumed to be samples
+  # sf <- unname(unlist(calcNormFactors(data[spike_idx,]))) # columns assumed to be samples
+  sf <- compute_sf(data[spike_idx,])
   
   # Re-normalize
   counts <- data
   if(absolute) {
     for(i in 1:ncol(counts)) {
-      counts[,i] <- counts[,i] * sf[i]
+      counts[,i] <- counts[,i] / sf[i]
     }
   }
   counts <- as.matrix(counts)
   colnames(counts) <- NULL
   rownames(counts) <- NULL
+  
+  plot(colSums(counts))
   
   parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
   return(parsed_obj)
@@ -484,9 +514,10 @@ parse_Hashimshony <- function(absolute = TRUE) {
   counts <- data
   if(absolute) {
     # Compute size factor from spike-ins
-    sf <- unname(unlist(calcNormFactors(counts[spike_idx,]))) # columns assumed to be samples
+    # sf <- unname(unlist(calcNormFactors(counts[spike_idx,]))) # columns assumed to be samples
+    sf <- compute_sf(counts[spike_idx,])
     for(i in 1:ncol(counts)) {
-      counts[,i] <- counts[,i] * sf[i]
+      counts[,i] <- counts[,i] / sf[i]
     }
   }
   counts <- as.matrix(counts)
@@ -532,11 +563,13 @@ parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE) {
   # The rationale for this squick and dirty renormalization is that I want a
   # size factor generated from the distribution of mass, centered at 1, with
   # a SD of around 0.1
-  sf <- scale(meta$mass/(sd(meta$mass)*10), scale = F) + 1
+  # sf <- scale(meta$mass/(sd(meta$mass)*10), scale = F) + 1
+  sf <- compute_sf(meta$mass)
   
   counts <- data
   if(absolute) {
     for(i in 1:ncol(counts)) {
+      # Multiply; library size should have a positive association with mass!
       counts[,i] <- counts[,i] * sf[i]
     }
   }
