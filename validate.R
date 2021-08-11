@@ -16,12 +16,7 @@ option_list = list(
               type = "character",
               default = "self",
               help = "calls to use as a reference: self, threshold",
-              metavar = "character"),
-  make_option(c("--range"),
-              type = "logical",
-              default = "TRUE",
-              help = "generate interval predictions",
-              metavar = "logical")
+              metavar = "character")
 );
 
 opt_parser = OptionParser(option_list = option_list);
@@ -29,7 +24,6 @@ opt = parse_args(opt_parser);
 
 dataset_name <- opt$dataset
 use_baseline <- opt$baseline
-use_range <- opt$range
 testing <- FALSE
 
 if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song", "Monaco", 
@@ -176,7 +170,8 @@ plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 
 for(use_result_type in c("TPR", "FPR")) {
 
-  plot_df <- NULL
+  plot_df_point <- NULL
+  plot_df_range <- NULL
 
   # Load predictive model
   model_fn <- file.path("output",
@@ -226,97 +221,106 @@ for(use_result_type in c("TPR", "FPR")) {
       select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
     
     # --------------------------------------------------------------------------
-    #   Make predictions on simulated and real
+    #   Make point predictions on simulated and real
     # --------------------------------------------------------------------------
     
-    if(use_range) {
-      pred_real <- predict(fit_obj$result, newdata = features_df, predict.all = TRUE)
-      
-      plot_df <- rbind(plot_df,
-                       data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
-                                  predicted = pred_real$aggregate,
-                                  type = DE_method,
-                                  pred_type = "aggregate"))
-      plot_df <- rbind(plot_df,
-                       data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
-                                  predicted = pred_real$individual[1,],
-                                  type = DE_method,
-                                  pred_type = "individual"))
-    } else {
-      pred_real <- predict(fit_obj$result, newdata = features_df)
-      
-      plot_df <- rbind(plot_df,
-                       data.frame(true = ifelse(use_result_type == "TPR", rates$TPR, 1 - rates$FPR),
-                                  predicted = pred_real,
-                                  type = DE_method))
-    }
+    pred_real <- predict(fit_obj$result, newdata = features_df)
     
+    plot_df_point <- rbind(plot_df_point,
+                           data.frame(true = ifelse(use_result_type == "TPR",
+                                                    rates$TPR,
+                                                    1 - rates$FPR),
+                                      predicted = pred_real,
+                                      type = DE_method))
+    
+    # --------------------------------------------------------------------------
+    #   Make range predictions on simulated and real
+    # --------------------------------------------------------------------------
+
+    pred_real <- predict(fit_obj$result, newdata = features_df, predict.all = TRUE)
+    
+    plot_df_range <- rbind(plot_df_range,
+                           data.frame(true = ifelse(use_result_type == "TPR",
+                                                    rates$TPR,
+                                                    1 - rates$FPR),
+                                      predicted = pred_real$aggregate,
+                                      type = DE_method,
+                                      pred_type = "aggregate"))
+    plot_df_range <- rbind(plot_df_range,
+                           data.frame(true = ifelse(use_result_type == "TPR",
+                                                    rates$TPR,
+                                                    1 - rates$FPR),
+                                      predicted = pred_real$individual[1,],
+                                      type = DE_method,
+                                      pred_type = "individual"))
   }
 
-  if(use_range) {
-    # Subset to 50% intervals for each setting
-    pl <- ggplot() +
-      # geom_violin(data = plot_df[plot_df$pred_type == "individual",],
-      #             mapping = aes(x = factor(type), y = predicted),
-      #             width = 1) +
-      geom_boxplot(data = plot_df[plot_df$pred_type == "individual",],
-                   mapping = aes(x = factor(type), y = predicted),
-                   width = 0.25,
-                   outlier.shape = NA) +
-      geom_point(data = plot_df[plot_df$pred_type == "aggregate",],
-                 mapping = aes(x = factor(type), y = true, fill = type),
-                 shape = 21,
-                 size = 5) +
-      scale_fill_manual(values = palette) +
-      theme_bw() +
-      ylim(c(0,1)) +
-      labs(x = paste0("observed ", plot_labels[[use_result_type]]),
-           y = paste0("predicted ", plot_labels[[use_result_type]]),
-           fill = "Data type") +
-      theme(legend.position = "none")
-    show(pl)
-    ggsave(file.path("output",
-                     "images",
-                     paste0("range-validations_",
-                            use_result_type,
-                            "_",
-                            use_baseline,
-                            "-",
-                            dataset_name,
-                            ".png")),
-           plot = pl,
-           dpi = 100,
-           units = "in",
-           height = 4,
-           width = 4)
-  } else {
-    pl <- ggplot() +
-      geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
-                   mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
-      geom_point(data = plot_df,
-                 mapping = aes(x = true, y = predicted, fill = type),
-                 shape = 21,
-                 size = 3) +
-      scale_fill_manual(values = palette) + 
-      xlim(c(0,1)) +
-      ylim(c(0,1)) +
-      labs(x = paste0("observed ", plot_labels[[use_result_type]]),
-           y = paste0("predicted ", plot_labels[[use_result_type]]),
-           fill = "Data type")
-    show(pl)
-    ggsave(file.path("output",
-                     "images",
-                     paste0("validations_",
-                            use_result_type,
-                            "_",
-                            use_baseline,
-                            "-",
-                            dataset_name,
-                            ".png")),
-           plot = pl,
-           dpi = 100,
-           units = "in",
-           height = 4,
-           width = 5.5)
-  }
+  # --------------------------------------------------------------------------
+  #   Visualize point predictions
+  # --------------------------------------------------------------------------
+  
+  pl <- ggplot() +
+    geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
+                 mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
+    geom_point(data = plot_df,
+               mapping = aes(x = true, y = predicted, fill = type),
+               shape = 21,
+               size = 3) +
+    scale_fill_manual(values = palette) + 
+    xlim(c(0,1)) +
+    ylim(c(0,1)) +
+    labs(x = paste0("observed ", plot_labels[[use_result_type]]),
+         y = paste0("predicted ", plot_labels[[use_result_type]]),
+         fill = "Data type")
+  show(pl)
+  ggsave(file.path("output",
+                   "images",
+                   paste0("validations_",
+                          use_result_type,
+                          "_",
+                          use_baseline,
+                          "-",
+                          dataset_name,
+                          ".png")),
+         plot = pl,
+         dpi = 100,
+         units = "in",
+         height = 4,
+         width = 5.5)
+  
+  # --------------------------------------------------------------------------
+  #   Visualize interval predictions
+  # --------------------------------------------------------------------------
+  
+  pl <- ggplot() +
+    geom_boxplot(data = plot_df[plot_df$pred_type == "individual",],
+                 mapping = aes(x = factor(type), y = predicted),
+                 width = 0.25,
+                 outlier.shape = NA) +
+    geom_point(data = plot_df[plot_df$pred_type == "aggregate",],
+               mapping = aes(x = factor(type), y = true, fill = type),
+               shape = 21,
+               size = 5) +
+    scale_fill_manual(values = palette) +
+    theme_bw() +
+    ylim(c(0,1)) +
+    labs(x = paste0("observed ", plot_labels[[use_result_type]]),
+         y = paste0("predicted ", plot_labels[[use_result_type]]),
+         fill = "Data type") +
+    theme(legend.position = "none")
+  show(pl)
+  ggsave(file.path("output",
+                   "images",
+                   paste0("range-validations_",
+                          use_result_type,
+                          "_",
+                          use_baseline,
+                          "-",
+                          dataset_name,
+                          ".png")),
+         plot = pl,
+         dpi = 100,
+         units = "in",
+         height = 4,
+         width = 4)
 }
