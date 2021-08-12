@@ -32,8 +32,8 @@ use_baseline <- opt$baseline
 model_type <- opt$model
 testing <- FALSE
 
-if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song", "Monaco", 
-                         "Muraro", "Hashimshony", "Kimmerling"))) {
+if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song",
+                         "Monaco", "Hagai", "Owens", "Klein", "Yu"))) {
   stop(paste0("Invalid data set: ", dataset_name, "!\n"))
 }
 
@@ -72,17 +72,22 @@ if(dataset_name == "Monaco") {
   abs_data <- parse_Monaco(absolute = TRUE)
   rel_data <- parse_Monaco(absolute = FALSE)
 }
-if(dataset_name == "Muraro") {
-  abs_data <- parse_Muraro(absolute = TRUE)
-  rel_data <- parse_Muraro(absolute = FALSE)
+if(dataset_name == "Hagai") {
+  abs_data <- parse_Hagai(absolute = TRUE)
+  rel_data <- parse_Hagai(absolute = FALSE)
 }
-if(dataset_name == "Hashimshony") {
-  abs_data <- parse_Hashimshony(absolute = TRUE)
-  rel_data <- parse_Hashimshony(absolute = FALSE)
+if(dataset_name == "Owens") {
+  # This one is slow to load
+  abs_data <- parse_Owens(absolute = TRUE)
+  rel_data <- parse_Owens(absolute = FALSE)
 }
-if(dataset_name == "Kimmerling") {
-  abs_data <- parse_Kimmerling(absolute = TRUE)
-  rel_data <- parse_Kimmerling(absolute = FALSE)
+if(dataset_name == "Klein") {
+  abs_data <- parse_Klein(absolute = TRUE)
+  rel_data <- parse_Klein(absolute = FALSE)
+}
+if(dataset_name == "Yu") {
+  abs_data <- parse_Yu(absolute = TRUE)
+  rel_data <- parse_Yu(absolute = FALSE)
 }
 
 if(testing & nrow(abs_data$counts) > 500) {
@@ -97,24 +102,22 @@ ref_data <- t(abs_data$counts)
 data <- t(rel_data$counts)
 groups <- abs_data$groups
 
-if(dataset_name == "VieiraSilva") {
-  subgroups <- c("mHC", "CD")
-  ref_data <- ref_data[groups %in% subgroups,]
-  data <- data[groups %in% subgroups,]
-  groups <- factor(groups[groups %in% subgroups])
+# Subsample if tons of cells/samples
+set.seed(100)
+pairs <- table(groups)
+if(pairs[1] > 100) {
+  A_sample <- sample(which(groups == names(pairs)[1]), size = 100)
+} else {
+  A_sample <- which(groups == names(pairs)[1])
 }
-if(dataset_name == "Monaco") {
-  subgroups <- c("Plasmablasts", "Neutrophils")
-  ref_data <- ref_data[groups %in% subgroups,]
-  data <- data[groups %in% subgroups,]
-  groups <- factor(groups[groups %in% subgroups])
+if(pairs[2] > 100) {
+  B_sample <- sample(which(groups == names(pairs)[2]), size = 100)
+} else {
+  B_sample <- which(groups == names(pairs)[2])
 }
-if(dataset_name == "Hashimshony") {
-  subgroups <- c("0", "1")
-  ref_data <- ref_data[groups %in% subgroups,]
-  data <- data[groups %in% subgroups,]
-  groups <- factor(groups[groups %in% subgroups])
-}
+ref_data <- ref_data[c(A_sample, B_sample),]
+data <- data[c(A_sample, B_sample),]
+groups <- groups[c(A_sample, B_sample)]
 
 # Convert to integers, just for DESeq2
 ref_data <- apply(ref_data, c(1,2), as.integer)
@@ -150,17 +153,21 @@ if(dataset_name == "Monaco") {
   counts_A <- data[groups == "Plasmablasts",]
   counts_B <- data[groups == "Neutrophils",]
 }
-if(dataset_name == "Muraro") {
-  counts_A <- data[groups == "alpha",]
-  counts_B <- data[groups == "beta",]
+if(dataset_name == "Hagai") {
+  counts_A <- data[groups == "unstimulated",]
+  counts_B <- data[groups == "pIC4",]
 }
-if(dataset_name == "Hashimshony") {
-  counts_A <- data[groups == "0",]
-  counts_B <- data[groups == "1",]
+if(dataset_name == "Owens") {
+  counts_A <- data[groups == "early_series",]
+  counts_B <- data[groups == "late_series",]
 }
-if(dataset_name == "Kimmerling") {
-  counts_A <- data[groups == "low_mass",]
-  counts_B <- data[groups == "high_mass",]
+if(dataset_name == "Klein") {
+  counts_A <- data[groups == "unstimulated",]
+  counts_B <- data[groups == "LIF-2hr",]
+}
+if(dataset_name == "Yu") {
+  counts_A <- data[groups == "Brn",]
+  counts_B <- data[groups == "Lvr",]
 }
 
 # This takes 2-3 min. to run on 15K features

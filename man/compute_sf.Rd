@@ -2,7 +2,7 @@
 % Please edit documentation in R/parse_datasets.R
 \name{compute_sf}
 \alias{compute_sf}
-\title{Compute reference derived per-sample scale factor}
+\title{Compute reference-derived per-sample scale factor}
 \usage{
 compute_sf(ref_data)
 }
@@ -14,5 +14,5 @@ orientation}
 per-sample size factors
 }
 \description{
-Compute reference derived per-sample scale factor
+Compute reference-derived per-sample scale factor
 }
