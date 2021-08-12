@@ -7,7 +7,7 @@ library(optparse)
 
 DE_method <- "all"
 use_baseline <- "self"
-model_type <- "RF"
+model_type <- "EN"
 
 plot_labels <- list(fpr = "specificity (1 - FPR)", tpr = "sensitivity (TPR)")
 
