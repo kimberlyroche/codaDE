@@ -15,13 +15,18 @@ option_list = list(
   make_option(c("--baseline"),
               type = "character",
               default = "self",
-              help = "calls to use as a reference: self, threshold",
+              help = "calls to use as a reference: self, oracle",
               metavar = "character"),
-  make_option(c("--model"),
-              type = "character",
-              default = "RF",
-              help = "predictive model type to use: RF, LM, or EN",
-              metavar = "character")
+  # make_option(c("--model"),
+  #             type = "character",
+  #             default = "RF",
+  #             help = "predictive model type to use: RF, LM, or EN",
+  #             metavar = "character"),
+  make_option(c("--threshold"),
+              type = "numeric",
+              default = "5",
+              help = "minimum mean abundance to threshold on",
+              metavar = "numeric")
 );
 
 opt_parser = OptionParser(option_list = option_list);
@@ -29,20 +34,28 @@ opt = parse_args(opt_parser);
 
 dataset_name <- opt$dataset
 use_baseline <- opt$baseline
-model_type <- opt$model
+threshold <- round(opt$threshold)
 testing <- FALSE
+
+model_type <- "RF"
+
+methods_list <- c("ALDEx2", "DESeq2", "MAST", "scran")
 
 if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song",
                          "Monaco", "Hagai", "Owens", "Klein", "Yu"))) {
   stop(paste0("Invalid data set: ", dataset_name, "!\n"))
 }
 
-if(!(use_baseline %in% c("self", "threshold"))) {
+if(!(use_baseline %in% c("self", "oracle"))) {
   stop(paste0("Invalid DA baseline: ", use_baseline, "!\n"))
 }
 
-if(!(model_type %in% c("RF", "LM", "EN"))) {
-  stop(paste0("Invalid model type: ", model_type, "!\n"))
+# if(!(model_type %in% c("RF", "LM", "EN"))) {
+#   stop(paste0("Invalid model type: ", model_type, "!\n"))
+# }
+
+if(threshold < 0) {
+  stop(paste0("Invalid threshold: ", threshold, "!\n"))
 }
 
 palette <- list(ALDEx2 = "#46A06B",
@@ -101,6 +114,7 @@ if(testing & nrow(abs_data$counts) > 500) {
 ref_data <- t(abs_data$counts)
 data <- t(rel_data$counts)
 groups <- abs_data$groups
+groups <- factor(groups)
 
 # Subsample if tons of cells/samples
 set.seed(100)
@@ -124,13 +138,47 @@ ref_data <- apply(ref_data, c(1,2), as.integer)
 data <- apply(data, c(1,2), as.integer)
 
 # Look at sparsity; filter out too-low features
-# retain_features <- colSums(ref_data) > 10 & colSums(data) > 10
-retain_features <- colMeans(ref_data) >= 1 & colMeans(data) >= 1
+retain_features <- colMeans(ref_data) >= threshold & colMeans(data) >= threshold
 ref_data <- ref_data[,retain_features]
 data <- data[,retain_features]
 
 cat(paste0("Dataset dimensions: ", nrow(ref_data), " x ", ncol(ref_data), "\n"))
 cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
+
+# ------------------------------------------------------------------------------
+#   Call discrepancy by each method; save to file if doesn't already exist
+#
+#   This can be time-consuming!
+# ------------------------------------------------------------------------------
+
+for(DE_method in method_list) {
+  # Pull saved calls on this data set x method if these exist
+  save_fn <- file.path("output",
+                       "predictive_fits",
+                       "all",
+                       paste0("calls_",
+                              use_baseline,
+                              "_",
+                              DE_method,
+                              "_",
+                              dataset_name,
+                              "_threshold",
+                              threshold,
+                              ".rds"))
+  if(!file.exists(save_fn)) {
+    cat(paste0("Making calls for ", DE_method, " on ", dataset_name, "...\n"))
+    # Get baseline differential abundance calls
+    if(use_baseline == "oracle") {
+      oracle_calls <- call_DA_NB(ref_data, groups)$pval
+    } else {
+      oracle_calls <- NULL
+    }
+    all_calls <- DA_wrapper(ref_data, data, groups, DE_method, oracle_calls)
+    rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls)
+    save_obj <- list(all_calls = all_calls, rates = rates)
+    saveRDS(save_obj, save_fn)
+  }
+}
 
 # ------------------------------------------------------------------------------
 #   Wrangle data for prediction-making
@@ -150,8 +198,8 @@ if(dataset_name == "Song") {
   counts_B <- data[groups == "brain",]
 }
 if(dataset_name == "Monaco") {
-  counts_A <- data[groups == "Plasmablasts",]
-  counts_B <- data[groups == "Neutrophils",]
+  counts_A <- data[groups == "CD4_naive",]
+  counts_B <- data[groups == "PBMC",]
 }
 if(dataset_name == "Hagai") {
   counts_A <- data[groups == "unstimulated",]
@@ -193,8 +241,7 @@ features_sims <- features_sims[sample(1:nrow(features_sims), size = 5000),]
 
 for(use_result_type in c("TPR", "FPR")) {
 
-  plot_df_point <- NULL
-  plot_df_range <- NULL
+  plot_df <- NULL
 
   # Load predictive model
   model_fn <- file.path("output",
@@ -212,33 +259,41 @@ for(use_result_type in c("TPR", "FPR")) {
   }
   fit_obj <- readRDS(model_fn)
 
-  for(DE_method in c("ALDEx2", "DESeq2", "MAST", "scran")) {
+  for(DE_method in methods_list) {
     
     cat(paste0("Evaluating ", use_result_type, " x ", DE_method, "\n"))
 
     features_new <- features # we'll alter this for each result type
     features_new$METHOD <- DE_method
     features_new$METHOD <- factor(features_new$METHOD,
-                                  levels = c("ALDEx2", "DESeq2", "MAST", "scran"))
+                                  levels = methods_list)
 
     if((max(table(groups)) < 5 | dataset_name == "Kimmerling") && DE_method == "scran") {
       next
     }
     
     # --------------------------------------------------------------------------
-    #   Call discrepancy by chosen method
+    #   Pull calls for chosen method
     # --------------------------------------------------------------------------
     
-    # Get baseline differential abundance calls
-    if(use_baseline == "oracle") {
-      oracle_calls <- call_DA_NB(ref_data, groups)$pval
-    } else {
-      oracle_calls <- NULL
+    save_fn <- file.path("output",
+                         "predictive_fits",
+                         "all",
+                         paste0("calls_",
+                                use_baseline,
+                                "_",
+                                DE_method,
+                                "_",
+                                dataset_name,
+                                "_threshold",
+                                threshold,
+                                ".rds"))
+    if(!file.exists(save_fn)) {
+      stop(paste0("Missing file ", save_fn, "!"))
     }
-    
-    all_calls <- DA_wrapper(ref_data, data, groups, DE_method, oracle_calls)
-
-    rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls)
+    calls_obj <- readRDS(save_fn)
+    all_calls <- calls_obj$all_calls
+    rates <- calls_obj$rates
     
     # --------------------------------------------------------------------------
     #   Finish feature wrangling
@@ -318,77 +373,50 @@ for(use_result_type in c("TPR", "FPR")) {
                                         predicted = pred_real$individual[1,],
                                         type = DE_method,
                                         pred_type = "individual"))
+      
+      plot_df_test <- NULL
+      plot_df_test <- rbind(plot_df_test,
+                            data.frame(true = ifelse(use_result_type == "TPR",
+                                                     rates$TPR,
+                                                     1 - rates$FPR),
+                                       lower = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
+                                       upper = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
+                                       point = pred_real$aggregate,
+                                       type = DE_method,
+                                       pred_type = "prediction"))
     }
   }
 
   # --------------------------------------------------------------------------
-  #   Visualize point predictions
+  #   Visualize predictions
   # --------------------------------------------------------------------------
   
-  pl <- ggplot() +
+  pl <- ggplot(plot_df_test, aes(x = true, y = point)) +
     geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
                  mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
-    geom_point(data = plot_df_point,
-               mapping = aes(x = true, y = predicted, fill = type),
-               shape = 21,
-               size = 3) +
-    scale_fill_manual(values = palette) + 
-    xlim(c(0,1)) +
+    geom_pointrange(data = plot_df_test,
+                    aes(x = true, ymin = lower, ymax = upper, color = factor(type))) +
+    scale_color_manual(values = palette) +
+    theme_bw() +
     ylim(c(0,1)) +
     labs(x = paste0("observed ", plot_labels[[use_result_type]]),
          y = paste0("predicted ", plot_labels[[use_result_type]]),
-         fill = "Data type")
-  show(pl)
+         fill = "Data type") +
+    theme(legend.position = "none")
   ggsave(file.path("output",
                    "images",
                    paste0("validations_",
                           use_result_type,
                           "_",
                           use_baseline,
-                          "-",
+                          "_",
                           dataset_name,
+                          "_threshold",
+                          threshold,
                           ".png")),
          plot = pl,
          dpi = 100,
          units = "in",
          height = 4,
-         width = 5.5)
-  
-  # --------------------------------------------------------------------------
-  #   Visualize interval predictions
-  # --------------------------------------------------------------------------
-  
-  if(model_type == "RF") {
-    pl <- ggplot() +
-      geom_boxplot(data = plot_df_range[plot_df_range$pred_type == "individual",],
-                   mapping = aes(x = factor(type), y = predicted),
-                   width = 0.25,
-                   outlier.shape = NA) +
-      geom_point(data = plot_df_range[plot_df_range$pred_type == "aggregate",],
-                 mapping = aes(x = factor(type), y = true, fill = type),
-                 shape = 21,
-                 size = 5) +
-      scale_fill_manual(values = palette) +
-      theme_bw() +
-      ylim(c(0,1)) +
-      labs(x = paste0("observed ", plot_labels[[use_result_type]]),
-           y = paste0("predicted ", plot_labels[[use_result_type]]),
-           fill = "Data type") +
-      theme(legend.position = "none")
-    show(pl)
-    ggsave(file.path("output",
-                     "images",
-                     paste0("range-validations_",
-                            use_result_type,
-                            "_",
-                            use_baseline,
-                            "-",
-                            dataset_name,
-                            ".png")),
-           plot = pl,
-           dpi = 100,
-           units = "in",
-           height = 4,
-           width = 4)
-  }
+         width = 4)
 }

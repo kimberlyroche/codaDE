@@ -22,7 +22,7 @@ plot_PCA <- function(counts, groups, use_labels = FALSE, use_groups = NULL,
     geom_point(size = 3, shape = 21) +
     theme_bw() +
     labs(x = "PC 1", y = "PC 2", fill = "Condition") +
-    scale_fill_manual(values = palette)
+    scale_fill_manual(values = c("#e6780b", "#dddddd"))
   if(use_labels) {
     p <- p +
       geom_text(check_overlap = TRUE)
@@ -139,52 +139,68 @@ calc_FC <- function(counts, groups, use_groups = NULL) {
   cat(paste0("Absolute FC: ", round(ratio, 3), "\n"))
 }
 
-get_feature_count <- function(counts) {
-  nrow(counts[rowMeans(counts) >= 1,])
+get_feature_count <- function(counts, threshold = 1) {
+  nrow(counts[rowMeans(counts) >= threshold,])
+}
+
+get_zeros <- function(counts, threshold = 1) {
+  retain_features <- colMeans(counts) >= threshold & colMeans(counts) >= threshold
+  counts <- counts[,retain_features]
+  sum(counts == 0)/(nrow(counts)*ncol(counts))
+}
+
+summarize_ds <- function(counts, groups, dataset_name = NULL) {
+  cat(paste0("Feature count: ", get_feature_count(counts), "\n"))
+  cat(paste0("Feature count: ", get_feature_count(counts, threshold = 5), "\n"))
+  calc_FC(counts, groups)
+  calc_prop_DA(counts, groups)
+  cat(paste0("Zeros: ", round(get_zeros(counts, threshold = 5)*100), "%\n\n"))
+  
+  plot_PCA(counts,
+           groups,
+           save_name = ifelse(!is.null(dataset_name), paste0(dataset_name, "_01.png"), NULL))
+  g1_idx <- which(groups == unique(groups)[1])
+  g2_idx <- which(groups == unique(groups)[2])
+  if(length(g1_idx) > 20) {
+    g1_idx <- sample(g1_idx, size = 20)
+  }
+  if(length(g2_idx) > 20) {
+    g2_idx <- sample(g2_idx, size = 20)
+  }
+  idx_subset <- c(g1_idx, g2_idx)
+  use_k <- min(round(nrow(counts)*0.8), 5000)
+  plot_relab(counts[,idx_subset],
+             groups[idx_subset],
+             k = use_k,
+             use_props = FALSE,
+             save_name = ifelse(!is.null(dataset_name), paste0(dataset_name, "_02.png"), NULL))
+  plot_relab(counts[,idx_subset],
+             groups[idx_subset],
+             k = use_k,
+             use_props = TRUE,
+             save_name = ifelse(!is.null(dataset_name), paste0(dataset_name, "_03.png"), NULL))
 }
 
 # ------------------------------------------------------------------------------
 #   Vieira-Silva et al. data
 # ------------------------------------------------------------------------------
 
-use_groups <- c("mHC", "CD")
 vs <- parse_VieiraSilva(absolute = TRUE)
-cat(paste0("Feature count: ", get_feature_count(vs$counts), "\n"))
-plot_PCA(vs$counts, vs$groups, use_groups = use_groups, save_name = "vieirasilva_01.png")
-calc_prop_DA(vs$counts, vs$groups, use_groups = use_groups)
-calc_FC(vs$counts, vs$groups, use_groups = use_groups)
-plot_totals(vs$counts, vs$groups, use_groups = use_groups, save_name = "vieirasilva_02.png")
-# Subset to CD vs. mHC samples
-idx_subset <- c(sample(which(vs$groups == "mHC"), size = 20),
-                sample(which(vs$groups == "CD"), size = 20))
-plot_relab(vs$counts[,idx_subset], vs$groups[idx_subset], use_props = FALSE, save_name = "vieirasilva_03a.png")
-plot_relab(vs$counts[,idx_subset], vs$groups[idx_subset], use_props = TRUE, save_name = "vieirasilva_03b.png")
+summarize_ds(vs$counts, factor(vs$groups), dataset_name = "VieiraSilva")
 
 # ------------------------------------------------------------------------------
 #   Barlow et al. data
 # ------------------------------------------------------------------------------
 
 barlow <- parse_Barlow(absolute = TRUE)
-cat(paste0("Feature count: ", get_feature_count(barlow$counts), "\n"))
-plot_PCA(barlow$counts, barlow$groups, save_name = "barlow_01.png")
-calc_prop_DA(barlow$counts, barlow$groups)
-calc_FC(barlow$counts, barlow$groups)
-plot_totals(barlow$counts, barlow$groups, save_name = "barlow_02.png")
-plot_relab(barlow$counts, barlow$groups, use_props = FALSE, save_name = "barlow_03a.png")
-plot_relab(barlow$counts, barlow$groups, use_props = TRUE, save_name = "barlow_03b.png")
+summarize_ds(barlow$counts, barlow$groups, dataset_name = "Barlow")
 
 # ------------------------------------------------------------------------------
 #   Song et al. data
 # ------------------------------------------------------------------------------
 
 song <- parse_Song(absolute = TRUE)
-cat(paste0("Feature count: ", get_feature_count(song$counts), "\n"))
-plot_PCA(song$counts, song$groups, save_name = "song_01.png")
-calc_prop_DA(song$counts, song$groups)
-calc_FC(song$counts, song$groups)
-plot_totals(song$counts, song$groups, save_name = "song_02.png")
-plot_relab(song$counts, song$groups, k = 200, use_props = FALSE, save_name = "song_03a.png")
-plot_relab(song$counts, song$groups, k = 200, use_props = TRUE, save_name = "song_03b.png")
+summarize_ds(song$counts, song$groups, dataset_name = "Song")
 
 # # PCA of features in FPR RF training set vs. this data set
 # # First pull "features_df" from `validate.R` for Song et al. x MAST
@@ -229,73 +245,40 @@ plot_relab(song$counts, song$groups, k = 200, use_props = TRUE, save_name = "son
 #   Monaco et al. data
 # ------------------------------------------------------------------------------
 
-use_groups <- c("CD4_naive", "PBMC")
 monaco <- parse_Monaco(absolute = TRUE)
-cat(paste0("Feature count: ", get_feature_count(monaco$counts), "\n"))
-plot_PCA(monaco$counts, monaco$groups, use_groups = use_groups,
-         use_labels = TRUE, save_name = "monaco_01.png", height = 6, width = 9)
-calc_prop_DA(monaco$counts, monaco$groups, use_groups = use_groups)
-calc_FC(monaco$counts, monaco$groups, use_groups = use_groups)
-plot_totals(monaco$counts, monaco$groups, use_groups = use_groups,
-            save_name = "monaco_02.png", height = 6, width = 10)
-plot_relab(monaco$counts, monaco$group, use_groups = use_groups, k = 5000,
-           use_props = FALSE, save_name = "monaco_03a.png", height = 6, width = 12)
-plot_relab(monaco$counts, monaco$group, use_groups = use_groups, k = 5000,
-           use_props = TRUE, save_name = "monaco_03b.png", height = 6, width = 12)
+summarize_ds(monaco$counts, monaco$groups, dataset_name = "Monaco")
 
 # ------------------------------------------------------------------------------
-#   Muraro et al. data
+#   Hagai et al. data
 # ------------------------------------------------------------------------------
 
-muraro <- parse_Muraro(absolute = TRUE)
-cat(paste0("Feature count: ", get_feature_count(muraro$counts), "\n"))
-idx_subset <- c(sample(which(muraro$groups == "alpha"), size = 50),
-                sample(which(muraro$groups == "beta"), size = 50))
-muraro$counts <- muraro$counts[,idx_subset]
-muraro$groups <- muraro$groups[idx_subset]
-plot_PCA(muraro$counts, muraro$groups, save_name = "muraro_01.png")
-calc_prop_DA(muraro$counts, muraro$groups)
-calc_FC(muraro$counts, muraro$groups)
-# Subset the groups for the following
-plot_totals(muraro$counts, muraro$groups, save_name = "muraro_02.png")
-plot_relab(muraro$counts, muraro$groups, k = 5000, use_props = FALSE, save_name = "muraro_03a.png")
-plot_relab(muraro$counts, muraro$groups, k = 5000, use_props = TRUE, save_name = "muraro_03b.png")
+hagai <- parse_Hagai(absolute = TRUE)
+summarize_ds(hagai$counts, hagai$groups, dataset_name = "Hagai")
 
 # ------------------------------------------------------------------------------
-#   Hashimshony et al. data
+#   Owens et al. data
 # ------------------------------------------------------------------------------
 
-use_groups = c("0", "0.5")
-hashim <- parse_Hashimshony(absolute = TRUE)
-cat(paste0("Feature count: ", get_feature_count(hashim$counts), "\n"))
-plot_PCA(hashim$counts, hashim$groups, save_name = "hashimshony_01.png")
-calc_prop_DA(hashim$counts, hashim$groups, use_groups = use_groups)
-calc_FC(hashim$counts, hashim$groups, use_groups = use_groups)
-plot_totals(hashim$counts, hashim$groups, save_name = "hashimshony_02.png")
-plot_relab(hashim$counts, hashim$groups, use_props = FALSE, use_groups = use_groups,
-           k = 5000, save_name = "hashimshony_03a.png")
-plot_relab(hashim$counts, hashim$groups, use_props = TRUE, use_groups = use_groups,
-           k = 5000, save_name = "hashimshony_03b.png")
+owens <- parse_Owens(absolute = TRUE)
+summarize_ds(owens$counts, owens$groups, dataset_name = "Owens")
 
 # ------------------------------------------------------------------------------
-#   Kimmerling et al. data
+#   Klein et al. data
 # ------------------------------------------------------------------------------
 
-kimmer <- parse_Kimmerling(absolute = TRUE)
-idx_subset <- c(sample(which(kimmer$groups == "low_mass"), size = 20),
-                sample(which(kimmer$groups == "high_mass"), size = 20))
-kimmer$counts <- kimmer$counts[,idx_subset]
-kimmer$groups <- kimmer$groups[idx_subset]
-cat(paste0("Feature count: ", get_feature_count(kimmer$counts), "\n"))
-plot_PCA(kimmer$counts, kimmer$groups, save_name = "kimmerling_01.png")
-calc_prop_DA(kimmer$counts, kimmer$groups)
-calc_FC(kimmer$counts, kimmer$groups)
-# Subset the groups for the following
-plot_totals(kimmer$counts, kimmer$groups, save_name = "kimmerling_02.png")
-plot_relab(kimmer$counts, kimmer$group, use_props = FALSE, k = 5000,
-           save_name = "kimmerling_03a.png")
-plot_relab(kimmer$counts, kimmer$group, use_props = TRUE, k = 5000,
-           save_name = "kimmerling_03b.png")
+klein <- parse_Klein(absolute = TRUE)
+summarize_ds(klein$counts, klein$groups, dataset_name = "Klein")
+
+# ------------------------------------------------------------------------------
+#   Yu et al. data
+# ------------------------------------------------------------------------------
+
+yu <- parse_Yu(absolute = TRUE)
+summarize_ds(yu$counts, yu$groups, dataset_name = "Yu")
+
+
+
+
 
 
 

@@ -19,7 +19,7 @@ TOTALS
 
 CORRELATION OF FEATURES
 	CORR_RA_MED: median correlation of relative abundances
-	CORR_RA_SD: correlation of relative abundances
+	CORR_RA_SD: SD correlation of relative abundances
 	CORR_RA_SKEW: skew correlation of relative abundances
 	CORR_LOG_MED: median correlation of log + PC counts
 	CORR_LOG_SD: SD correlation of log + PC counts

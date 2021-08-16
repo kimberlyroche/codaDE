@@ -28,7 +28,7 @@ save_slug <- file.path("output",
 for(use_result_type in c("TPR", "FPR")) {
   # Evaluate TPR model
   fit_obj <- readRDS(paste0(save_slug, "_", model_type, "_", use_result_type, ".rds"))
-      
+
   test_data <- cbind(fit_obj$test_features, response = fit_obj$test_response)
   
   prediction <- predict(fit_obj$result, newdata = test_data) # predict.all = TRUE
