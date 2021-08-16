@@ -53,7 +53,11 @@ characterize_dataset <- function(counts_A, counts_B) {
   #   Characteristics assoc. with correlation
   # --------------------------------------------------------------------------
   
-  ra_correlation <- cor(relab_A)
+  if(ncol(relab_A) > 10000) {
+    ra_correlation <- cor(relab_A[,1:10000])
+  } else {
+    ra_correlation <- cor(relab_A)
+  }
   ra_correlation_vector <- ra_correlation[upper.tri(ra_correlation,
                                                     diag = FALSE)]
   
@@ -64,11 +68,19 @@ characterize_dataset <- function(counts_A, counts_B) {
   if(length(remove_idx) > 0) {
     temp <- temp[,-remove_idx]
   }
-  log_correlation <- cor(temp)
+  if(ncol(temp) > 10000) {
+    log_correlation <- cor(temp[,1:10000])
+  } else {
+    log_correlation <- cor(temp)
+  }
   log_correlation_vector <- log_correlation[upper.tri(log_correlation,
                                                       diag = FALSE)]
 
-  clr_correlation <- cor(clr_A)
+  if(ncol(clr_A) > 10000) {
+    clr_correlation <- cor(clr_A[,1:10000])
+  } else {
+    clr_correlation <- cor(clr_A)
+  }
   clr_correlation_vector <- clr_correlation[upper.tri(clr_correlation,
                                                       diag = FALSE)]
   CORR_RA_MED <- median(ra_correlation_vector)

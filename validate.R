@@ -40,6 +40,7 @@ testing <- FALSE
 model_type <- "RF"
 
 methods_list <- c("ALDEx2", "DESeq2", "MAST", "scran")
+#methods_list <- c("ALDEx2", "DESeq2", "scran")
 
 if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song",
                          "Monaco", "Hagai", "Owens", "Klein", "Yu"))) {
@@ -155,7 +156,7 @@ cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*1
 #   This can be time-consuming!
 # ------------------------------------------------------------------------------
 
-for(DE_method in method_list) {
+for(DE_method in methods_list) {
   # Pull saved calls on this data set x method if these exist
   save_fn <- file.path("output",
                        "predictive_fits",
@@ -264,7 +265,7 @@ for(use_result_type in c("TPR", "FPR")) {
   fit_obj <- readRDS(model_fn)
 
   for(DE_method in methods_list) {
-    
+
     cat(paste0("Evaluating ", use_result_type, " x ", DE_method, "\n"))
 
     features_new <- features # we'll alter this for each result type
@@ -298,6 +299,7 @@ for(use_result_type in c("TPR", "FPR")) {
     calls_obj <- readRDS(save_fn)
     all_calls <- calls_obj$all_calls
     rates <- calls_obj$rates
+    rm(calls_obj)
     
     # --------------------------------------------------------------------------
     #   Finish feature wrangling
@@ -347,58 +349,26 @@ for(use_result_type in c("TPR", "FPR")) {
     #   Make point predictions on simulated and real
     # --------------------------------------------------------------------------
     
-    pred_real <- predict(fit_obj$result, newdata = features_new)
-    
-    plot_df_point <- rbind(plot_df_point,
-                           data.frame(true = ifelse(use_result_type == "TPR",
-                                                    rates$TPR,
-                                                    1 - rates$FPR),
-                                      predicted = pred_real,
-                                      type = DE_method))
-    
-    # --------------------------------------------------------------------------
-    #   Make range predictions on simulated and real
-    # --------------------------------------------------------------------------
-
-    if(model_type == "RF") {
-      pred_real <- predict(fit_obj$result, newdata = features_new, predict.all = TRUE)
-      
-      plot_df_range <- rbind(plot_df_range,
-                             data.frame(true = ifelse(use_result_type == "TPR",
-                                                      rates$TPR,
-                                                      1 - rates$FPR),
-                                        predicted = pred_real$aggregate,
-                                        type = DE_method,
-                                        pred_type = "aggregate"))
-      plot_df_range <- rbind(plot_df_range,
-                             data.frame(true = ifelse(use_result_type == "TPR",
-                                                      rates$TPR,
-                                                      1 - rates$FPR),
-                                        predicted = pred_real$individual[1,],
-                                        type = DE_method,
-                                        pred_type = "individual"))
-      
-      plot_df_test <- NULL
-      plot_df_test <- rbind(plot_df_test,
-                            data.frame(true = ifelse(use_result_type == "TPR",
-                                                     rates$TPR,
-                                                     1 - rates$FPR),
-                                       lower = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
-                                       upper = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
-                                       point = pred_real$aggregate,
-                                       type = DE_method,
-                                       pred_type = "prediction"))
-    }
+    pred_real <- predict(fit_obj$result, newdata = features_new, predict.all = TRUE)
+    plot_df <- rbind(plot_df,
+                     data.frame(true = ifelse(use_result_type == "TPR",
+                                              rates$TPR,
+                                              1 - rates$FPR),
+                                lower = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
+                                upper = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
+                                point = pred_real$aggregate,
+                                type = DE_method,
+                                pred_type = "prediction"))
   }
 
   # --------------------------------------------------------------------------
   #   Visualize predictions
   # --------------------------------------------------------------------------
   
-  pl <- ggplot(plot_df_test, aes(x = true, y = point)) +
+  pl <- ggplot(plot_df, aes(x = true, y = point)) +
     geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
                  mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
-    geom_pointrange(data = plot_df_test,
+    geom_pointrange(data = plot_df,
                     aes(x = true, ymin = lower, ymax = upper, color = factor(type))) +
     scale_color_manual(values = palette) +
     theme_bw() +
