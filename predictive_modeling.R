@@ -7,7 +7,7 @@ library(optparse)
 
 DE_method <- "all"
 use_baseline <- "self"
-model_type <- "EN"
+model_type <- "RF"
 
 plot_labels <- list(fpr = "specificity (1 - FPR)", tpr = "sensitivity (TPR)")
 
@@ -17,7 +17,7 @@ fit_predictive_model(model_type = model_type,
                      DE_method = DE_method,
                      use_baseline = use_baseline,
                      plot_weights = FALSE,
-                     exclude_partials = FALSE,
+                     exclude_partials = TRUE,
                      exclude_independent = FALSE)
 
 save_slug <- file.path("output",

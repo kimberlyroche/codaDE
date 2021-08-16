@@ -334,6 +334,7 @@ pull_features <- function(DE_method = "all",
   uuids <- results$UUID
   if(DE_method == "all") {
     results <- results %>%
+      # filter(METHOD != "MAST") %>%
       select(-c(UUID, CORRP, BASELINE_TYPE))
     results$METHOD <- factor(results$METHOD)
   } else {
@@ -407,6 +408,8 @@ fit_predictive_model <- function(model_type = "RF",
                             exclude_partials = exclude_partials,
                             exclude_independent = exclude_independent,
                             fit_full = fit_full)
+  
+  features <- features[sample(1:nrow(features), size = 1000),]
   
   # for(use_result_type in c("TPR", "FPR")) {
   for(use_result_type in c("TPR", "FPR")) {
