@@ -58,6 +58,10 @@ if(threshold < 0) {
   stop(paste0("Invalid threshold: ", threshold, "!\n"))
 }
 
+if(threshold < 0) {
+  stop(paste0("Invalid threshold: ", threshold, "!\n"))
+}
+
 palette <- list(ALDEx2 = "#46A06B",
                 DESeq2 = "#FF5733",
                 MAST = "#EF82BB",
@@ -419,4 +423,5 @@ for(use_result_type in c("TPR", "FPR")) {
          units = "in",
          height = 4,
          width = 4)
+
 }
