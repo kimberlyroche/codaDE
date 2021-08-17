@@ -51,7 +51,8 @@ parse_VieiraSilva <- function(absolute = TRUE) {
   
   # Get the samples in the QMP matrix into agreement
   mapping <- meta %>%
-    left_join(data.frame(sample_id = rownames(data), idx_in_data = 1:nrow(data)), by = "sample_id")
+    left_join(data.frame(sample_id = rownames(data), idx_in_data = 1:nrow(data)),
+              by = "sample_id")
   data <- data[mapping$idx_in_data,]
   data <- t(data)
   
@@ -61,7 +62,9 @@ parse_VieiraSilva <- function(absolute = TRUE) {
     set.seed(1001)
     new_totals <- sample(round(colSums(counts)))
     for(i in 1:ncol(counts)) {
-      counts[,i] <- rmultinom(1, size = new_totals[i], prob = counts[,i] / sum(counts[,i]))
+      counts[,i] <- rmultinom(1,
+                              size = new_totals[i],
+                              prob = counts[,i] / sum(counts[,i]))
     }
   }
   counts <- data.matrix(counts)
@@ -251,10 +254,18 @@ parse_Monaco <- function(absolute = TRUE) {
   
   # Re-normalize
   sf <- compute_sf(data[spike_idx,])
-  counts <- data
+  counts <- data[-spike_idx,]
   if(absolute) {
     for(i in 1:ncol(counts)) {
       counts[,i] <- counts[,i] / sf[i]
+    }
+  } else {
+    # Shuffle observed abundances
+    set.seed(101)
+    new_totals <- sample(round(colSums(counts)))
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- rmultinom(1, size = new_totals[i],
+                              prob = counts[,i] / sum(counts[,i]))
     }
   }
   counts <- data.matrix(counts)
@@ -777,7 +788,7 @@ parse_Athanasiadou <- function(absolute = TRUE, which_data = "ciona") {
 #' data
 #' @return named list of counts and group labels
 #' @import stringr
-#' @import edgeR
+#' @import dplyr
 #' @export
 parse_Muraro <- function(absolute = TRUE) {
   file_dir <- file.path("data", "Muraro_2016")
@@ -805,20 +816,20 @@ parse_Muraro <- function(absolute = TRUE) {
   # tm4sf4_idx <- which(sapply(rownames(data), function(x) str_detect(x, "^TM4SF4__")))
   
   # ID clusters with max GCG as alpha cells, max INS as beta cells
-  c1 <- data.frame(expr = unlist(unname(data[gcg_idx,])),
-                   cluster = mapping$cluster[!is.na(mapping$cluster)]) %>%
-    group_by(cluster) %>%
-    summarize(mean_expr = mean(expr)) %>%
-    arrange(desc(mean_expr)) %>%
-    top_n(1) %>%
-    pull(cluster)
-  c2 <- data.frame(expr = unlist(unname(data[ins_idx,])),
-                   cluster = mapping$cluster[!is.na(mapping$cluster)]) %>%
-    group_by(cluster) %>%
-    summarize(mean_expr = mean(expr)) %>%
-    arrange(desc(mean_expr)) %>%
-    top_n(1) %>%
-    pull(cluster)
+  c1 <- suppressMessages(data.frame(expr = unlist(unname(data[gcg_idx,])),
+                                    cluster = mapping$cluster[!is.na(mapping$cluster)]) %>%
+                           group_by(cluster) %>%
+                           summarize(mean_expr = mean(expr)) %>%
+                           arrange(desc(mean_expr)) %>%
+                           top_n(1) %>%
+                           pull(cluster))
+  c2 <- suppressMessages(data.frame(expr = unlist(unname(data[ins_idx,])),
+                                    cluster = mapping$cluster[!is.na(mapping$cluster)]) %>%
+                           group_by(cluster) %>%
+                           summarize(mean_expr = mean(expr)) %>%
+                           arrange(desc(mean_expr)) %>%
+                           top_n(1) %>%
+                           pull(cluster))
   
   # Pull data per group
   counts_A <- data_orig[,mapping %>% filter(!is.na(cluster)) %>% filter(cluster %in% c(c1)) %>% pull(idx)]
@@ -838,13 +849,21 @@ parse_Muraro <- function(absolute = TRUE) {
   # Use edgeR (for now) to compute the size factor
   # sf <- calcNormFactors(spikein_counts) # columns assumed to be samples
   sf <- compute_sf(spikein_counts)
-  
   counts <- counts[-spikein_seqs,]
+  
   if(absolute) {
     for(j in 1:ncol(counts)) {
       counts[,j] <- counts[,j] / sf[j]
     }
+  } else {
+    set.seed(1000)
+    new_totals <- sample(round(colSums(counts)))
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- rmultinom(1, size = new_totals[i],
+                              prob = counts[,i] / sum(counts[,i]))
+    }
   }
+
   counts <- data.matrix(counts)
   colnames(counts) <- NULL
   rownames(counts) <- NULL
@@ -896,13 +915,19 @@ parse_Hashimshony <- function(absolute = TRUE) {
   # Here total abundances look pretty informative. Use:
   #   gapdh_idx <- which(data$Sample == "ENSMUSG00000057666")
   # which returns 16179 to compare Gadph abundance to totals
+  sf <- compute_sf(counts[spike_idx,])
   
-  # Re-normalize
-  counts <- data
+  counts <- data[-spike_idx,]
   if(absolute) {
-    sf <- compute_sf(counts[spike_idx,])
     for(i in 1:ncol(counts)) {
       counts[,i] <- counts[,i] / sf[i]
+    }
+  } else {
+    set.seed(101)
+    new_totals <- sample(round(colSums(counts)))
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- rmultinom(1, size = new_totals[i],
+                              prob = counts[,i] / sum(counts[,i]))
     }
   }
   counts <- data.matrix(counts)
@@ -967,6 +992,13 @@ parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE) {
     for(i in 1:ncol(counts)) {
       # Multiply; library size should have a positive association with mass!
       counts[,i] <- counts[,i] * sf[i]
+    }
+  } else {
+    set.seed(101)
+    new_totals <- sample(round(colSums(counts)))
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- rmultinom(1, size = new_totals[i],
+                              prob = counts[,i] / sum(counts[,i]))
     }
   }
   
@@ -1050,6 +1082,13 @@ parse_ESCA <- function(absolute = TRUE) {
   if(absolute) {
     sf <- compute_sf(esca_spike)
     counts <- esca / sf
+  } else {
+    set.seed(101)
+    new_totals <- sample(round(colSums(esca)))
+    for(i in 1:ncol(esca)) {
+      esca[,i] <- rmultinom(1, size = new_totals[i],
+                              prob = esca[,i] / sum(esca[,i]))
+    }
   }
   groups <- scc_flag
   tax = NULL
@@ -1059,6 +1098,7 @@ parse_ESCA <- function(absolute = TRUE) {
   
   counts <- cbind(counts[,groups == "Other"], counts[,groups == "SCC"])
   groups <- sort(groups)
+  
   parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
   return(parsed_obj)
 }
@@ -1131,3 +1171,78 @@ parse_Gruen <- function(absolute = TRUE) {
   return(parsed_obj)
 }
 
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+#
+#   Ferreira et al. (2014)
+#
+#   No longer in use!
+#   Very little detectable differential abundance in "absolute" counts here
+#
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+#' Parse the Ferreira et al. (2014) zebrafish bulk RNA-seq data set
+#'
+#' @param absolute flag indicating whether or not to parse absolute abundance
+#' data
+#' @return named list of counts and group labels
+#' @import stringr
+#' @export
+parse_Ferreira <- function(absolute = TRUE) {
+  counts_A1 <- read.table(file.path("data",
+                                    "Ferreira_2014",
+                                    "GSM1289430_Control_1_rep1.txt"))
+  counts_A2 <- read.table(file.path("data",
+                                    "Ferreira_2014",
+                                    "GSM1289431_Control_2_rep1.txt"))
+  counts_A3 <- read.table(file.path("data",
+                                    "Ferreira_2014",
+                                    "GSM1289432_Control_3_rep1.txt"))
+  counts_B1 <- read.table(file.path("data",
+                                    "Ferreira_2014",
+                                    "GSM1289433_Treated_1_rep1.txt"))
+  counts_B2 <- read.table(file.path("data",
+                                    "Ferreira_2014",
+                                    "GSM1289434_Treated_2_rep1.txt"))
+  counts_B3 <- read.table(file.path("data",
+                                    "Ferreira_2014",
+                                    "GSM1289435_Treated_3_rep1.txt"))
+  
+  clip_row <- which(counts_A1$V1 == "no_feature")
+  counts_A1 <- counts_A1[1:(clip_row-1),]
+  counts_A2 <- counts_A2[1:(clip_row-1),]
+  counts_A3 <- counts_A3[1:(clip_row-1),]
+  counts_B1 <- counts_B1[1:(clip_row-1),]
+  counts_B2 <- counts_B2[1:(clip_row-1),]
+  counts_B3 <- counts_B3[1:(clip_row-1),]
+  
+  gene_IDs <- counts_A1$V1
+  counts_A <- cbind(counts_A1[,2], counts_A2[,2], counts_A3[,2])
+  counts_B <- cbind(counts_B1[,2], counts_B2[,2], counts_B3[,2])
+  
+  counts <- cbind(counts_A, counts_B)
+  spike_idx <- which(sapply(gene_IDs, function(x) str_detect(x, "^ERCC-")))
+  spike_counts <- counts[spike_idx,]
+  sf <- compute_sf(spike_counts)
+  counts <- counts[-spike_idx,]
+  
+  if(absolute) {
+    for(j in 1:ncol(counts)) {
+      counts[,j] <- counts[,j]/sf[j]
+    }
+  } else {
+    # Shuffle observed abundances
+    set.seed(101)
+    new_totals <- sample(round(colSums(counts)))
+    plot(new_totals)
+    for(i in 1:ncol(counts)) {
+      counts[,i] <- rmultinom(1, size = new_totals[i],
+                              prob = counts[,i] / sum(counts[,i]))
+    }
+  }
+  
+  groups <- c(rep("control", 3), rep("treated", 3))
+  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  return(parsed_obj)
+}
