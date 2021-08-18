@@ -34,7 +34,7 @@ opt = parse_args(opt_parser);
 
 dataset_name <- opt$dataset
 use_baseline <- opt$baseline
-threshold <- round(opt$threshold)
+threshold <- opt$threshold
 testing <- FALSE
 
 model_type <- "RF"
@@ -137,6 +137,14 @@ if(pairs[2] > 100) {
 ref_data <- ref_data[c(A_sample, B_sample),]
 data <- data[c(A_sample, B_sample),]
 groups <- groups[c(A_sample, B_sample)]
+
+# if(dataset_name == "Hagai") {
+#   abs_totals <- rowSums(ref_data)
+#   include_idx <- abs_totals >= 500000 & abs_totals < 1e7
+#   ref_data <- ref_data[include_idx,]
+#   data <- data[include_idx,]
+#   groups <- groups[include_idx]
+# }
 
 # Convert to integers, just for DESeq2
 ref_data <- apply(ref_data, c(1,2), as.integer)

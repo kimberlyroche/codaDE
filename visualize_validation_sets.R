@@ -2,7 +2,9 @@ library(tidyverse)
 library(codaDE)
 library(rulesoflife) # for generate_highcontrast_palette()
 
-palette <- generate_highcontrast_palette(5001)
+source("ggplot_fix.R")
+
+palette <- generate_highcontrast_palette(6000)
 
 img_dir <- file.path("output", "images", "validation_datasets")
 
@@ -72,11 +74,11 @@ plot_relab <- function(counts, groups, k = 20, use_groups = NULL, use_props = TR
       relab[,j] <- relab[,j] / sum(relab[,j])
     }
   }
-  feat_idx <- data.frame(x = 1:nrow(relab), mu = rowMeans(relab)) %>%
-    arrange(desc(mu)) %>%
-    top_n(k) %>%
-    arrange(x) %>%
-    pull(x)
+  feat_idx <- suppressMessages(data.frame(x = 1:nrow(relab), mu = rowMeans(relab)) %>%
+                                 arrange(desc(mu)) %>%
+                                 top_n(k) %>%
+                                 arrange(x) %>%
+                                 pull(x))
   relab1 <- relab[feat_idx,]
   relab2 <- colSums(relab[-feat_idx,])
   relab <- rbind(relab1, relab2)
@@ -93,12 +95,15 @@ plot_relab <- function(counts, groups, k = 20, use_groups = NULL, use_props = TR
   data_long$feature <- factor(data_long$feature)
   data_long$sample <- factor(data_long$sample)
 
+  tick_labels <- as.character(groups)
+  names(tick_labels) <- colnames(relab)[2:ncol(relab)]
   p <- ggplot(data_long, aes(fill = feature, y = abundance, x = sample)) + 
     geom_bar(position = "stack", stat = "identity") +
     scale_fill_manual(values = palette) +
     theme_bw() +
     theme(legend.position = "none") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+    scale_x_discrete(labels = tick_labels)
   show(p)
   if(!is.null(save_name)) {
     ggsave(file.path(img_dir, save_name), p,
@@ -149,16 +154,19 @@ get_zeros <- function(counts, threshold = 1) {
   sum(counts == 0)/(nrow(counts)*ncol(counts))
 }
 
-summarize_ds <- function(counts, groups, dataset_name = NULL) {
+summarize_ds <- function(parse_fn, dataset_name = NULL) {
+  data <- do.call(parse_fn, list(absolute = TRUE))
+  counts <- data$counts
+  groups <- factor(data$groups)
+  
   cat(paste0("Feature count: ", get_feature_count(counts), "\n"))
-  cat(paste0("Feature count: ", get_feature_count(counts, threshold = 5), "\n"))
   calc_FC(counts, groups)
   calc_prop_DA(counts, groups)
   cat(paste0("Zeros: ", round(get_zeros(counts, threshold = 5)*100), "%\n\n"))
   
-  plot_PCA(counts,
-           groups,
-           save_name = ifelse(!is.null(dataset_name), paste0(dataset_name, "_01.png"), NULL))
+  # plot_PCA(counts,
+  #          groups,
+  #          save_name = ifelse(!is.null(dataset_name), paste0(dataset_name, "_01.png"), NULL))
   g1_idx <- which(groups == unique(groups)[1])
   g2_idx <- which(groups == unique(groups)[2])
   if(length(g1_idx) > 20) {
@@ -169,38 +177,50 @@ summarize_ds <- function(counts, groups, dataset_name = NULL) {
   }
   idx_subset <- c(g1_idx, g2_idx)
   use_k <- min(round(nrow(counts)*0.8), 5000)
+  if(is.null(dataset_name)) {
+    save_name <- NULL
+  } else {
+    save_name <- paste0(dataset_name, "_01_abs.png")
+  }
   plot_relab(counts[,idx_subset],
              groups[idx_subset],
              k = use_k,
              use_props = FALSE,
-             save_name = ifelse(!is.null(dataset_name), paste0(dataset_name, "_02.png"), NULL))
+             save_name = save_name)
+  
+  data <- do.call(parse_fn, list(absolute = FALSE))
+  counts <- data$counts
+  groups <- factor(data$groups)
+
+  if(is.null(dataset_name)) {
+    save_name <- NULL
+  } else {
+    save_name <- paste0(dataset_name, "_02_rel.png")
+  }
   plot_relab(counts[,idx_subset],
              groups[idx_subset],
              k = use_k,
-             use_props = TRUE,
-             save_name = ifelse(!is.null(dataset_name), paste0(dataset_name, "_03.png"), NULL))
+             use_props = FALSE,
+             save_name = save_name)
 }
 
 # ------------------------------------------------------------------------------
 #   Vieira-Silva et al. data
 # ------------------------------------------------------------------------------
 
-vs <- parse_VieiraSilva(absolute = TRUE)
-summarize_ds(vs$counts, factor(vs$groups), dataset_name = "VieiraSilva")
+summarize_ds("parse_VieiraSilva", dataset_name = "VieiraSilva")
 
 # ------------------------------------------------------------------------------
 #   Barlow et al. data
 # ------------------------------------------------------------------------------
 
-barlow <- parse_Barlow(absolute = TRUE)
-summarize_ds(barlow$counts, barlow$groups, dataset_name = "Barlow")
+summarize_ds("parse_Barlow", dataset_name = "Barlow")
 
 # ------------------------------------------------------------------------------
 #   Song et al. data
 # ------------------------------------------------------------------------------
 
-song <- parse_Song(absolute = TRUE)
-summarize_ds(song$counts, song$groups, dataset_name = "Song")
+summarize_ds("parse_Song", dataset_name = "Song")
 
 # # PCA of features in FPR RF training set vs. this data set
 # # First pull "features_df" from `validate.R` for Song et al. x MAST
@@ -245,36 +265,51 @@ summarize_ds(song$counts, song$groups, dataset_name = "Song")
 #   Monaco et al. data
 # ------------------------------------------------------------------------------
 
-monaco <- parse_Monaco(absolute = TRUE)
-summarize_ds(monaco$counts, monaco$groups, dataset_name = "Monaco")
+summarize_ds("parse_Monaco", dataset_name = "Monaco")
 
 # ------------------------------------------------------------------------------
 #   Hagai et al. data
 # ------------------------------------------------------------------------------
 
-hagai <- parse_Hagai(absolute = TRUE)
-summarize_ds(hagai$counts, hagai$groups, dataset_name = "Hagai")
+summarize_ds("parse_Hagai", dataset_name = "Hagai")
 
 # ------------------------------------------------------------------------------
 #   Owens et al. data
 # ------------------------------------------------------------------------------
 
-owens <- parse_Owens(absolute = TRUE)
-summarize_ds(owens$counts, owens$groups, dataset_name = "Owens")
+summarize_ds("parse_Owens", dataset_name = "Owens")
 
 # ------------------------------------------------------------------------------
 #   Klein et al. data
 # ------------------------------------------------------------------------------
 
-klein <- parse_Klein(absolute = TRUE)
-summarize_ds(klein$counts, klein$groups, dataset_name = "Klein")
+summarize_ds("parse_Klein", dataset_name = "Klein")
 
 # ------------------------------------------------------------------------------
 #   Yu et al. data
 # ------------------------------------------------------------------------------
 
-yu <- parse_Yu(absolute = TRUE)
-summarize_ds(yu$counts, yu$groups, dataset_name = "Yu")
+summarize_ds("parse_Yu", dataset_name = "Yu")
+
+# ------------------------------------------------------------------------------
+#   Unused data sets
+# ------------------------------------------------------------------------------
+
+summarize_ds("parse_Morton", dataset_name = "Morton")
+summarize_ds("parse_Athanasiadou", dataset_name = "Athanasiadou")
+summarize_ds("parse_Muraro", dataset_name = "Muraro")
+summarize_ds("parse_Hashimshony", dataset_name = "Hashimshony")
+summarize_ds("parse_Kimmerling", dataset_name = "Kimmerling")
+summarize_ds("parse_ESCA", dataset_name = "ESCA")
+summarize_ds("parse_Gruen", dataset_name = "Gruen")
+summarize_ds("parse_Ferreira", dataset_name = "Ferreira")
+
+
+
+
+
+
+
 
 
 

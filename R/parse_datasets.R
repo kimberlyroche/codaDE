@@ -245,6 +245,7 @@ parse_Monaco <- function(absolute = TRUE) {
   spike_sums <- colSums(spike_counts)
   retain_idx <- which(spike_sums >= quantile(spike_sums, probs = c(0.05)))
   data <- data[,retain_idx]
+  spike_counts <- data[spike_idx,]
 
   # Plot spike-in relative abundance by type
   groups <- sapply(colnames(data), function(x) {
@@ -350,7 +351,6 @@ parse_Hagai <- function(absolute = TRUE) {
   spike_counts <- counts[ref_idx,]
   sf <- compute_sf(spike_counts)
   counts <- counts[-ref_idx,]
-  
   if(absolute) {
     for(j in 1:ncol(counts)) {
       counts[,j] <- counts[,j]/sf[j]
@@ -478,6 +478,31 @@ parse_Klein <- function(absolute = TRUE) {
   gapdh_expr <- unlist(counts[gapdh_idx,])
   sf <- compute_sf(gapdh_expr)
   counts <- counts[-gapdh_idx,]
+  
+  # # Plot observed abundance vs. our reference for each group
+  # plot_df <- data.frame(total = colSums(counts),
+  #                       group = groups,
+  #                       reference = sf)
+  # # plot_df <- plot_df %>%
+  # #   filter(total > quantile(plot_df$total, probs = c(0.05)) & total < quantile(plot_df$total, probs = c(0.95))) %>%
+  # #   filter(reference > quantile(plot_df$reference, probs = c(0.05)) & reference < quantile(plot_df$reference, probs = c(0.95)))
+  # ggplot(plot_df, aes(x = reference, y = total)) +
+  #   geom_smooth(aes(color = group), formula = y ~ x, method = "lm", alpha = 0.5) +
+  #   geom_point(aes(fill = group), size = 2, shape = 21) +
+  #   scale_fill_manual(values = c("#58D68D", "#9B59B6")) +
+  #   scale_color_manual(values = c("#58D68D", "#9B59B6"), guide = FALSE) +
+  #   theme_bw() +
+  #   labs(x = "Reference (Gadph)", y = "Total abundance", fill = "Group")
+  # ggsave(file.path("output", "images", "Klein_totals.png"),
+  #        units = "in",
+  #        dpi = 100,
+  #        height = 5,
+  #        width = 7)
+  # for(grp in unique(groups)) {
+  #   r2 <- cor(plot_df[plot_df$group == grp,]$reference,
+  #             plot_df[plot_df$group == grp,]$total)**2
+  #   cat(paste0("R^2 (", grp, "): ", round(r2, 3), "\n"))
+  # }
   
   if(absolute) {
     for(j in 1:ncol(counts)) {
@@ -639,6 +664,10 @@ parse_Morton <- function(absolute = TRUE) {
     counts <- counts / min_observed
   }
   
+  counts <- data.matrix(counts)
+  rownames(counts) <- NULL
+  colnames(counts) <- NULL
+  
   parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
   return(parsed_obj)
 }
@@ -766,6 +795,16 @@ parse_Athanasiadou <- function(absolute = TRUE, which_data = "ciona") {
     scale <- mean_yeast / mean_ciona
     counts <- counts * scale
     
+    rownames(counts) <- NULL
+    colnames(counts) <- NULL
+    counts <- data.matrix(counts)
+    
+    # Subset to the SC samples
+    A_idx <- which(groups == "dnfgfr")
+    B_idx <- which(groups == "lacz")
+    counts <- counts[,c(A_idx, B_idx)]
+    groups <- c(rep("dnfgfr", length(A_idx)), rep("lacz", length(B_idx)))
+    
     parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
     return(parsed_obj)
   }
@@ -851,6 +890,31 @@ parse_Muraro <- function(absolute = TRUE) {
   sf <- compute_sf(spikein_counts)
   counts <- counts[-spikein_seqs,]
   
+  # Not strong
+  # plot_df <- data.frame(total = colSums(counts),
+  #                       group = groups,
+  #                       reference = sf)
+  # plot_df <- plot_df %>%
+  #   filter(total > quantile(plot_df$total, probs = c(0.05)) & total < quantile(plot_df$total, probs = c(0.95))) %>%
+  #   filter(reference > quantile(plot_df$reference, probs = c(0.05)) & reference < quantile(plot_df$reference, probs = c(0.95)))
+  # ggplot(plot_df, aes(x = reference, y = total)) +
+  #   geom_smooth(aes(color = group), formula = y ~ x, method = "lm", alpha = 0.5) +
+  #   geom_point(aes(fill = group), size = 2, shape = 21) +
+  #   scale_fill_manual(values = c("#58D68D", "#9B59B6")) +
+  #   scale_color_manual(values = c("#58D68D", "#9B59B6"), guide = FALSE) +
+  #   theme_bw() +
+  #   labs(x = "Reference (Gadph)", y = "Total abundance", fill = "Group")
+  # ggsave(file.path("output", "images", "Muraro_totals.png"),
+  #        units = "in",
+  #        dpi = 100,
+  #        height = 5,
+  #        width = 7)
+  # for(grp in unique(groups)) {
+  #   r2 <- cor(plot_df[plot_df$group == grp,]$reference,
+  #             plot_df[plot_df$group == grp,]$total)**2
+  #   cat(paste0("R^2 (", grp, "): ", round(r2, 3), "\n"))
+  # }
+  
   if(absolute) {
     for(j in 1:ncol(counts)) {
       counts[,j] <- counts[,j] / sf[j]
@@ -915,9 +979,27 @@ parse_Hashimshony <- function(absolute = TRUE) {
   # Here total abundances look pretty informative. Use:
   #   gapdh_idx <- which(data$Sample == "ENSMUSG00000057666")
   # which returns 16179 to compare Gadph abundance to totals
-  sf <- compute_sf(counts[spike_idx,])
-  
+  sf <- compute_sf(data[spike_idx,])
   counts <- data[-spike_idx,]
+
+  # # Plot observed abundance vs. our reference
+  # plot_df <- data.frame(total = colSums(counts),
+  #                       stage = as.numeric(as.character(groups)),
+  #                       reference = sf)
+  # ggplot(plot_df, aes(x = reference, y = total, fill = stage)) +
+  #   geom_smooth(formula = y ~ x, method = "lm", alpha = 0.5, color = "#666666") +
+  #   geom_point(size = 2, shape = 21) +
+  #   scale_fill_gradient2(low = "#58D68D", mid = "white", high = "#9B59B6", midpoint = 0.5) +
+  #   theme_bw() +
+  #   labs(x = "Reference (spike-ins)", y = "Total abundance", fill = "Cell cycle stage")
+  # ggsave(file.path("output", "images", "Hashimshony_totals.png"),
+  #        units = "in",
+  #        dpi = 100,
+  #        height = 5,
+  #        width = 7)
+  # r2 <- cor(plot_df$reference, plot_df$total)**2
+  # cat(paste0("R^2 (", grp, "): ", round(r2, 3), "\n"))
+  
   if(absolute) {
     for(i in 1:ncol(counts)) {
       counts[,i] <- counts[,i] / sf[i]
@@ -933,6 +1015,12 @@ parse_Hashimshony <- function(absolute = TRUE) {
   counts <- data.matrix(counts)
   colnames(counts) <- NULL
   rownames(counts) <- NULL
+  
+  # Subset to the SC samples
+  A_idx <- which(groups == "0")
+  B_idx <- which(groups == "1")
+  counts <- counts[,c(A_idx, B_idx)]
+  groups <- c(rep("0", length(A_idx)), rep("1", length(B_idx)))
   
   parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
   return(parsed_obj)
@@ -986,8 +1074,8 @@ parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE) {
   # a SD of around 0.1
   # sf <- scale(meta$mass/(sd(meta$mass)*10), scale = F) + 1
   sf <- compute_sf(meta$mass)
-  
   counts <- data
+  
   if(absolute) {
     for(i in 1:ncol(counts)) {
       # Multiply; library size should have a positive association with mass!
@@ -1081,7 +1169,7 @@ parse_ESCA <- function(absolute = TRUE) {
   # SCC samples
   if(absolute) {
     sf <- compute_sf(esca_spike)
-    counts <- esca / sf
+    esca <- esca / sf
   } else {
     set.seed(101)
     new_totals <- sample(round(colSums(esca)))
@@ -1092,14 +1180,14 @@ parse_ESCA <- function(absolute = TRUE) {
   }
   groups <- scc_flag
   tax = NULL
-  rownames(counts) <- NULL
-  colnames(counts) <- NULL
-  counts <- data.matrix(counts)
+  rownames(esca) <- NULL
+  colnames(esca) <- NULL
+  esca <- data.matrix(esca)
   
-  counts <- cbind(counts[,groups == "Other"], counts[,groups == "SCC"])
+  esca <- cbind(esca[,groups == "Other"], esca[,groups == "SCC"])
   groups <- sort(groups)
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  parsed_obj <- list(counts = esca, groups = groups, tax = NULL)
   return(parsed_obj)
 }
 
@@ -1143,6 +1231,24 @@ parse_Gruen <- function(absolute = TRUE) {
   ref_idx <- which(sapply(gene_IDs, function(x) str_detect(x, "^ERCC-")))
   spike_counts <- counts[ref_idx,]
   sf <- unname(compute_sf(spike_counts))
+  counts <- counts[-ref_idx,]
+  
+  # # Plot observed abundance vs. our reference
+  # plot_df <- data.frame(total = colSums(counts),
+  #                       # stage = as.numeric(as.character(groups)),
+  #                       reference = sf)
+  # ggplot(plot_df, aes(x = reference, y = total)) +
+  #   geom_smooth(formula = y ~ x, method = "lm", alpha = 0.5, color = "#666666") +
+  #   geom_point(size = 2, shape = 21, fill = "#888888") +
+  #   theme_bw() +
+  #   labs(x = "Reference (spike-ins)", y = "Total abundance", fill = "Cell cycle stage")
+  # ggsave(file.path("output", "images", "Gruen_totals.png"),
+  #        units = "in",
+  #        dpi = 100,
+  #        height = 5,
+  #        width = 6)
+  # r2 <- cor(plot_df$reference, plot_df$total)**2
+  # cat(paste0("R^2 (", grp, "): ", round(r2, 3), "\n"))
   
   if(absolute) {
     for(j in 1:ncol(counts)) {

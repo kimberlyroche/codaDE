@@ -1,0 +1,45 @@
+Datasets with little apparent FC between conditions:
+
+Muraro
+	Feature count: 4290
+	Absolute FC: 1.003
+	Differential: 734 / 1000 (73.4%)
+	Zeros: 39%
+ESCA
+	Feature count: 18556
+	Absolute FC: 1.083
+	Differential: 458 / 1000 (45.8%)
+	Zeros: 11%
+Gruen
+	Feature count: 5573
+	Absolute FC: 1.096
+	Differential: 442 / 1000 (44.2%)
+	Zeros: 42%
+
+Datasets with little apparent differential abundance:
+
+Morton
+	Feature count: 204
+	Absolute FC: 2.77
+	Differential: 0 / 204 (0%)
+	Zeros: 48%
+Athanasiadou (dnfgfr vs. lacz)
+	Feature count: 8207
+	Absolute FC: 1.289
+	Differential: 8 / 1000 (0.8%)
+	Zeros: 2%
+Ferreira
+	Feature count: 22946
+	Absolute FC: 2.318
+	Differential: 12 / 1000 (1.2%)
+	Zeros: 36%
+Kimmerling
+	Feature count: 10055
+	Absolute FC: 2.001
+	Differential: 5 / 1000 (0.5%)
+	Zeros: 71%
+Hashimshony (0 vs. 1)
+	Feature count: 9291
+	Absolute FC: 1.246
+	Differential: 74 / 1000 (7.4%)
+	Zeros: 57%
