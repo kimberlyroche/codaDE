@@ -39,8 +39,8 @@ testing <- FALSE
 
 model_type <- "RF"
 
-methods_list <- c("ALDEx2", "DESeq2", "MAST", "scran")
-#methods_list <- c("ALDEx2", "DESeq2", "scran")
+#methods_list <- c("ALDEx2", "DESeq2", "MAST", "scran")
+methods_list <- c("ALDEx2", "DESeq2", "scran")
 
 if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song",
                          "Monaco", "Hagai", "Owens", "Klein", "Yu"))) {
