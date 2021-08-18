@@ -39,7 +39,6 @@ testing <- FALSE
 
 model_type <- "RF"
 
-#methods_list <- c("ALDEx2", "DESeq2", "MAST", "scran")
 methods_list <- c("ALDEx2", "DESeq2", "scran")
 
 if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song",
@@ -49,14 +48,6 @@ if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song",
 
 if(!(use_baseline %in% c("self", "oracle"))) {
   stop(paste0("Invalid DA baseline: ", use_baseline, "!\n"))
-}
-
-# if(!(model_type %in% c("RF", "LM", "EN"))) {
-#   stop(paste0("Invalid model type: ", model_type, "!\n"))
-# }
-
-if(threshold < 0) {
-  stop(paste0("Invalid threshold: ", threshold, "!\n"))
 }
 
 if(threshold < 0) {
@@ -74,39 +65,8 @@ palette <- list(ALDEx2 = "#46A06B",
 #   Parse and wrangle validation data
 # ------------------------------------------------------------------------------
 
-if(dataset_name == "VieiraSilva") {
-  abs_data <- parse_VieiraSilva(absolute = TRUE)
-  rel_data <- parse_VieiraSilva(absolute = FALSE)
-}
-if(dataset_name == "Barlow") {
-  abs_data <- parse_Barlow(absolute = TRUE)
-  rel_data <- parse_Barlow(absolute = FALSE)
-}
-if(dataset_name == "Song") {
-  abs_data <- parse_Song(absolute = TRUE)
-  rel_data <- parse_Song(absolute = FALSE)
-}
-if(dataset_name == "Monaco") {
-  abs_data <- parse_Monaco(absolute = TRUE)
-  rel_data <- parse_Monaco(absolute = FALSE)
-}
-if(dataset_name == "Hagai") {
-  abs_data <- parse_Hagai(absolute = TRUE)
-  rel_data <- parse_Hagai(absolute = FALSE)
-}
-if(dataset_name == "Owens") {
-  # This one is slow to load
-  abs_data <- parse_Owens(absolute = TRUE)
-  rel_data <- parse_Owens(absolute = FALSE)
-}
-if(dataset_name == "Klein") {
-  abs_data <- parse_Klein(absolute = TRUE)
-  rel_data <- parse_Klein(absolute = FALSE)
-}
-if(dataset_name == "Yu") {
-  abs_data <- parse_Yu(absolute = TRUE)
-  rel_data <- parse_Yu(absolute = FALSE)
-}
+abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE))
+rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE))
 
 if(testing & nrow(abs_data$counts) > 500) {
   k <- 500
