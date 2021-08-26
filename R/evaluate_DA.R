@@ -494,18 +494,3 @@ calc_threshold_DA <- function(counts, fc_lower = 0.5, fc_upper = 1.5, nA = NULL)
   oracle_calls[fc <= fc_lower | fc >= fc_upper] <- 0
   oracle_calls
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

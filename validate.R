@@ -82,15 +82,16 @@ groups <- abs_data$groups
 groups <- factor(groups)
 
 # Subsample if tons of cells/samples
+downsample_limit <- 100 # was 100
 set.seed(100)
 pairs <- table(groups)
-if(pairs[1] > 100) {
-  A_sample <- sample(which(groups == names(pairs)[1]), size = 100)
+if(pairs[1] > downsample_limit) {
+  A_sample <- sample(which(groups == names(pairs)[1]), size = downsample_limit)
 } else {
   A_sample <- which(groups == names(pairs)[1])
 }
-if(pairs[2] > 100) {
-  B_sample <- sample(which(groups == names(pairs)[2]), size = 100)
+if(pairs[2] > downsample_limit) {
+  B_sample <- sample(which(groups == names(pairs)[2]), size = downsample_limit)
 } else {
   B_sample <- which(groups == names(pairs)[2])
 }
@@ -345,6 +346,7 @@ for(use_result_type in c("TPR", "FPR")) {
          y = paste0("predicted ", plot_labels[[use_result_type]]),
          fill = "Data type") +
     theme(legend.position = "none")
+  # show(pl)
   ggsave(file.path("output",
                    "images",
                    paste0("validations_",
@@ -361,5 +363,4 @@ for(use_result_type in c("TPR", "FPR")) {
          units = "in",
          height = 4,
          width = 4)
-
 }
