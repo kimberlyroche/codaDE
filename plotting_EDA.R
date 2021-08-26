@@ -78,6 +78,33 @@ ggsave(file.path("output",
        height = 3,
        width = 6)
 
+# Sparsity
+
+conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
+res <- dbGetQuery(conn, paste0("SELECT P, COMP_C_P0_A, COMP_C_P0_B ",
+                               "FROM characteristics LEFT JOIN datasets ",
+                               "ON characteristics.UUID=datasets.UUID ",
+                               "WHERE PARTIAL = 0;"))
+dbDisconnect(conn)
+
+plot_df <- data.frame(sparsity = c(res$COMP_C_P0_A, res$COMP_C_P0_B),
+                      P = c(res$P, res$P))
+pl <- ggplot(plot_df, aes(x = sparsity, fill = factor(P))) +
+  geom_density(alpha = 0.6) +
+  scale_fill_brewer(palette = "RdYlGn") +
+  theme_bw() +
+  labs(x = "percent zeros",
+       fill = "Feature number")
+show(pl)
+ggsave(file.path("output",
+                 "images",
+                 paste0("SPARSITY.png")),
+       plot = pl,
+       dpi = 100,
+       units = "in",
+       height = 4,
+       width = 5.5)
+
 # pl <- ggplot(temp, aes(x = FC_PARTIAL, fill = factor(P))) +
 #   geom_density(alpha = 0.6) +
 #   scale_fill_brewer(palette = "RdYlGn") +
@@ -100,24 +127,26 @@ ggsave(file.path("output",
 #   Information "restored" in partial case
 # ------------------------------------------------------------------------------
 
-plot_df <- data.frame(x = res$FC_ABSOLUTE, y = res$FC_PARTIAL)
-
-pl <- ggplot(plot_df, aes(x = x, y = y)) +
-  geom_point(size = 2, shape = 21, fill = "#bbbbbb") +
-  theme_bw() +
-  labs(x = "Fold change in totals (original abundances)",
-       y = "Fold change in totals (observed abundances)")
-show(pl)
-ggsave(file.path("output",
-                 "images",
-                 paste0("PARTIAL_CORR.png")),
-       plot = pl,
-       dpi = 100,
-       units = "in",
-       height = 5,
-       width = 5.5)
-
-cor(plot_df$x, plot_df$y)**2
+if(FALSE) {
+  plot_df <- data.frame(x = res$FC_ABSOLUTE, y = res$FC_PARTIAL)
+  
+  pl <- ggplot(plot_df, aes(x = x, y = y)) +
+    geom_point(size = 2, shape = 21, fill = "#bbbbbb") +
+    theme_bw() +
+    labs(x = "Fold change in totals (original abundances)",
+         y = "Fold change in totals (observed abundances)")
+  show(pl)
+  ggsave(file.path("output",
+                   "images",
+                   paste0("PARTIAL_CORR.png")),
+         plot = pl,
+         dpi = 100,
+         units = "in",
+         height = 5,
+         width = 5.5)
+  
+  cor(plot_df$x, plot_df$y)**2
+}
 
 # ------------------------------------------------------------------------------
 #   FPR as a function of "remaining" missing information
@@ -127,53 +156,55 @@ cor(plot_df$x, plot_df$y)**2
 #   help much with accuracy.
 # ------------------------------------------------------------------------------
 
-DE_method <- "scran"
-
-conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
-
-res <- dbGetQuery(conn, paste0("SELECT PARTIAL_INFO, FC_ABSOLUTE, ",
-                               "FC_PARTIAL, FPR ",
-                               "FROM results LEFT JOIN datasets ",
-                               "ON results.UUID = datasets.UUID ",
-                               "WHERE FC_ABSOLUTE <= 10 ",
-                               "AND FC_ABSOLUTE >= 0.1 ",
-                               "AND METHOD='", DE_method, "' ",
-                               "AND P=1000"))
-
-dbDisconnect(conn)
-
-# Subset to cases where absolute and partially accurate abundances register
-# an increase in condition B *AND* partials don't accidentally create a larger
-# discrepancy
-temp <- res %>%
-  filter(FC_ABSOLUTE > 1 & FC_ABSOLUTE > FC_PARTIAL)
-
-# Calculate the absolute difference in fold change; too stupid?
-temp$delta <- temp$FC_ABSOLUTE - temp$FC_PARTIAL
-# temp$delta <- temp$FC_PARTIAL / temp$FC_ABSOLUTE
-
-x <- c()
-y <- c()
-i <- 1
-while(i < nrow(temp)) {
-  fpr_before <- temp[i,]$FPR
-  fpr_after <- temp[i+1,]$FPR
-  x <- c(x, temp[i,]$delta)
-  y <- c(y, fpr_after - fpr_before)
-  i <- i + 2
+if(FALSE) {
+  DE_method <- "scran"
+  
+  conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
+  
+  res <- dbGetQuery(conn, paste0("SELECT PARTIAL_INFO, FC_ABSOLUTE, ",
+                                 "FC_PARTIAL, FPR ",
+                                 "FROM results LEFT JOIN datasets ",
+                                 "ON results.UUID = datasets.UUID ",
+                                 "WHERE FC_ABSOLUTE <= 10 ",
+                                 "AND FC_ABSOLUTE >= 0.1 ",
+                                 "AND METHOD='", DE_method, "' ",
+                                 "AND P=1000"))
+  
+  dbDisconnect(conn)
+  
+  # Subset to cases where absolute and partially accurate abundances register
+  # an increase in condition B *AND* partials don't accidentally create a larger
+  # discrepancy
+  temp <- res %>%
+    filter(FC_ABSOLUTE > 1 & FC_ABSOLUTE > FC_PARTIAL)
+  
+  # Calculate the absolute difference in fold change; too stupid?
+  temp$delta <- temp$FC_ABSOLUTE - temp$FC_PARTIAL
+  # temp$delta <- temp$FC_PARTIAL / temp$FC_ABSOLUTE
+  
+  x <- c()
+  y <- c()
+  i <- 1
+  while(i < nrow(temp)) {
+    fpr_before <- temp[i,]$FPR
+    fpr_after <- temp[i+1,]$FPR
+    x <- c(x, temp[i,]$delta)
+    y <- c(y, fpr_after - fpr_before)
+    i <- i + 2
+  }
+  
+  pl <- ggplot(data.frame(x = x, y = y), aes(x = x, y = y)) +
+    geom_point(size = 2, shape = 21, fill = "#bbbbbb") +
+    theme_bw() +
+    labs(x = "Difference in fold change: absolute - partially informative abundances",
+         y = paste0("Change in FPR w/ partial info (", DE_method, ")"))
+  show(pl)
+  ggsave(file.path("output",
+                   "images",
+                   paste0("partial_rescue_", DE_method, ".png")),
+         plot = pl,
+         dpi = 100,
+         units = "in",
+         height = 5,
+         width = 5.5)
 }
-
-pl <- ggplot(data.frame(x = x, y = y), aes(x = x, y = y)) +
-  geom_point(size = 2, shape = 21, fill = "#bbbbbb") +
-  theme_bw() +
-  labs(x = "Difference in fold change: absolute - partially informative abundances",
-       y = paste0("Change in FPR w/ partial info (", DE_method, ")"))
-show(pl)
-ggsave(file.path("output",
-                 "images",
-                 paste0("partial_rescue_", DE_method, ".png")),
-       plot = pl,
-       dpi = 100,
-       units = "in",
-       height = 5,
-       width = 5.5)

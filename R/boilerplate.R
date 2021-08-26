@@ -78,16 +78,24 @@ plot_bipartite_graph <- function(expr1, expr2, alpha = 1) {
   qq[[1]] <- -Inf
   qq[[length(qq)]] <- Inf
   
-  plot_data$rank <- cut(plot_data$y, qq) # factor
+  # Color v1
+  # plot_data$rank <- cut(plot_data$y, qq) # factor
   
-  p <- ggplot(plot_data, aes(color = rank)) +
+  # Color v2
+  plot_data$increase <- plot_data$y < plot_data$yend
+  plot_data$increase <- factor(plot_data$increase, levels = c("FALSE", "TRUE"))
+  levels(plot_data$increase) <- c("decrease", "increase")
+  
+  p <- ggplot(plot_data, aes(color = increase)) +
     geom_point(aes(x = x, y = y), size = 3, alpha = alpha) +
     geom_point(aes(x = xend, y = yend), size = 3, alpha = alpha) +
     geom_segment(aes(x = x, xend = xend, y = y, yend = yend), alpha = alpha) +
     scale_x_discrete(name = "condition", 
                      limits = c("baseline", "differential")) +
-    ylab("abundance") +
     theme_bw() +
-    theme(legend.position = "none")
+    labs(y = "abundance",
+         color = "direction") +
+    facet_wrap(. ~ increase)
+    # theme(legend.position = "none")
   show(p)
 }

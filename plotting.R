@@ -191,6 +191,16 @@ for(p in ps) {
       # plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference)
       # plot_ROC(res, plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
 
+      res$sign <- ifelse(res$FC_ABSOLUTE > 1, 1, -1)
+      plot_ROC(res %>%
+                 filter(FC_plot == "high") %>%
+                 filter(FPR < 0.05 | FPR > 0.5) %>%
+                 filter(TPR > 0.8), plot_tag = NULL, "sign")
+      plot_ROC(res %>%
+                 filter(FC_plot == "high") %>%
+                 filter(FPR < 0.05 | FPR > 0.5) %>%
+                 filter(TPR > 0.8), plot_tag = NULL, "LOG_MEAN")
+      
       plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference, "_max50")
       plot_ROC(res %>% filter(PERCENT_DIFF_REALIZ < 0.5), plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
       
