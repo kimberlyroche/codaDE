@@ -3,16 +3,22 @@ use warnings;
 use POSIX;
 use List::Util qw(min);
 
-my @datasets = qw(VieiraSilva Barlow Song Monaco Hagai Klein Owens Yu);
-my @RAM =      qw(12          12     24   32     32    64    64    64);
-my @hours =    qw(2           2      2    2      2     2     2     2);
+#my @datasets =  qw(VieiraSilva Barlow Song Monaco Hagai Klein Owens Yu);
+#my @RAM =       qw(12          12     24   32     32    64    64    64);
+#my @hours =     qw(2           2      2    2      2     2     2     2);
+#my @threshold = qw(1           1      1    2      3     2     1     1);
+
+my @datasets =  qw(Klein Klein Klein);
+my @RAM =       qw(64    64    64);
+my @hours =     qw(2     2     2);
+my @threshold = qw(0     1     1.5);
 
 my $filename = "job.slurm";
 my $i = 0;
 my $end = $#datasets;
 
-$i = 4;
-$end = 4;
+#$i = 3;
+#$end = 3;
 
 while($i <= $end) {
   open(my $fh, '>', $filename);
@@ -25,7 +31,7 @@ while($i <= $end) {
 
   print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
-  print $fh 'srun Rscript validate.R --dataset='.$datasets[$i].' --baseline=self --threshold=5'."\n\n";
+  print $fh 'srun Rscript validate.R --dataset='.$datasets[$i].' --baseline=self --threshold='.$threshold[$i]."\n\n";
 
   close $fh;
 

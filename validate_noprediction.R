@@ -30,10 +30,11 @@ opt = parse_args(opt_parser);
 dataset_name <- opt$dataset
 use_baseline <- opt$baseline
 threshold <- opt$threshold
+testing <- FALSE
 
 methods_list <- c("ALDEx2", "DESeq2", "MAST", "scran")
 
-if(!(dataset_name %in% c("Muraro", "ESCA", "Gruen", "Athanasiadou, ",
+if(!(dataset_name %in% c("Muraro", "ESCA", "Gruen", "Athanasiadou",
                          "Ferreira", "Kimmerling", "Hashimshony"))) {
   stop(paste0("Invalid data set: ", dataset_name, "!\n"))
 }
@@ -107,6 +108,8 @@ cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*1
 #
 #   This can be time-consuming!
 # ------------------------------------------------------------------------------
+
+plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 
 plot_df <- NULL
 

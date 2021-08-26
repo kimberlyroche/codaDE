@@ -421,8 +421,6 @@ fit_predictive_model <- function(model_type = "RF",
                             exclude_independent = exclude_independent,
                             fit_full = fit_full)
   
-  features <- features[sample(1:nrow(features), size = 1000),]
-  
   # for(use_result_type in c("TPR", "FPR")) {
   for(use_result_type in c("TPR", "FPR")) {
     cat(paste0("Modeling ", use_result_type, " w/ DE method ", DE_method, "\n"))

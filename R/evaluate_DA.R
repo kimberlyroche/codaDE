@@ -219,7 +219,17 @@ call_DA_scran <- function(data, groups) {
   # Methods below taken from this tutorial:
   # https://bioconductor.org/packages/release/bioc/vignettes/scran/inst/doc/scran.html
   # Use a first-pass clustering
-  clusters <- suppressWarnings(quickCluster(sce, min.size = 1))
+
+  if(FALSE) {
+    # (1) Find clusters
+    clusters <- suppressWarnings(quickCluster(sce, min.size = 1))
+  } else {
+    # (2) Or specify them
+    clusters <- as.numeric(as.factor(groups))
+    if(min(clusters) == 0) {
+      clusters <- clusters + 1
+    }
+  }
   sce <- suppressWarnings(computeSumFactors(sce, clusters = clusters))
   sce <- logNormCounts(sce)
   
@@ -241,13 +251,13 @@ call_DA_scran <- function(data, groups) {
     # sce <- runTSNE(sce, dimred = "PCAsub")
     # plotTSNE(sce, colour_by = "label", text_by = "label")
   } else {
-    cluster <- as.numeric(as.factor(groups))
-    if(min(cluster) == 0) {
-      cluster <- cluster + 1
+    clusters <- as.numeric(as.factor(groups))
+    if(min(clusters) == 0) {
+      clusters <- clusters + 1
     }
   }
   # Assigning to the 'colLabels' of the 'sce'
-  colLabels(sce) <- factor(cluster)
+  colLabels(sce) <- factor(clusters)
   # table(colLabels(sce))
   
   # The FDR column contains BH-corrected p-values, which you can confirm by

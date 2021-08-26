@@ -17,7 +17,7 @@ fit_predictive_model(model_type = model_type,
                      DE_method = DE_method,
                      use_baseline = use_baseline,
                      plot_weights = FALSE,
-                     exclude_partials = TRUE,
+                     exclude_partials = FALSE,
                      exclude_independent = FALSE)
 
 save_slug <- file.path("output",
