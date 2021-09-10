@@ -5,10 +5,9 @@
 \title{Generate simulated differential expression for two conditions}
 \usage{
 fit_predictive_model(
-  model_type = "RF",
-  DE_method = "all",
+  DE_methods = c("ALDEx2", "DESeq2", "scran"),
   use_baseline = "self",
-  plot_weights = FALSE,
+  output_weights = TRUE,
   exclude_partials = TRUE,
   exclude_independent = FALSE,
   train_percent = 0.8,
@@ -18,14 +17,12 @@ fit_predictive_model(
 )
 }
 \arguments{
-\item{model_type}{either "RF", "LM", or "EN"}
-
-\item{DE_method}{which DE calling method's results to predict; if "all",
+\item{DE_methods}{which DE calling method's results to predict; if "all",
 prediction is over all results together}
 
 \item{use_baseline}{"self" or "oracle"}
 
-\item{plot_weights}{flag indicating whether or not to plot some visualization
+\item{output_weights}{flag indicating whether or not to plot some visualization
 of feature weights}
 
 \item{exclude_partials}{flag indicating whether to exclude simulations with 

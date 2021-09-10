@@ -360,11 +360,10 @@ pull_features <- function(DE_method = "all",
 
 #' Generate simulated differential expression for two conditions
 #'
-#' @param model_type either "RF", "LM", or "EN"
-#' @param DE_method which DE calling method's results to predict; if "all",
+#' @param DE_methods which DE calling method's results to predict; if "all",
 #' prediction is over all results together
 #' @param use_baseline "self" or "oracle"
-#' @param plot_weights flag indicating whether or not to plot some visualization
+#' @param output_weights flag indicating whether or not to plot some visualization
 #' of feature weights
 #' @param exclude_partials flag indicating whether to exclude simulations with 
 #' partial abundance information
@@ -384,10 +383,9 @@ pull_features <- function(DE_method = "all",
 #' @import ggstance
 #' @import broom.mixed
 #' @export
-fit_predictive_model <- function(model_type = "RF",
-                                 DE_method = "all",
+fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                                  use_baseline = "self",
-                                 plot_weights = FALSE,
+                                 output_weights = TRUE,
                                  exclude_partials = TRUE,
                                  exclude_independent = FALSE,
                                  train_percent = 0.8,
@@ -395,19 +393,15 @@ fit_predictive_model <- function(model_type = "RF",
                                  save_slug = NULL,
                                  save_training_data = TRUE) {
   
-  if(!(model_type %in% c("RF", "LM", "EN"))) {
-    stop(paste0("Invalid model type: ", model_type, "!\n"))
-  }
-  
   if(!(use_baseline %in% c("self", "oracle"))) {
     stop(paste0("Invalid baseline: ", use_baseline, "!\n"))
   }
   
-  if(!(DE_method %in% c("all", "ALDEx2", "DESeq2", "MAST", "scran"))) {
+  if(!any(DE_methods %in% c("all", "ALDEx2", "DESeq2", "MAST", "scran"))) {
     stop(paste0("Invalid DE calling method: ", DE_method, "!\n"))
   }
 
-  save_path <- list("output", "predictive_fits", DE_method)
+  save_path <- list("output", "predictive_fits")
   for(i in 1:length(save_path)) {
     fp <- do.call(file.path, save_path[1:i])
     if(!dir.exists(fp)) {
@@ -421,9 +415,14 @@ fit_predictive_model <- function(model_type = "RF",
                             exclude_independent = exclude_independent,
                             fit_full = fit_full)
   
+  # Subset to methods of interest
+  features <- features %>%
+    filter(METHOD %in% DE_methods)
+  features$METHOD <- factor(features$METHOD)
+  
   # for(use_result_type in c("TPR", "FPR")) {
   for(use_result_type in c("TPR", "FPR")) {
-    cat(paste0("Modeling ", use_result_type, " w/ DE method ", DE_method, "\n"))
+    cat(paste0("Modeling ", use_result_type, "\n"))
     
     # Pull out the features we won't predict on
     uuids <- features$UUID
@@ -465,35 +464,18 @@ fit_predictive_model <- function(model_type = "RF",
 
     if(is.null(save_slug)) {
       save_fn <- file.path(save_dir,
-                           paste0(DE_method,
-                                  "_",
-                                  use_baseline,
-                                  "_",
-                                  model_type,
+                           paste0(use_baseline,
                                   "_",
                                   use_result_type,
                                   ".rds"))
     } else {
-      save_fn <- paste0(save_slug, "_", model_type, "_", use_result_type, ".rds")
+      save_fn <- paste0(save_slug, "_", use_baseline, "_", use_result_type, ".rds")
     }
     cat(paste0("Predictive model saving/saved to: ", save_fn, "\n"))
     if(!file.exists(save_fn)) {
       cat("Training model...\n")
       train_data <- cbind(train_features, response = train_response)
-      if(model_type == "RF") {
-        res <- randomForest(response ~ ., data = train_data)
-      } else if(model_type == "LM") {
-        res <- lm(response ~ ., data = train_data)
-      } else {
-        res <- train(response ~ .,
-                     data = train_data,
-                     method = "glmnet",
-                     trControl = trainControl(method = "cv",
-                                              number = 5,
-                                              p = 0.8),
-                     tuneGrid = expand.grid(alpha = seq(0.2, 1, by = 0.2),
-                                            lambda = seq(0.01, 1, by = 0.05)))
-      }
+      res <- randomForest(response ~ ., data = train_data)
       if(save_training_data) {
         saveRDS(list(result = res,
                      train_features = train_features,
@@ -505,7 +487,7 @@ fit_predictive_model <- function(model_type = "RF",
       }
     }
 
-    if(plot_weights & model_type == "RF") {
+    if(output_weights) {
       if(file.exists(save_fn)) {
         res_obj <- readRDS(save_fn)
         res <- res_obj$result
@@ -516,38 +498,12 @@ fit_predictive_model <- function(model_type = "RF",
       } else {
         stop(paste0("Model not found at: ", save_fn, "!\n"))
       }
-      plot_df <- varImpPlot(res)
-      plot_df <- data.frame(feature = rownames(plot_df),
-                            "IncNodePurity" = plot_df[,1])
-      rownames(plot_df) <- NULL
-      plot_df <- plot_df %>%
-        arrange(desc(IncNodePurity)) %>%
-        slice(1:20)
-      pl <- ggplot(plot_df, aes(x = IncNodePurity,
-                                y = reorder(feature, IncNodePurity))) +
-        geom_bar(stat = "identity") +
-        labs(y = "feature") +
-        theme_bw()
-      show(pl)
-      ggsave(file.path(save_dir,
-                       paste0("betas_",
-                              DE_method,
-                              "_",
-                              use_baseline,
-                              "_",
-                              model_type,
-                              "_",
-                              use_result_type,
-                              ".png")),
-             plot = pl,
-             dpi = 100,
-             units = "in",
-             height = 4,
-             width = 6)
+      saveRDS(varImp(res),
+              file.path(save_dir,
+                        paste0(use_baseline,
+                               "_",
+                               use_result_type,
+                               "_variable-importance.rds")))
     }
-    
-    # To predict do:
-    # test_data <- cbind(test_features, test_response)
-    # prediction <- predict(res, newdata = test_data)
   }
 }
