@@ -6,7 +6,7 @@ library(RColorBrewer)
 library(optparse)
 
 DE_method <- "all"
-use_baseline <- "self"
+use_baseline <- "oracle"
 model_type <- "RF"
 
 plot_labels <- list(fpr = "specificity (1 - FPR)", tpr = "sensitivity (TPR)")
