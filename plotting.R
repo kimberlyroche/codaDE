@@ -9,6 +9,12 @@ library(randomForest)
 
 source("ggplot_fix.R")
 
+string_to_calls <- function(call_string) {
+  pvals <- as.numeric(strsplit(call_string, ";")[[1]])
+  pvals <- p.adjust(pvals, method = "BH")
+  pvals < 0.05
+}
+
 label_combo <- function(data, plot_tag, logical_vec) {
   data$flag <- FALSE
   data$flag[logical_vec] <- TRUE
@@ -26,12 +32,12 @@ plot_ROC <- function(data, plot_tag = NULL, fill_var = NULL, fill_var_label = NU
     pl <- ggplot() +
       geom_point(data = data[data$flag == FALSE,],
                  mapping = aes_string(x = "FPR", y = "TPR"),
-                 size = 2,
-                 shape = 21,
-                 fill = "#dddddd") +
+                 # size = 2,
+                 # shape = 21,
+                 color = "#dddddd") +
       geom_point(data = data[data$flag == TRUE,],
                  mapping = aes_string(x = "FPR", y = "TPR"),
-                 size = 3,
+                 size = 2,
                  shape = 21,
                  fill = "#1ab079") +
       xlim(c(0,1)) +
@@ -42,8 +48,18 @@ plot_ROC <- function(data, plot_tag = NULL, fill_var = NULL, fill_var_label = NU
       theme_bw() +
       facet_wrap(. ~ METHOD, ncol = 4)
   } else {
-    pl <- ggplot(data, aes_string(x = "FPR", y = "TPR", fill = fill_var)) +
-      geom_point(size = 2, shape = 21) +
+    pl <- ggplot() +
+      # geom_point(data = data %>% filter(MED_ABS_TOTAL > 2e06),
+      #            mapping = aes(x = FPR, y = TPR),
+      #            color = "#dddddd") +
+      # geom_point(data = data %>% filter(MED_ABS_TOTAL <= 2e06),
+      #            mapping = aes_string(x = "FPR", y = "TPR", fill = fill_var),
+      #            size = 2,
+      #            shape = 21) +
+      geom_point(data,
+                 mapping = aes_string(x = "FPR", y = "TPR", fill = fill_var),
+                 size = 2,
+                 shape = 21) +
       xlim(c(0,1)) +
       ylim(c(0,1)) +
       labs(x = "specificity (1 - FPR)",
@@ -64,8 +80,38 @@ plot_ROC <- function(data, plot_tag = NULL, fill_var = NULL, fill_var_label = NU
     pl <- pl +
       scale_fill_manual(values = palette)
   }
+  show(pl)
   if(!is.null(plot_tag)) {
     ggsave(file.path("output", "images", paste0(fill_var,
+                                                "_",
+                                                plot_tag,
+                                                ".png")),
+           plot = pl,
+           dpi = 100,
+           units = "in",
+           height = 3,
+           width = 10)
+  }
+  show(pl)
+}
+
+plot_density <- function(data, plot_tag = NULL) {
+  fill_var <- "METHOD"
+  fill_var_label <- "Method"
+
+  pl <- ggplot() +
+    geom_density(data,
+               mapping = aes(x = FPR, fill = METHOD)) +
+    labs(x = "false discovery rate",
+         y = "density",
+         fill = fill_var_label) +
+    scale_fill_manual(values = palette) +
+    theme_bw() +
+    theme(legend.position = "none") +
+    facet_wrap(. ~ METHOD, ncol = 4, scales = "free_y")
+  if(!is.null(plot_tag)) {
+    ggsave(file.path("output", "images", paste0("FDR_",
+                                                fill_var,
                                                 "_",
                                                 plot_tag,
                                                 ".png")),
@@ -110,7 +156,7 @@ dir.create(file.path("output", "images"), showWarnings = FALSE)
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 ps <- c(100, 1000, 5000)
-partials <- c(0, 1)
+partials <- c(0)
 references <- c("oracle", "self")
 
 qq_res <- dbGetQuery(conn, paste0("SELECT FC_ABSOLUTE FROM datasets ",
@@ -124,6 +170,7 @@ qq_res <- sapply(qq_res, function(x) {
   }
 })
 qq <- quantile(qq_res, probs = seq(from = 0, to = 1, length.out = 4))
+qq <- c(qq[1:3], 5, Inf)
 
 # Build a fold change color scale
 # ramped_palette1 <- colorRampPalette(c("#00cc00", "#ffffff", "#fe8b00"))(7)
@@ -166,6 +213,48 @@ for(p in ps) {
       res <- res %>%
         filter(!is.na(TPR) & !is.na(FPR))
       
+      # What proportion of calls exceed an FDR of 5% here?
+      # res <- res %>%
+      #   filter(METHOD == 'DESeq2') %>%
+      #   mutate(FDR_big = ifelse(FPR > 0.05, "yes", "no")) %>%
+      #   select(!c("ORACLE_BASELINE", "SELF_BASELINE", "CALLS"))
+      # 
+      # sum(res$FDR_big == "yes")/nrow(res)
+      
+      # Filter out what DESeq2 calls > 85% DE
+      # res$DESeq2_DE <- sapply(res$SELF_BASELINE, function(x) sum(string_to_calls(x)))
+      # res$DESeq2_DE <- res$DESeq2_DE / p
+      # res <- res %>%
+      #   filter(DESeq2_DE <= 0.85)
+      
+      # res <- res %>%
+      #   filter(PERCENT_DIFF_REALIZ < 0.85)
+      
+      # ------------------------------------------------------------------------
+      #   Histogram with real data overlaid
+      # ------------------------------------------------------------------------
+      
+      # real_data <- readRDS("bad_good_results.rds")
+      # real_data <- real_data %>%
+      #   filter(dtype != "simulated") %>%
+      #   select(dtype, fpr)
+      # 
+      # real_df <- data.frame(x = real_data$fpr,
+      #                       y = rep(c(25,45), 4),
+      #                       type = real_data$dtype)
+      # ggplot() +
+      #   geom_histogram(data = res[res$METHOD == "DESeq2",],
+      #                  mapping = aes(x = FPR),
+      #                  color = "white") +
+      #   geom_point(data = real_df,
+      #              mapping = aes(x = x, y = y, fill = type),
+      #              size = 4,
+      #              shape = 21,
+      #              stroke = 1.2) +
+      #   scale_fill_manual(values = generate_highcontrast_palette(8)) +
+      #   labs(fill = "Data set") +
+      #   theme_bw()
+      
       # Remove some of the simulations with huge median abundances
       # res <- res %>%
       #   filter(MED_ABS_TOTAL < 2e06)
@@ -183,103 +272,18 @@ for(p in ps) {
         }
       })
       res$FC_plot <- cut(res$FC_plot, breaks = qq)
-      levels(res$FC_plot) <- c("low", "moderate", "high")
+      levels(res$FC_plot) <- c("low", "moderate", "high", "very high")
       
       # Shuffle before plotting
       res <- res[sample(1:nrow(res)),]
       
-      # plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference)
-      # plot_ROC(res, plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
-
-      res$sign <- ifelse(res$FC_ABSOLUTE > 1, 1, -1)
-      plot_ROC(res %>%
-                 filter(FC_plot == "high") %>%
-                 filter(FPR < 0.05 | FPR > 0.5) %>%
-                 filter(TPR > 0.8), plot_tag = NULL, "sign")
-      plot_ROC(res %>%
-                 filter(FC_plot == "high") %>%
-                 filter(FPR < 0.05 | FPR > 0.5) %>%
-                 filter(TPR > 0.8), plot_tag = NULL, "LOG_MEAN")
+      plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference)
+      plot_ROC(res, plot_tag, "FC_plot", "Fold change")
+      plot_density(res, plot_tag)
       
-      plot_tag <- paste0("p-", p, "_partial-", partial, "_ref-", reference, "_max50")
-      plot_ROC(res %>% filter(PERCENT_DIFF_REALIZ < 0.5), plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
+      # plot_ROC(res, plot_tag, "PERCENT_DIFF_REALIZ", "Realized proportion DE") # Look at no. features DE?
       
-      # plot_ROC(res, plot_tag)
-      # plot_ROC(res, plot_tag, "FC_plot", "Fold change") # Look at no. features DE?
-      # plot_ROC(res, plot_tag = NULL, "LOG_MAT", "Log med.\ntotal (orig.)")
-      # plot_ROC(res, plot_tag, "MED_REL_TOTAL", "Median total relative abundance")
-      # plot_ROC(res, plot_tag = NULL, "PERCENT_DIFF", "Percent DA features")
-      # plot_ROC(res, plot_tag = NULL, "CORRP", "Correlation level")
-      # plot_ROC(res, plot_tag = NULL, "LOG_MEAN", "Log mean abundance")
-      # plot_ROC(res, plot_tag = NULL, "PERTURBATION", "Log mean perturbation")
-      # plot_ROC(res, plot_tag, "REP_NOISE", "Noise within condition")
-      
-      # Does high abundance and high replicate noise yield big FPR?
-      # label_combo(res, plot_tag, res$LOG_MAT > 17 & res$FC_plot == "high")
-      # label_combo(res, plot_tag, res$LOG_MAT > 16 & res$REP_NOISE < 0.25)
-      # label_combo(res, plot_tag, res$PERCENT_DIFF > 0.5)
-      # label_combo(res, plot_tag, res$PERCENT_DIFF < 0.5)
-      
-      # LM test - What explains the high FPR in some samples?
-      # Answer - Surprisingly, it's having a high starting abundance. These are
-      #          generally scenarios where you've got a big downsampling
-      
-      # Find "interesting" simulations and visualize them as stacked bar plots
-      # temp <- res %>%
-      #     filter(LOG_MAT > 16) %>%
-      #     filter(FPR > 0.65)
-      # 
-      # temp2 <- temp[sample(1:nrow(temp), size = 1),]
-      # str(temp2)
-      # 
-      # data <- readRDS(file.path("output", "datasets", paste0(temp2$UUID, ".rds")))
-      # palette <- generate_highcontrast_palette(5000)
-      # plot_stacked_bars(data$simulation$abundances, palette = palette)
-      # plot_stacked_bars(data$simulation$observed_counts1, palette = palette)
-      
-      res <- res %>%
-        filter(METHOD == 'DESeq2' & FPR > 0.6)
-      uuid <- sample(res$UUID, size = 1) # Pull this dataset
-
-      res2 <- dbGetQuery(conn, paste0("SELECT datasets.UUID, BASELINE_TYPE, CALLS, ",
-                                      "datasets.BASELINE_CALLS AS ORACLE_CALLS, ",
-                                      "results.BASELINE_CALLS AS SELF_CALLS ",
-                                      "FROM results LEFT JOIN datasets ",
-                                      "ON results.UUID=datasets.UUID WHERE ",
-                                      "METHOD='DESeq2' AND ",
-                                      "datasets.UUID='", uuid, "' AND ",
-                                      "PARTIAL_INFO=0"))
-
-      oracle_calls <- as.numeric(str_split(res2 %>%
-                                             filter(is.na(SELF_CALLS)) %>%
-                                             pull(ORACLE_CALLS), ";")[[1]])
-      self_calls <- as.numeric(str_split(res2 %>%
-                                           filter(!is.na(SELF_CALLS)) %>%
-                                           pull(SELF_CALLS), ";")[[1]])
-
-      oracle_adj <- p.adjust(oracle_calls, method = "BH")
-      self_adj <- p.adjust(self_calls, method = "BH")
-
-      idx <- which(oracle_adj >= 0.05 & self_adj < 0.05)
-
-      data <- readRDS(file.path("output", "datasets", paste0(uuid, ".rds")))
-      abundances <- data$simulation$abundances
-
-      # What does a random disagreement (NO by oracle, YES by DESeq2) look like?
-      ggplot(data.frame(x = 1:nrow(abundances),
-                        y = abundances[,sample(idx, size = 1)],
-                        group = factor(data$simulation$groups)),
-             aes(x = x, y = y, fill = group)) +
-        geom_point(size = 2, shape = 21) +
-        theme_bw() +
-        labs(x = "sample index",
-             y = "abundance")
-      
-      # rates <- calc_DA_discrepancy(temp2$CALLS, temp2$ORACLE_BASELINE)
-      # idx <- sample(which(rates$FP_calls == TRUE), size = 1)
-      # par(mfrow = c(1, 2))
-      # plot(data$simulation$abundances[,idx])
-      # plot(data$simulation$observed_counts1[,idx])
+      # label_combo(res, plot_tag, res$PERCENT_DIFF_REALIZ < 0.5 & res$FC_plot %in% c("high","very high"))
     }
   }
 }
