@@ -1,0 +1,422 @@
+source("path_fix.R")
+
+library(tidyverse)
+library(codaDE)
+library(RSQLite)
+library(cowplot)
+library(ggExtra)
+library(RColorBrewer)
+library(randomForest)
+
+source("ggplot_fix.R")
+
+# This is only in use in some commented out code below
+string_to_calls <- function(call_string) {
+  pvals <- as.numeric(strsplit(call_string, ";")[[1]])
+  pvals <- p.adjust(pvals, method = "BH")
+  pvals < 0.05
+}
+
+pull_data <- function(qq, use_baseline = "self") {
+  conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
+  res <- dbGetQuery(conn, paste0("SELECT ",
+                                 "datasets.UUID AS UUID, ",
+                                 "METHOD, ",
+                                 "PARTIAL_INFO, ",
+                                 "BASELINE_TYPE, ",
+                                 "datasets.BASELINE_CALLS AS ORACLE_BASELINE, ",
+                                 "CALLS, ",
+                                 "results.BASELINE_CALLS AS SELF_BASELINE, ",
+                                 "P, ",
+                                 "CORRP, ",
+                                 "LOG_MEAN, ",
+                                 "PERTURBATION, ",
+                                 "REP_NOISE, ",
+                                 "FC_ABSOLUTE, ",
+                                 "FC_RELATIVE, ",
+                                 "FC_PARTIAL, ",
+                                 "MED_ABS_TOTAL, ",
+                                 "MED_REL_TOTAL, ",
+                                 "PERCENT_DIFF_REALIZ, ",
+                                 "TPR, ",
+                                 "FPR ",
+                                 "FROM results LEFT JOIN datasets ON ",
+                                 "results.UUID=datasets.UUID ",
+                                 "WHERE PARTIAL_INFO=0 ",
+                                 "AND BASELINE_TYPE='", use_baseline, "' ",
+                                 "AND FC_ABSOLUTE <= 10 ",
+                                 "AND FC_ABSOLUTE >= 0.1;"))
+  dbDisconnect(conn)
+  
+  # Strip "result-less" entries. These are simulations with negligible amounts
+  # of differential abundance - the simulated effect sizes were just too small!
+  res <- res %>%
+    filter(!is.na(TPR) & !is.na(FPR))
+  
+  # Filter out MAST entries. The added zero-inflation component makes MAST really
+  # different than the other models and exceptionally sensitive to data processing
+  # (esp filtering) choices. Remove for now.
+  res <- res %>%
+    filter(METHOD != "MAST")
+  
+  # Generate an absolute fold change low/med/high factor labeling
+  # This reports the scale of increases in fold abundance either from A -> B or
+  # from B -> A
+  res$FC_plot <- sapply(res$FC_ABSOLUTE, function(x) {
+    if(x < 1) {
+      1 / x
+    } else {
+      x
+    }
+  })
+  res$FC_plot <- cut(res$FC_plot, breaks = qq)
+  levels(res$FC_plot) <- c(paste0("low (< ", qq[2], ")"),
+                           "moderate",
+                           paste0("high (> ", qq[3], ")"),
+                           paste0("very high (> ", qq[4], ")"))
+  
+  # Generate an fold change direction label
+  res$FC_dir <- sapply(res$FC_ABSOLUTE, function(x) {
+    if(x < 1) {
+      -1
+    } else {
+      1
+    }
+  })
+  res$FC_dir <- factor(res$FC_dir)
+  res
+}
+
+plot_ROC_flag <- function(data, method, p, logical_vec) {
+  data$flag <- FALSE
+  data$flag[logical_vec] <- TRUE
+  pl <- ggplot() +
+    geom_point(data = data %>% filter(!flag & METHOD == method & P == p),
+               mapping = aes_string(x = "FPR", y = "TPR"),
+               # size = 2,
+               # shape = 21,
+               color = "#dddddd") +
+    geom_point(data = data %>% filter(flag & METHOD == method & P == p),
+               mapping = aes_string(x = "FPR", y = "TPR"),
+               size = 2,
+               shape = 21,
+               fill = "#1ab079") +
+    xlim(c(0,1)) +
+    ylim(c(0,1)) +
+    labs(x = "specificity (1 - FPR)",
+         y = "sensitivity (TPR)",
+         fill = fill_var_label) +
+    theme_bw() +
+    facet_wrap(. ~ METHOD, ncol = 4)
+  return(pl)
+}
+
+plot_ROC_fc <- function(data, method, p) {
+  pl <- ggplot() +
+    geom_point(data %>% filter(METHOD == method & P == p),
+               mapping = aes(x = FPR, y = TPR, fill = FC_plot),
+               size = 2,
+               shape = 21) +
+    xlim(c(-0.025,1.025)) +
+    ylim(c(-0.025,1.025)) +
+    labs(x = paste0(method, " specificity (1 - FPR)"),
+         y = paste0(method, " sensitivity (TPR)"),
+         fill = "Fold change") +
+    theme_bw() +
+    theme(axis.title.x = element_text(margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0))) +
+    scale_fill_brewer(palette = "RdYlBu")
+  legend <- get_legend(pl + theme(legend.position = "bottom"))
+  pl <- pl +
+    theme(legend.position = "none")
+  pl <- ggMarginal(pl, margins = "both", type = "histogram", bins = 30,
+                   fill = "#888888", color = "#333333", size = 10)
+  return(list(pl = pl, legend = legend))
+}
+
+plot_ROC_percentDE <- function(data, method, p) {
+  pl <- ggplot() +
+    geom_point(data %>% filter(METHOD == method & P == p),
+               mapping = aes(x = FPR, y = TPR, fill = PERCENT_DIFF_REALIZ),
+               size = 2,
+               shape = 21) +
+    xlim(c(-0.025,1.025)) +
+    ylim(c(-0.025,1.025)) +
+    labs(x = paste0(method, " specificity (1 - FPR)"),
+         y = paste0(method, " sensitivity (TPR)"),
+         fill = "Proportion differentially abundance features") +
+    theme_bw() +
+    theme(axis.title.x = element_text(margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0))) +
+    scale_fill_distiller(palette = "RdYlBu",
+                         limits = c(0,1),
+                         breaks = c(0, 0.5, 1))
+  legend <- get_legend(pl + theme(legend.position = "bottom"))
+  pl <- pl +
+    theme(legend.position = "none")
+  pl <- ggMarginal(pl, margins = "both", type = "histogram", bins = 30,
+                   fill = "#888888", color = "#333333", size = 10)
+  return(list(pl = pl, legend = legend))
+}
+
+# Method-labeling palette
+palette <- c("#46A06B", "#FF5733", "#EF82BB", "#7E54DE", "#E3C012", "#B95D6E")
+
+# ------------------------------------------------------------------------------
+#   Initialize output directory and generate a color palette for levels of fold
+#   change
+# ------------------------------------------------------------------------------
+
+# Create directories manually if they don't already exist
+dir.create("output", showWarnings = FALSE)
+dir.create(file.path("output", "images"), showWarnings = FALSE)
+
+conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
+
+# Define bins for absolute fold change
+# qq_res <- dbGetQuery(conn, paste0("SELECT FC_ABSOLUTE FROM datasets ",
+#                                   "WHERE FC_ABSOLUTE <= 10 AND ",
+#                                   "FC_ABSOLUTE >= 0.1"))$FC_ABSOLUTE
+# qq_res <- sapply(qq_res, function(x) {
+#   if(x < 1) {
+#     1 / x
+#   } else {
+#     x
+#   }
+# })
+# qq <- quantile(qq_res, probs = seq(from = 0, to = 1, length.out = 4))
+# qq <- c(qq[1:3], 5, Inf)
+
+qq <- c(0, 1.5, 2.5, 5, Inf)
+
+# ------------------------------------------------------------------------------
+#   ROC plot #1
+#
+#   Sensitivity and specificity of calls made by all methods on absolute vs.
+#   relative abundances
+#
+#   For some reason, this code doesn't work as a function (I guess something 
+#   needs to be global?) so it's duplicated below.
+# ------------------------------------------------------------------------------
+
+data <- pull_data(qq, use_baseline = "self")
+data$FPR <- 1 - data$FPR
+
+p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
+p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
+p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
+legend <- NULL
+method_list <- sort(unique(data$METHOD))
+for(i in 1:length(method_list)) {
+  method <- method_list[i]
+  for(j in c(100, 1000, 5000)) {
+    plot_pieces <- plot_ROC_fc(data, method, j)
+    pl <- plot_pieces$pl
+    if(is.null(legend)) {
+      legend <- plot_pieces$legend
+    }
+    if(i == 1 & j == 100) p1_100 <<- pl
+    if(i == 1 & j == 1000) p1_1000 <<- pl
+    if(i == 1 & j == 5000) p1_5000 <<- pl
+    if(i == 2 & j == 100) p2_100 <<- pl
+    if(i == 2 & j == 1000) p2_1000 <<- pl
+    if(i == 2 & j == 5000) p2_5000 <<- pl
+    if(i == 3 & j == 100) p3_100 <<- pl
+    if(i == 3 & j == 1000) p3_1000 <<- pl
+    if(i == 3 & j == 5000) p3_5000 <<- pl
+  }
+}
+prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
+prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
+prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
+pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
+ggsave(file.path("output", "images", "ROC_by_FC.png"),
+       plot = pl,
+       units = "in",
+       height = 10.5,
+       width = 10,
+       bg = "white")
+show(pl)
+
+# ------------------------------------------------------------------------------
+#   ROC plot #2
+#
+#   As above, but labelled by percent of features differentially abundant
+# ------------------------------------------------------------------------------
+
+p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
+p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
+p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
+legend <- NULL
+method_list <- sort(unique(data$METHOD))
+for(i in 1:length(method_list)) {
+  method <- method_list[i]
+  for(j in c(100, 1000, 5000)) {
+    plot_pieces <- plot_ROC_percentDE(data, method, j)
+    pl <- plot_pieces$pl
+    if(is.null(legend)) {
+      legend <- plot_pieces$legend
+    }
+    if(i == 1 & j == 100) p1_100 <<- pl
+    if(i == 1 & j == 1000) p1_1000 <<- pl
+    if(i == 1 & j == 5000) p1_5000 <<- pl
+    if(i == 2 & j == 100) p2_100 <<- pl
+    if(i == 2 & j == 1000) p2_1000 <<- pl
+    if(i == 2 & j == 5000) p2_5000 <<- pl
+    if(i == 3 & j == 100) p3_100 <<- pl
+    if(i == 3 & j == 1000) p3_1000 <<- pl
+    if(i == 3 & j == 5000) p3_5000 <<- pl
+  }
+}
+prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
+prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
+prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
+pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
+ggsave(file.path("output", "images", "ROC_by_percentDE.png"),
+       plot = pl,
+       units = "in",
+       height = 10.5,
+       width = 10,
+       bg = "white")
+show(pl)
+
+# ------------------------------------------------------------------------------
+#   ROC plot #3
+#
+#   Simulations with A MAJORITY OF DIFFERENTIAL FEATURES and WITH HIGH OR V HIGH
+#   FOLD CHANGE are labeled
+# ------------------------------------------------------------------------------
+
+p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
+p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
+p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
+legend <- NULL
+method_list <- sort(unique(data$METHOD))
+for(i in 1:length(method_list)) {
+  method <- method_list[i]
+  for(j in c(100, 1000, 5000)) {
+    pl <- plot_ROC_flag(data, method, j, data$PERCENT_DIFF_REALIZ < 0.5 & data$FC_plot %in% levels(data$FC_plot)[3:4])
+    if(i == 1 & j == 100) p1_100 <<- pl
+    if(i == 1 & j == 1000) p1_1000 <<- pl
+    if(i == 1 & j == 5000) p1_5000 <<- pl
+    if(i == 2 & j == 100) p2_100 <<- pl
+    if(i == 2 & j == 1000) p2_1000 <<- pl
+    if(i == 2 & j == 5000) p2_5000 <<- pl
+    if(i == 3 & j == 100) p3_100 <<- pl
+    if(i == 3 & j == 1000) p3_1000 <<- pl
+    if(i == 3 & j == 5000) p3_5000 <<- pl
+  }
+}
+prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
+prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
+prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
+pl <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+ggsave(file.path("output", "images", "ROC_by_label.png"),
+       plot = pl,
+       units = "in",
+       height = 10,
+       width = 10,
+       bg = "white")
+show(pl)
+
+# ------------------------------------------------------------------------------
+#   ROC plot #4
+#
+#   Sensitivity and specificity plot for but discrepancies against calls made by
+#   a NB GLM ("oracle method") on absolute abundances
+# ------------------------------------------------------------------------------
+
+data <- pull_data(qq, use_baseline = "oracle")
+data$FPR <- 1 - data$FPR
+
+p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
+p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
+p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
+legend <- NULL
+method_list <- sort(unique(data$METHOD))
+for(i in 1:length(method_list)) {
+  method <- method_list[i]
+  for(j in c(100, 1000, 5000)) {
+    plot_pieces <- plot_ROC_fc(data, method, j)
+    pl <- plot_pieces$pl
+    if(is.null(legend)) {
+      legend <- plot_pieces$legend
+    }
+    if(i == 1 & j == 100) p1_100 <<- pl
+    if(i == 1 & j == 1000) p1_1000 <<- pl
+    if(i == 1 & j == 5000) p1_5000 <<- pl
+    if(i == 2 & j == 100) p2_100 <<- pl
+    if(i == 2 & j == 1000) p2_1000 <<- pl
+    if(i == 2 & j == 5000) p2_5000 <<- pl
+    if(i == 3 & j == 100) p3_100 <<- pl
+    if(i == 3 & j == 1000) p3_1000 <<- pl
+    if(i == 3 & j == 5000) p3_5000 <<- pl
+  }
+}
+prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
+prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
+prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
+pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
+ggsave(file.path("output", "images", "ROC_by_FC_NBGLM.png"),
+       plot = pl,
+       units = "in",
+       height = 10.5,
+       width = 10,
+       bg = "white")
+show(pl)
+
+# ------------------------------------------------------------------------
+#   What proportion of calls exceed an FDR of 5% here?
+# ------------------------------------------------------------------------
+
+# res <- res %>%
+#   filter(METHOD == 'DESeq2') %>%
+#   mutate(FDR_big = ifelse(FPR > 0.05, "yes", "no")) %>%
+#   select(!c("ORACLE_BASELINE", "SELF_BASELINE", "CALLS"))
+# 
+# sum(res$FDR_big == "yes")/nrow(res)
+
+# Filter out what DESeq2 calls > 85% DE
+# res$DESeq2_DE <- sapply(res$SELF_BASELINE, function(x) sum(string_to_calls(x)))
+# res$DESeq2_DE <- res$DESeq2_DE / p
+# res <- res %>%
+#   filter(DESeq2_DE <= 0.85)
+
+# res <- res %>%
+#   filter(PERCENT_DIFF_REALIZ < 0.85)
+
+# ------------------------------------------------------------------------
+#   Histogram with real data overlaid
+# ------------------------------------------------------------------------
+
+# real_data <- readRDS("bad_good_results.rds")
+# real_data <- real_data %>%
+#   filter(dtype != "simulated") %>%
+#   select(dtype, fpr)
+# 
+# real_df <- data.frame(x = real_data$fpr,
+#                       y = rep(c(25,45), 4),
+#                       type = real_data$dtype)
+# ggplot() +
+#   geom_histogram(data = res[res$METHOD == "DESeq2",],
+#                  mapping = aes(x = FPR),
+#                  color = "white") +
+#   geom_point(data = real_df,
+#              mapping = aes(x = x, y = y, fill = type),
+#              size = 4,
+#              shape = 21,
+#              stroke = 1.2) +
+#   scale_fill_manual(values = generate_highcontrast_palette(8)) +
+#   labs(fill = "Data set") +
+#   theme_bw()
+
+# Remove some of the simulations with huge median abundances
+# res <- res %>%
+#   filter(MED_ABS_TOTAL < 2e06)
+
+# Remove simulations where > 50% of features are differential
+# res <- res %>%
+#   filter(PERCENT_DIFF < 0.5)

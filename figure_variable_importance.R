@@ -4,6 +4,9 @@ source("path_fix.R")
 
 library(caret)
 
+use_baseline <- "self"
+partial_flag <- "nopartial"
+
 # ------------------------------------------------------------------------------
 #   Define feature lookup
 # ------------------------------------------------------------------------------
@@ -73,16 +76,14 @@ mapping <- list(METHOD = "method",
                 FW_CLR_PFC2_D = "percent features with < 2 FC in CLR")
 
 for(type in c("TPR", "FPR")) {
-  save_fn <- file.path("output", paste0("varImp_", type, ".rds"))
+  save_fn <- file.path("output",
+                       "predictive_fits",
+                       paste0(use_baseline, "_", partial_flag),
+                       paste0(use_baseline, "_", type, "_variable-importance.rds"))
   if(file.exists(save_fn)) {
     plot_df <- readRDS(save_fn)
   } else {
-    model <- readRDS(file.path("output",
-                               "predictive_fits",
-                               "all",
-                               paste0("all_self_RF_", type, ".rds")))
-    plot_df <- varImp(model$result)
-    saveRDS(plot_df, save_fn)
+    stop("Variable importance results not found!")
   }
   
   # Fix data.frame
@@ -91,27 +92,31 @@ for(type in c("TPR", "FPR")) {
   colnames(plot_df) <- c("weight", "feature")
   
   # Map features to readable names
-  relabel <- data.frame(feature = plot_df$feature) %>%
-    left_join(data.frame(feature = names(mapping), string = unname(unlist(mapping))))
+  relabel <- suppressMessages(data.frame(feature = plot_df$feature) %>%
+    left_join(data.frame(feature = names(mapping), string = unname(unlist(mapping)))))
   
   plot_df$label <- relabel$string
   
   # Truncate by relative feature weight
   plot_df <- plot_df %>%
     arrange(desc(weight)) %>%
-    mutate(rel_weight = weight/sum(plot_df$weight)) %>%
-    filter(rel_weight > 0.01)
+    mutate(rel_weight = weight/sum(plot_df$weight)) #%>%
+    # filter(rel_weight > 0.01)
+  plot_df <- plot_df[1:10,]
   
   ggplot(plot_df, aes(x = weight, y = reorder(label, weight))) +
     geom_bar(stat = "identity") +
     theme_bw() +
     labs(x = "feature weight",
-         y = paste("feature in ", ifelse(type == "TPR", "sensitivity", "specificity"), " model"))
+         y = paste0("feature in ", ifelse(type == "TPR", "sensitivity", "specificity"), " model")) +
+    theme(axis.title.x = element_text(margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0)))
   ggsave(file.path("output",
                    "images",
                    paste0("varImp_", type, ".png")),
          units = "in",
          dpi = 100,
-         height = ifelse(type == "TPR", 4, 3),
+         # height = ifelse(type == "TPR", 3, 6),
+         height = 3.5,
          width = 7)
 }
