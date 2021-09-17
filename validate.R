@@ -57,13 +57,6 @@ if(!file.exists(file.path("output", "predictive_fits", model_dir))) {
   stop(paste0("Model folder does not exist: ", model_dir, "\n"))
 }
 
-# palette <- list(ALDEx2 = "#46A06B",
-#                 DESeq2 = "#FF5733",
-#                 MAST = "#EF82BB",
-#                 NBGLM = "#7E54DE",
-#                 scran = "#E3C012",
-#                 simulated = "#DDDDDD")
-
 # ------------------------------------------------------------------------------
 #   Parse and wrangle validation data
 # ------------------------------------------------------------------------------
@@ -186,31 +179,26 @@ if(dataset_name == "Yu") {
 }
 
 # This takes 2-3 min. to run on 15K features
-features <- characterize_dataset(counts_A, counts_B)
+features <- as.data.frame(characterize_dataset(counts_A, counts_B))
 
 # Add a few more
 features$P <- ncol(counts_A)
+
+features <- features %>%
+  select(c(-FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
 
 # ------------------------------------------------------------------------------
 #   Make predictions on simulations and real data and visualize these together
 # ------------------------------------------------------------------------------
 
-# plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
-
-# For the Kimmerling data, scran throws this error:
-# "inter-cluster rescaling factors are not strictly positive"
-
-# Pull features from existing simulations
-# We'll need to scale against these later
-features_sims <- pull_features(use_baseline = use_baseline,
-                               exclude_partials = ifelse(str_detect(model_dir, "_nopartial$"), TRUE, FALSE))
-# Relevel as in the model fitting function
-features_sims <- features_sims %>%
-    filter(METHOD %in% methods_list)
-features_sims$METHOD <- factor(features_sims$METHOD)
-
-# Sample
-features_sims <- features_sims[sample(1:nrow(features_sims), size = 5000),]
+# It's crucial we match the factor levels the model was trained on
+# Features will return all levels for METHOD (including methods we evaluated
+# on when testing but aren't reporting). Make sure these 
+# features_simulated <- pull_features(use_baseline = use_baseline,
+#                                     feature_list = c("METHOD"))
+# features_simulated <- features_simulated %>%
+#     filter(METHOD %in% methods_list)
+# features_simulated$METHOD <- factor(features_simulated$METHOD)
 
 save_df <- NULL
 
@@ -230,6 +218,10 @@ for(use_result_type in c("TPR", "FPR")) {
   fit_obj <- readRDS(model_fn)
 
   for(DE_method in methods_list) {
+    
+    if(!(DE_method %in% fit_obj$result$forest$xlevels$METHOD)) {
+      next;
+    }
 
     cat(paste0("Evaluating ", use_result_type, " x ", DE_method, "\n"))
 
@@ -273,60 +265,11 @@ for(use_result_type in c("TPR", "FPR")) {
     if(file.exists(save_fn)) {
       pred_real <- readRDS(save_fn)
     } else {
-      features_new <- features # we'll alter this for each result type
-      features_new$METHOD <- DE_method
-      features_new$METHOD <- factor(features_new$METHOD,
-                                    levels = methods_list)
+      features$METHOD <- DE_method
+      features$METHOD <- factor(features$METHOD,
+                                levels = fit_obj$result$forest$xlevels$METHOD)
   
-      if((max(table(groups)) < 5 | dataset_name == "Kimmerling") && DE_method == "scran") {
-        next
-      }
-  
-      # Convert to data.frame
-      features_new <- as.data.frame(features_new)
-      
-      # Remove some features we're no longer using (too correlated with others)
-      features_new <- features_new %>%
-        select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
-      
-      # Scale features
-      # 1) Pull features from simulations
-      # 2) Add this new data point
-      # 3) Rescale all
-      # 4) Extract this new data point
-      #
-      # This is tedious but I can't think of a better, simple way...
-  
-      # Remove result type we're not interested in and separate data into a
-      # features and response data.frame
-      features_sims2 <- features_sims %>%
-        select(-one_of(ifelse(use_result_type == "TPR", "FPR", "TPR")))
-      response <- features_sims2 %>%
-        select(one_of(use_result_type))
-      features_sims2 <- features_sims2 %>%
-        select(-one_of(use_result_type))
-      
-      # Map in new feature
-      reorder_idx <- data.frame(names = colnames(features_sims2)) %>%
-        left_join(data.frame(names = colnames(features_new), idx_ds = 1:ncol(features_new)), by = "names")
-      features_new <- features_new[,reorder_idx$idx_ds]
-      
-      features_sims2 <- rbind(features_sims2, features_new)
-      
-      # Scale non-factors
-      factors <- which(colnames(features_sims2) %in% c("METHOD"))
-      non_factors <- setdiff(1:ncol(features_sims2), factors)
-      for(f in non_factors) {
-        features_sims2[,f] <- scale(features_sims2[,f])
-      }
-      
-      features_new <- features_sims2[nrow(features_sims2),]
-  
-      # --------------------------------------------------------------------------
-      #   Make point predictions on simulated and real
-      # --------------------------------------------------------------------------
-      
-      pred_real <- predict(fit_obj$result, newdata = features_new, predict.all = TRUE)
+      pred_real <- predict(fit_obj$result, newdata = features, predict.all = TRUE)
       saveRDS(pred_real, save_fn)
     }
     
@@ -367,46 +310,6 @@ for(use_result_type in c("TPR", "FPR")) {
                                 upper90 = unname(quantile(pred_real$individual[1,], probs = c(0.95))),
                                 point = pred_real$aggregate))
   }
-
-  # --------------------------------------------------------------------------
-  #   Visualize predictions
-  # --------------------------------------------------------------------------
-  
-  # pl <- ggplot(plot_df, aes(x = true, y = point)) +
-  #   geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
-  #                mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
-  #   geom_linerange(data = plot_df,
-  #                  aes(ymin = lower90, ymax = upper90, color = factor(type)),
-  #                  size = 0.75) +
-  #   geom_linerange(data = plot_df,
-  #                  aes(ymin = lower50, ymax = upper50, color = factor(type)),
-  #                  size = 2) +
-  #   geom_point(data = plot_df,
-  #              aes(x = true, y = point, color = factor(type)),
-  #              size = 4) +
-  #   scale_color_manual(values = palette) +
-  #   theme_bw() +
-  #   ylim(c(0,1)) +
-  #   labs(x = paste0("observed ", plot_labels[[use_result_type]]),
-  #        y = paste0("predicted ", plot_labels[[use_result_type]]),
-  #        fill = "Data type") +
-  #   theme(legend.position = "none")
-  # # show(pl)
-  # ggsave(file.path("output",
-  #                  "predictive_fits",
-  #                  model_dir,
-  #                  paste0("validations_",
-  #                         use_result_type,
-  #                         "_",
-  #                         dataset_name,
-  #                         "_threshold",
-  #                         threshold,
-  #                         ".png")),
-  #        plot = pl,
-  #        dpi = 100,
-  #        units = "in",
-  #        height = 4,
-  #        width = 4)
 }
 
 save_fn <- file.path("output",

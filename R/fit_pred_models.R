@@ -252,51 +252,63 @@ characterize_dataset <- function(counts_A, counts_B) {
 #' @return data.frame with predictive model training features
 #' @import RSQLite
 #' @export
-pull_features <- function(DE_method = "all",
+pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                           use_baseline = "self",
                           exclude_partials = TRUE,
                           exclude_independent = FALSE,
-                          fit_full = FALSE) {
+                          fit_full = FALSE,
+                          feature_list = NULL) {
 
   conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
   
   # Note: I'm not pulling FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D
   # because these predictors appear to be strongly correlated.
   
-  results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
-                                     "FC_ABSOLUTE, FC_PARTIAL, FC_RELATIVE, ",
-                                     "TOTALS_C_FC, TOTALS_C_D, ",
-                                     "TOTALS_C_MAX_D, TOTALS_C_MED_D, ",
-                                     "TOTALS_C_SD_D, CORR_RA_MED, CORR_RA_SD, ",
-                                     "CORR_RA_SKEW, CORR_LOG_MED, CORR_LOG_SD, ",
-                                     "CORR_LOG_SKEW, CORR_CLR_MED, CORR_CLR_SD, ",
-                                     "CORR_CLR_SKEW, COMP_C_P0_A, COMP_C_P0_B, ",
-                                     "COMP_C_P1_A, COMP_C_P1_B, COMP_C_P5_A, ",
-                                     "COMP_C_P5_B, COMP_RA_P01_A, COMP_RA_P01_B, ",
-                                     "COMP_RA_P1_A, COMP_RA_P1_B, COMP_RA_P5_A, ",
-                                     "COMP_RA_P5_B, COMP_RA_MAX_A, COMP_RA_MED_A, ",
-                                     "COMP_RA_SD_A, COMP_RA_SKEW_A, COMP_RA_MAX_B, ",
-                                     "COMP_RA_MED_B, COMP_RA_SD_B, COMP_RA_SKEW_B, ",
-                                     "COMP_C_ENT_A, COMP_C_ENT_B, FW_RA_MAX_D, ",
-                                     "FW_RA_MED_D, FW_RA_SD_D, FW_RA_PPOS_D, ",
-                                     "FW_RA_PNEG_D, FW_RA_PFC05_D, ",
-                                     "FW_RA_PFC2_D, FW_LOG_MAX_D, FW_LOG_MED_D, ",
-                                     "FW_LOG_SD_D, FW_LOG_PPOS_D, FW_LOG_PNEG_D, ",
-                                     "FW_LOG_PFC05_D, FW_LOG_PFC1_D, ",
-                                     "FW_LOG_PFC2_D, FW_CLR_MAX_D, ",
-                                     "FW_CLR_PPOS_D, ",
-                                     "FW_CLR_PFC05_D, FW_CLR_PFC1_D, ",
-                                     "FW_CLR_PFC2_D, METHOD, PARTIAL_INFO, ",
-                                     "BASELINE_TYPE,TPR, FPR ",
-                                     "FROM datasets LEFT JOIN characteristics ",
-                                     "ON datasets.UUID=characteristics.UUID ",
-                                     "LEFT JOIN results ",
-                                     "ON (characteristics.UUID=results.UUID ",
-                                     "AND characteristics.partial=results.PARTIAL_INFO) ",
-                                     "WHERE BASELINE_TYPE='", use_baseline, "';"))
-  
-  dbDisconnect(conn)
-  
+  if(!is.null(feature_list) & length(feature_list > 0)) {
+    results <- dbGetQuery(conn, paste0("SELECT ", feature_list, " ",
+                                       "FROM datasets LEFT JOIN characteristics ",
+                                       "ON datasets.UUID=characteristics.UUID ",
+                                       "LEFT JOIN results ",
+                                       "ON (characteristics.UUID=results.UUID ",
+                                       "AND characteristics.partial=results.PARTIAL_INFO) ",
+                                       "WHERE BASELINE_TYPE='", use_baseline, "';"))
+    dbDisconnect(conn)
+    return(results)
+  } else {
+    results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
+                                       "FC_ABSOLUTE, FC_PARTIAL, FC_RELATIVE, ",
+                                       "TOTALS_C_FC, TOTALS_C_D, ",
+                                       "TOTALS_C_MAX_D, TOTALS_C_MED_D, ",
+                                       "TOTALS_C_SD_D, CORR_RA_MED, CORR_RA_SD, ",
+                                       "CORR_RA_SKEW, CORR_LOG_MED, CORR_LOG_SD, ",
+                                       "CORR_LOG_SKEW, CORR_CLR_MED, CORR_CLR_SD, ",
+                                       "CORR_CLR_SKEW, COMP_C_P0_A, COMP_C_P0_B, ",
+                                       "COMP_C_P1_A, COMP_C_P1_B, COMP_C_P5_A, ",
+                                       "COMP_C_P5_B, COMP_RA_P01_A, COMP_RA_P01_B, ",
+                                       "COMP_RA_P1_A, COMP_RA_P1_B, COMP_RA_P5_A, ",
+                                       "COMP_RA_P5_B, COMP_RA_MAX_A, COMP_RA_MED_A, ",
+                                       "COMP_RA_SD_A, COMP_RA_SKEW_A, COMP_RA_MAX_B, ",
+                                       "COMP_RA_MED_B, COMP_RA_SD_B, COMP_RA_SKEW_B, ",
+                                       "COMP_C_ENT_A, COMP_C_ENT_B, FW_RA_MAX_D, ",
+                                       "FW_RA_MED_D, FW_RA_SD_D, FW_RA_PPOS_D, ",
+                                       "FW_RA_PNEG_D, FW_RA_PFC05_D, ",
+                                       "FW_RA_PFC2_D, FW_LOG_MAX_D, FW_LOG_MED_D, ",
+                                       "FW_LOG_SD_D, FW_LOG_PPOS_D, FW_LOG_PNEG_D, ",
+                                       "FW_LOG_PFC05_D, FW_LOG_PFC1_D, ",
+                                       "FW_LOG_PFC2_D, FW_CLR_MAX_D, ",
+                                       "FW_CLR_PPOS_D, ",
+                                       "FW_CLR_PFC05_D, FW_CLR_PFC1_D, ",
+                                       "FW_CLR_PFC2_D, METHOD, PARTIAL_INFO, ",
+                                       "BASELINE_TYPE,TPR, FPR ",
+                                       "FROM datasets LEFT JOIN characteristics ",
+                                       "ON datasets.UUID=characteristics.UUID ",
+                                       "LEFT JOIN results ",
+                                       "ON (characteristics.UUID=results.UUID ",
+                                       "AND characteristics.partial=results.PARTIAL_INFO) ",
+                                       "WHERE BASELINE_TYPE='", use_baseline, "';"))
+    dbDisconnect(conn)
+  }
+
   if(exclude_partials) {
     # Filter out results with partial information
     results <- results %>%
@@ -344,17 +356,10 @@ pull_features <- function(DE_method = "all",
   
   # Pull out the features we won't predict on
   uuids <- results$UUID
-  if(DE_method == "all") {
-    results <- results %>%
-      # filter(METHOD != "MAST") %>%
-      select(-c(UUID, CORRP, BASELINE_TYPE))
-    results$METHOD <- factor(results$METHOD)
-  } else {
-    results <- results %>%
-      filter(METHOD == DE_method) %>%
-      select(-c(UUID, CORRP, BASELINE_TYPE, METHOD))
-  }
-  
+  results <- results %>%
+    filter(METHOD %in% DE_methods) %>%
+    select(-c(UUID, CORRP, BASELINE_TYPE))
+
   return(results)
 }
 
@@ -377,11 +382,9 @@ pull_features <- function(DE_method = "all",
 #' with the saved model output
 #' @return NULL (fitted models are saved in output directory)
 #' @import randomForest
+#' @import dplyr
 #' @import tidyr
 #' @import caret
-#' @import jtools
-#' @import ggstance
-#' @import broom.mixed
 #' @export
 fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                                  use_baseline = "self",
@@ -397,8 +400,8 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
     stop(paste0("Invalid baseline: ", use_baseline, "!\n"))
   }
   
-  if(!any(DE_methods %in% c("all", "ALDEx2", "DESeq2", "MAST", "scran"))) {
-    stop(paste0("Invalid DE calling method: ", DE_method, "!\n"))
+  if(!any(DE_methods %in% c("ALDEx2", "DESeq2", "MAST", "scran"))) {
+    stop(paste0("Invalid DE calling method!\n"))
   }
 
   save_path <- list("output", "predictive_fits")
@@ -436,14 +439,11 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
     features_result_type <- features_result_type %>%
       select(-one_of(use_result_type))
     
-    factors <- which(colnames(features_result_type) %in% c("METHOD"))
-    non_factors <- setdiff(1:ncol(features_result_type), factors)
-
-    # Scale non-factor features    
-    for(f in non_factors) {
-      features_result_type[,f] <- scale(features_result_type[,f])
-    }
-
+    # Subset for testing
+    # idx <- sample(1:nrow(features), size = 1000)
+    # features_result_type <- features_result_type[idx,]
+    # response <- response[idx,,drop=FALSE]
+    
     n <- nrow(features_result_type)
     
     # Define test/train set for all remaining methods
