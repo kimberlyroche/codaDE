@@ -6,12 +6,12 @@ library(RColorBrewer)
 library(optparse)
 
 DE_methods <- c("ALDEx2", "DESeq2", "scran")
-use_baseline <- "oracle"
+use_baseline <- "self"
 
 fit_predictive_model(DE_methods = DE_methods,
                      use_baseline = use_baseline,
                      output_weights = TRUE,
-                     exclude_partials = FALSE,
+                     exclude_partials = TRUE,
                      exclude_independent = FALSE)
 
 for(use_result_type in c("TPR", "FPR")) {

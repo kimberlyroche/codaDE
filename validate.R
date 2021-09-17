@@ -57,12 +57,12 @@ if(!file.exists(file.path("output", "predictive_fits", model_dir))) {
   stop(paste0("Model folder does not exist: ", model_dir, "\n"))
 }
 
-palette <- list(ALDEx2 = "#46A06B",
-                DESeq2 = "#FF5733",
-                MAST = "#EF82BB",
-                NBGLM = "#7E54DE",
-                scran = "#E3C012",
-                simulated = "#DDDDDD")
+# palette <- list(ALDEx2 = "#46A06B",
+#                 DESeq2 = "#FF5733",
+#                 MAST = "#EF82BB",
+#                 NBGLM = "#7E54DE",
+#                 scran = "#E3C012",
+#                 simulated = "#DDDDDD")
 
 # ------------------------------------------------------------------------------
 #   Parse and wrangle validation data
@@ -329,6 +329,18 @@ for(use_result_type in c("TPR", "FPR")) {
       pred_real <- predict(fit_obj$result, newdata = features_new, predict.all = TRUE)
       saveRDS(pred_real, save_fn)
     }
+    
+    save_df <- rbind(save_df,
+                     data.frame(true = ifelse(use_result_type == "TPR",
+                                              rates$TPR,
+                                              1 - rates$FPR),
+                                lower90 = unname(quantile(pred_real$individual[1,], probs = c(0.05))),
+                                lower50 = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
+                                upper50 = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
+                                upper90 = unname(quantile(pred_real$individual[1,], probs = c(0.95))),
+                                point = pred_real$aggregate,
+                                type = DE_method,
+                                pred_type = "prediction"))
     
     save_df <- rbind(save_df,
                      data.frame(dataset = dataset_name,

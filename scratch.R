@@ -12,12 +12,12 @@ percent_stable <- function(data, groups, abs_fc_threshold = 1.5) {
 }
 
 statistics <- NULL
-datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco",
-	      "Hagai", "Owens", "Klein", "Yu")
+datasets <- c("VieiraSilva", "Barlow") #, "Song", "Monaco",
+	          # "Hagai", "Owens", "Klein", "Yu")
 for(dataset in datasets) {
   for(threshold in 0:5) {
-  	abs_data <- do.call(paste0("parse_", dataset), list(absolute = TRUE))
-  	rel_data <- do.call(paste0("parse_", dataset), list(absolute = FALSE))
+  	abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE))
+  	rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE))
   
   	# Reorient as (samples x features)
   	ref_data <- t(abs_data$counts)
