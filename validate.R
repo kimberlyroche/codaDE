@@ -17,16 +17,16 @@ option_list = list(
               default = "self",
               help = "calls to use as a reference: self, oracle",
               metavar = "character"),
-  # make_option(c("--model"),
-  #             type = "character",
-  #             default = "RF",
-  #             help = "predictive model type to use: RF, LM, or EN",
-  #             metavar = "character"),
   make_option(c("--threshold"),
               type = "numeric",
               default = "5",
               help = "minimum mean abundance to threshold on",
-              metavar = "numeric")
+              metavar = "numeric"),
+  make_option(c("--model_folder"),
+              type = "character",
+              default = "self_nopartial",
+              help = "folder containing fitted models from which to predict",
+              metavar = "character")
 );
 
 opt_parser = OptionParser(option_list = option_list);
@@ -35,11 +35,10 @@ opt = parse_args(opt_parser);
 dataset_name <- opt$dataset
 use_baseline <- opt$baseline
 threshold <- opt$threshold
+model_dir <- opt$model_folder
 testing <- FALSE
 
-model_type <- "RF"
-
-methods_list <- c("ALDEx2", "DESeq2", "MAST", "scran")
+methods_list <- c("ALDEx2", "DESeq2", "scran")
 
 if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song",
                          "Monaco", "Hagai", "Owens", "Klein", "Yu"))) {
@@ -52,6 +51,10 @@ if(!(use_baseline %in% c("self", "oracle"))) {
 
 if(threshold < 0) {
   stop(paste0("Invalid threshold: ", threshold, "!\n"))
+}
+
+if(!file.exists(file.path("output", "predictive_fits", model_dir))) {
+  stop(paste0("Model folder does not exist: ", model_dir, "\n"))
 }
 
 palette <- list(ALDEx2 = "#46A06B",
@@ -99,14 +102,6 @@ ref_data <- ref_data[c(A_sample, B_sample),]
 data <- data[c(A_sample, B_sample),]
 groups <- groups[c(A_sample, B_sample)]
 
-# if(dataset_name == "Hagai") {
-#   abs_totals <- rowSums(ref_data)
-#   include_idx <- abs_totals >= 500000 & abs_totals < 1e7
-#   ref_data <- ref_data[include_idx,]
-#   data <- data[include_idx,]
-#   groups <- groups[include_idx]
-# }
-
 # Convert to integers, just for DESeq2
 ref_data <- apply(ref_data, c(1,2), as.integer)
 data <- apply(data, c(1,2), as.integer)
@@ -128,8 +123,6 @@ cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*1
 for(DE_method in methods_list) {
   # Pull saved calls on this data set x method if these exist
   save_fn <- file.path("output",
-                       "predictive_fits",
-                       "all",
                        paste0("calls_",
                               use_baseline,
                               "_",
@@ -202,7 +195,7 @@ features$P <- ncol(counts_A)
 #   Make predictions on simulations and real data and visualize these together
 # ------------------------------------------------------------------------------
 
-plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
+# plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 
 # For the Kimmerling data, scran throws this error:
 # "inter-cluster rescaling factors are not strictly positive"
@@ -210,21 +203,24 @@ plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 # Pull features from existing simulations
 # We'll need to scale against these later
 features_sims <- pull_features(use_baseline = use_baseline,
-                               exclude_partials = FALSE)
+                               exclude_partials = ifelse(str_detect(model_dir, "_nopartial$"), TRUE, FALSE))
+# Relevel as in the model fitting function
+features_sims <- features_sims %>%
+    filter(METHOD %in% methods_list)
+features_sims$METHOD <- factor(features_sims$METHOD)
+
+# Sample
 features_sims <- features_sims[sample(1:nrow(features_sims), size = 5000),]
 
-for(use_result_type in c("TPR", "FPR")) {
+save_df <- NULL
 
-  plot_df <- NULL
+for(use_result_type in c("TPR", "FPR")) {
 
   # Load predictive model
   model_fn <- file.path("output",
                         "predictive_fits",
-                        "all",
-                        paste0("all_",
-                               use_baseline,
-                               "_",
-                               model_type,
+                        model_dir,
+                        paste0(use_baseline,
                                "_",
                                use_result_type,
                                ".rds"))
@@ -237,22 +233,11 @@ for(use_result_type in c("TPR", "FPR")) {
 
     cat(paste0("Evaluating ", use_result_type, " x ", DE_method, "\n"))
 
-    features_new <- features # we'll alter this for each result type
-    features_new$METHOD <- DE_method
-    features_new$METHOD <- factor(features_new$METHOD,
-                                  levels = methods_list)
-
-    if((max(table(groups)) < 5 | dataset_name == "Kimmerling") && DE_method == "scran") {
-      next
-    }
-    
     # --------------------------------------------------------------------------
     #   Pull calls for chosen method
     # --------------------------------------------------------------------------
     
     save_fn <- file.path("output",
-                         "predictive_fits",
-                         "all",
                          paste0("calls_",
                                 use_baseline,
                                 "_",
@@ -269,98 +254,155 @@ for(use_result_type in c("TPR", "FPR")) {
     all_calls <- calls_obj$all_calls
     rates <- calls_obj$rates
     rm(calls_obj)
-    
+
     # --------------------------------------------------------------------------
-    #   Finish feature wrangling
+    #   Make predictions
     # --------------------------------------------------------------------------
 
-    # Convert to data.frame
-    features_new <- as.data.frame(features_new)
-    
-    # Remove some features we're no longer using (too correlated with others)
-    features_new <- features_new %>%
-      select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
-    
-    # Scale features
-    # 1) Pull features from simulations
-    # 2) Add this new data point
-    # 3) Rescale all
-    # 4) Extract this new data point
-    #
-    # This is tedious but I can't think of a better, simple way...
-
-    # Remove result type we're not interested in and separate data into a
-    # features and response data.frame
-    features_sims2 <- features_sims %>%
-      select(-one_of(ifelse(use_result_type == "TPR", "FPR", "TPR")))
-    response <- features_sims2 %>%
-      select(one_of(use_result_type))
-    features_sims2 <- features_sims2 %>%
-      select(-one_of(use_result_type))
-    
-    # Map in new feature
-    reorder_idx <- data.frame(names = colnames(features_sims2)) %>%
-      left_join(data.frame(names = colnames(features_new), idx_ds = 1:ncol(features_new)), by = "names")
-    features_new <- features_new[,reorder_idx$idx_ds]
-    
-    features_sims2 <- rbind(features_sims2, features_new)
-    
-    # Scale non-factors
-    factors <- which(colnames(features_sims2) %in% c("METHOD"))
-    non_factors <- setdiff(1:ncol(features_sims2), factors)
-    for(f in non_factors) {
-      features_sims2[,f] <- scale(features_sims2[,f])
+    save_fn <- file.path("output",
+                         "predictive_fits",
+                         paste0("predictions_",
+                                use_baseline,
+                                "_",
+                                DE_method,
+                                "_",
+                                dataset_name,
+                                "_threshold",
+                                threshold,
+                                ".rds"))
+    if(file.exists(save_fn)) {
+      pred_real <- readRDS(save_fn)
+    } else {
+      features_new <- features # we'll alter this for each result type
+      features_new$METHOD <- DE_method
+      features_new$METHOD <- factor(features_new$METHOD,
+                                    levels = methods_list)
+  
+      if((max(table(groups)) < 5 | dataset_name == "Kimmerling") && DE_method == "scran") {
+        next
+      }
+  
+      # Convert to data.frame
+      features_new <- as.data.frame(features_new)
+      
+      # Remove some features we're no longer using (too correlated with others)
+      features_new <- features_new %>%
+        select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
+      
+      # Scale features
+      # 1) Pull features from simulations
+      # 2) Add this new data point
+      # 3) Rescale all
+      # 4) Extract this new data point
+      #
+      # This is tedious but I can't think of a better, simple way...
+  
+      # Remove result type we're not interested in and separate data into a
+      # features and response data.frame
+      features_sims2 <- features_sims %>%
+        select(-one_of(ifelse(use_result_type == "TPR", "FPR", "TPR")))
+      response <- features_sims2 %>%
+        select(one_of(use_result_type))
+      features_sims2 <- features_sims2 %>%
+        select(-one_of(use_result_type))
+      
+      # Map in new feature
+      reorder_idx <- data.frame(names = colnames(features_sims2)) %>%
+        left_join(data.frame(names = colnames(features_new), idx_ds = 1:ncol(features_new)), by = "names")
+      features_new <- features_new[,reorder_idx$idx_ds]
+      
+      features_sims2 <- rbind(features_sims2, features_new)
+      
+      # Scale non-factors
+      factors <- which(colnames(features_sims2) %in% c("METHOD"))
+      non_factors <- setdiff(1:ncol(features_sims2), factors)
+      for(f in non_factors) {
+        features_sims2[,f] <- scale(features_sims2[,f])
+      }
+      
+      features_new <- features_sims2[nrow(features_sims2),]
+  
+      # --------------------------------------------------------------------------
+      #   Make point predictions on simulated and real
+      # --------------------------------------------------------------------------
+      
+      pred_real <- predict(fit_obj$result, newdata = features_new, predict.all = TRUE)
+      saveRDS(pred_real, save_fn)
     }
     
-    features_new <- features_sims2[nrow(features_sims2),]
-
-    # --------------------------------------------------------------------------
-    #   Make point predictions on simulated and real
-    # --------------------------------------------------------------------------
-    
-    pred_real <- predict(fit_obj$result, newdata = features_new, predict.all = TRUE)
-    plot_df <- rbind(plot_df,
-                     data.frame(true = ifelse(use_result_type == "TPR",
-                                              rates$TPR,
-                                              1 - rates$FPR),
-                                lower = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
-                                upper = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
-                                point = pred_real$aggregate,
-                                type = DE_method,
-                                pred_type = "prediction"))
+    save_df <- rbind(save_df,
+                     data.frame(dataset = dataset_name,
+                                result_type = "true",
+                                DE_method = DE_method,
+                                threshold = threshold,
+                                score_type = use_result_type,
+                                lower90 = NA,
+                                lower50 = NA,
+                                upper50 = NA,
+                                upper90 = NA,
+                                point = ifelse(use_result_type == "TPR",
+                                               rates$TPR,
+                                               1 - rates$FPR)))
+    save_df <- rbind(save_df,
+                     data.frame(dataset = dataset_name,
+                                result_type = "predicted",
+                                DE_method = DE_method,
+                                threshold = threshold,
+                                score_type = use_result_type,
+                                lower90 = unname(quantile(pred_real$individual[1,], probs = c(0.05))),
+                                lower50 = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
+                                upper50 = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
+                                upper90 = unname(quantile(pred_real$individual[1,], probs = c(0.95))),
+                                point = pred_real$aggregate))
   }
 
   # --------------------------------------------------------------------------
   #   Visualize predictions
   # --------------------------------------------------------------------------
   
-  pl <- ggplot(plot_df, aes(x = true, y = point)) +
-    geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
-                 mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
-    geom_pointrange(data = plot_df,
-                    aes(x = true, ymin = lower, ymax = upper, color = factor(type))) +
-    scale_color_manual(values = palette) +
-    theme_bw() +
-    ylim(c(0,1)) +
-    labs(x = paste0("observed ", plot_labels[[use_result_type]]),
-         y = paste0("predicted ", plot_labels[[use_result_type]]),
-         fill = "Data type") +
-    theme(legend.position = "none")
-  # show(pl)
-  ggsave(file.path("output",
-                   "images",
-                   paste0("validations_",
-                          use_result_type,
-                          "_",
-                          use_baseline,
-                          "_",
-                          dataset_name,
-                          "_threshold",
-                          threshold,
-                          ".png")),
-         plot = pl,
-         dpi = 100,
-         units = "in",
-         height = 4,
-         width = 4)
+  # pl <- ggplot(plot_df, aes(x = true, y = point)) +
+  #   geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
+  #                mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
+  #   geom_linerange(data = plot_df,
+  #                  aes(ymin = lower90, ymax = upper90, color = factor(type)),
+  #                  size = 0.75) +
+  #   geom_linerange(data = plot_df,
+  #                  aes(ymin = lower50, ymax = upper50, color = factor(type)),
+  #                  size = 2) +
+  #   geom_point(data = plot_df,
+  #              aes(x = true, y = point, color = factor(type)),
+  #              size = 4) +
+  #   scale_color_manual(values = palette) +
+  #   theme_bw() +
+  #   ylim(c(0,1)) +
+  #   labs(x = paste0("observed ", plot_labels[[use_result_type]]),
+  #        y = paste0("predicted ", plot_labels[[use_result_type]]),
+  #        fill = "Data type") +
+  #   theme(legend.position = "none")
+  # # show(pl)
+  # ggsave(file.path("output",
+  #                  "predictive_fits",
+  #                  model_dir,
+  #                  paste0("validations_",
+  #                         use_result_type,
+  #                         "_",
+  #                         dataset_name,
+  #                         "_threshold",
+  #                         threshold,
+  #                         ".png")),
+  #        plot = pl,
+  #        dpi = 100,
+  #        units = "in",
+  #        height = 4,
+  #        width = 4)
 }
+
+save_fn <- file.path("output",
+                     "predictive_fits",
+                     model_dir,
+                     paste0("results_",
+                            dataset_name,
+                            "_threshold",
+                            threshold,
+                            ".tsv"))
+write.table(save_df, save_fn, sep = "\t", quote = FALSE, row.names = FALSE)

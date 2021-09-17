@@ -3,11 +3,11 @@ source("path_fix.R")
 library(codaDE)
 
 datasets_names <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
-thresholds <- c(1, 1, 1, 2, 3, 1, 1, 1)
+thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
 for(i in 1:length(datasets_names)) {
   name <- datasets_names[i]
   ts <- thresholds[i]
-  data <- readRDS(file.path("output", "predictive_fits", "all", paste0("calls_self_DESeq2_", name, "_threshold", ts, ".rds")))
+  data <- readRDS(file.path("output", paste0("calls_self_DESeq2_", name, "_threshold", ts, ".rds")))
   n <- length(data$all_calls$oracle_calls)
   baseline_yes <- sum(p.adjust(data$all_calls$oracle_calls, method = "BH") < 0.05)/n
   tp <- sum(data$rates$TP_calls)
@@ -33,6 +33,9 @@ for(i in 1:length(datasets_names)) {
   data <- t(rel_data$counts)
   groups <- abs_data$groups
   groups <- factor(groups)
+
+  A_idx <- groups == levels(groups)[1]
+  B_idx <- groups == levels(groups)[2]
 
   # Subsample if tons of cells/samples
   downsample_limit <- 100 # was 100
@@ -61,8 +64,13 @@ for(i in 1:length(datasets_names)) {
   ref_data <- ref_data[,retain_features]
   # data <- data[,retain_features]
 
-  # cat(paste0("Dataset dimensions: ", nrow(ref_data), " x ", ncol(ref_data), "\n"))
+  cat(paste0("Dataset dimensions: ", nrow(ref_data), " x ", ncol(ref_data), "\n"))
   # cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
 
+  fc <- mean(rowSums(ref_data[B_idx,])) / mean(rowSums(ref_data[A_idx,]))
+  if(fc < 1) {
+    fc <- 1 / fc
+  }
+  cat(paste0("\tFC: ", round(fc, 1), "\n"))
   cat(paste0("\tPercent DE (oracle): ", 100*round(sum(p.adjust(call_DA_NB(ref_data, groups)$pval, method = "BH") < 0.05)/ncol(ref_data), 3), "\n"))
 }

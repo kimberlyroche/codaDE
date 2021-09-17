@@ -8,22 +8,22 @@ use List::Util qw(min);
 #my @hours =     qw(2           2      2    2      2     2     2     2);
 #my @threshold = qw(1           1      1    2      3     2     1     1);
 
-my @datasets =  qw(Klein Klein Klein);
-my @RAM =       qw(64    64    64);
-my @hours =     qw(2     2     2);
-my @threshold = qw(0     1     1.5);
+my @datasets = qw(Song Song Song Song Song Monaco Monaco Monaco Monaco Monaco Hagai Hagai Hagai Hagai Hagai Klein Klein Klein Klein Klein);
+my @RAM = qw(24 24 24 24 24 32 32 32 32 32 32 32 32 32 32 64 64 64 64 64);
+my @hours = qw(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1);
+my @threshold = qw(1 2 3 4 5 1 2 3 4 5 1 2 3 4 5 1 2 3 4 5);
+
+my $baseline = "self";
+my $partial_flag = "nopartial";
 
 my $filename = "job.slurm";
 my $i = 0;
 my $end = $#datasets;
 
-#$i = 3;
-#$end = 3;
-
 while($i <= $end) {
   open(my $fh, '>', $filename);
   print $fh '#!/bin/bash'."\n";
-  print $fh '#SBATCH -J '.$datasets[$i]."\n";
+  print $fh '#SBATCH -J '.$threshold[$i].'_'.$datasets[$i]."\n";
   print $fh '#SBATCH --mem='.$RAM[$i].'GB'."\n";
   print $fh '#SBATCH --get-user-env'."\n";
   print $fh '#SBATCH --time='.$hours[$i].':00:00'."\n";
@@ -31,7 +31,7 @@ while($i <= $end) {
 
   print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
-  print $fh 'srun Rscript validate.R --dataset='.$datasets[$i].' --baseline=self --threshold='.$threshold[$i]."\n\n";
+  print $fh 'srun Rscript validate.R --dataset='.$datasets[$i].' --baseline='.$baseline.' --threshold='.$threshold[$i].' --model_folder='.$baseline.'_'.$partial_flag."\n\n";
 
   close $fh;
 
