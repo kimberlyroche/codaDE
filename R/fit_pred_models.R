@@ -244,20 +244,27 @@ characterize_dataset <- function(counts_A, counts_B) {
 
 #' Generate simulated differential expression for two conditions
 #'
+#' @param DE_methods differential abundance calling methods to use
+#' @param use_baseline one of either "self" or "oracle"; baseline differential
+#' abundance calls against which we will score accuracy of calls made on 
+#' observed (relative) abundance data
 #' @param exclude_partials flag indicating whether to exclude simulations with 
 #' partial abundance information
 #' @param exclude_independent flag indicating whether to exclude simulations 
 #' with uncorrelated features
-#' @param fit_full fit model with true fold change information
+#' @param feature_list optional predictive feature list to use
+#' @param abs_feature_list optional predictive feature list from absolute 
+#' abundance data to use
 #' @return data.frame with predictive model training features
+#' @import dplyr
 #' @import RSQLite
 #' @export
 pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                           use_baseline = "self",
                           exclude_partials = TRUE,
                           exclude_independent = FALSE,
-                          fit_full = FALSE,
-                          feature_list = NULL) {
+                          feature_list = NULL,
+                          abs_feature_list = NULL) {
 
   conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
   
@@ -265,48 +272,90 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
   # because these predictors appear to be strongly correlated.
   
   if(!is.null(feature_list) & length(feature_list > 0)) {
-    results <- dbGetQuery(conn, paste0("SELECT ", feature_list, " ",
+    if(!is.null(abs_feature_list) & length(abs_feature_list > 0)) {
+      results <- dbGetQuery(conn, paste0("SELECT ", paste(unique(c(feature_list, abs_feature_list)), collapse = ", "), " ",
+                                         "FROM datasets LEFT JOIN characteristics ",
+                                         "ON datasets.UUID=characteristics.UUID ",
+                                         "LEFT JOIN results ",
+                                         "ON (characteristics.UUID=results.UUID ",
+                                         "AND characteristics.partial=results.PARTIAL_INFO) ",
+                                         "WHERE BASELINE_TYPE='", use_baseline, "';"))
+    } else {
+      results <- dbGetQuery(conn, paste0("SELECT ", paste(feature_list, collapse = ", "), " ",
                                        "FROM datasets LEFT JOIN characteristics ",
                                        "ON datasets.UUID=characteristics.UUID ",
                                        "LEFT JOIN results ",
                                        "ON (characteristics.UUID=results.UUID ",
                                        "AND characteristics.partial=results.PARTIAL_INFO) ",
                                        "WHERE BASELINE_TYPE='", use_baseline, "';"))
+    }
     dbDisconnect(conn)
     return(results)
   } else {
-    results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
-                                       "FC_ABSOLUTE, FC_PARTIAL, FC_RELATIVE, ",
-                                       "PERCENT_DIFF_REALIZ, ",
-                                       "TOTALS_C_FC, TOTALS_C_D, ",
-                                       "TOTALS_C_MAX_D, TOTALS_C_MED_D, ",
-                                       "TOTALS_C_SD_D, CORR_RA_MED, CORR_RA_SD, ",
-                                       "CORR_RA_SKEW, CORR_LOG_MED, CORR_LOG_SD, ",
-                                       "CORR_LOG_SKEW, CORR_CLR_MED, CORR_CLR_SD, ",
-                                       "CORR_CLR_SKEW, COMP_C_P0_A, COMP_C_P0_B, ",
-                                       "COMP_C_P1_A, COMP_C_P1_B, COMP_C_P5_A, ",
-                                       "COMP_C_P5_B, COMP_RA_P01_A, COMP_RA_P01_B, ",
-                                       "COMP_RA_P1_A, COMP_RA_P1_B, COMP_RA_P5_A, ",
-                                       "COMP_RA_P5_B, COMP_RA_MAX_A, COMP_RA_MED_A, ",
-                                       "COMP_RA_SD_A, COMP_RA_SKEW_A, COMP_RA_MAX_B, ",
-                                       "COMP_RA_MED_B, COMP_RA_SD_B, COMP_RA_SKEW_B, ",
-                                       "COMP_C_ENT_A, COMP_C_ENT_B, FW_RA_MAX_D, ",
-                                       "FW_RA_MED_D, FW_RA_SD_D, FW_RA_PPOS_D, ",
-                                       "FW_RA_PNEG_D, FW_RA_PFC05_D, ",
-                                       "FW_RA_PFC2_D, FW_LOG_MAX_D, FW_LOG_MED_D, ",
-                                       "FW_LOG_SD_D, FW_LOG_PPOS_D, FW_LOG_PNEG_D, ",
-                                       "FW_LOG_PFC05_D, FW_LOG_PFC1_D, ",
-                                       "FW_LOG_PFC2_D, FW_CLR_MAX_D, ",
-                                       "FW_CLR_PPOS_D, ",
-                                       "FW_CLR_PFC05_D, FW_CLR_PFC1_D, ",
-                                       "FW_CLR_PFC2_D, METHOD, PARTIAL_INFO, ",
-                                       "BASELINE_TYPE,TPR, FPR ",
-                                       "FROM datasets LEFT JOIN characteristics ",
-                                       "ON datasets.UUID=characteristics.UUID ",
-                                       "LEFT JOIN results ",
-                                       "ON (characteristics.UUID=results.UUID ",
-                                       "AND characteristics.partial=results.PARTIAL_INFO) ",
-                                       "WHERE BASELINE_TYPE='", use_baseline, "';"))
+    if(!is.null(abs_feature_list) & length(abs_feature_list > 0)) {
+      results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
+                                         paste0(paste(abs_feature_list, collapse = ", "), ", "),
+                                         "TOTALS_C_FC, TOTALS_C_D, ",
+                                         "TOTALS_C_MAX_D, TOTALS_C_MED_D, ",
+                                         "TOTALS_C_SD_D, CORR_RA_MED, CORR_RA_SD, ",
+                                         "CORR_RA_SKEW, CORR_LOG_MED, CORR_LOG_SD, ",
+                                         "CORR_LOG_SKEW, CORR_CLR_MED, CORR_CLR_SD, ",
+                                         "CORR_CLR_SKEW, COMP_C_P0_A, COMP_C_P0_B, ",
+                                         "COMP_C_P1_A, COMP_C_P1_B, COMP_C_P5_A, ",
+                                         "COMP_C_P5_B, COMP_RA_P01_A, COMP_RA_P01_B, ",
+                                         "COMP_RA_P1_A, COMP_RA_P1_B, COMP_RA_P5_A, ",
+                                         "COMP_RA_P5_B, COMP_RA_MAX_A, COMP_RA_MED_A, ",
+                                         "COMP_RA_SD_A, COMP_RA_SKEW_A, COMP_RA_MAX_B, ",
+                                         "COMP_RA_MED_B, COMP_RA_SD_B, COMP_RA_SKEW_B, ",
+                                         "COMP_C_ENT_A, COMP_C_ENT_B, FW_RA_MAX_D, ",
+                                         "FW_RA_MED_D, FW_RA_SD_D, FW_RA_PPOS_D, ",
+                                         "FW_RA_PNEG_D, FW_RA_PFC05_D, ",
+                                         "FW_RA_PFC2_D, FW_LOG_MAX_D, FW_LOG_MED_D, ",
+                                         "FW_LOG_SD_D, FW_LOG_PPOS_D, FW_LOG_PNEG_D, ",
+                                         "FW_LOG_PFC05_D, FW_LOG_PFC1_D, ",
+                                         "FW_LOG_PFC2_D, FW_CLR_MAX_D, ",
+                                         "FW_CLR_PPOS_D, ",
+                                         "FW_CLR_PFC05_D, FW_CLR_PFC1_D, ",
+                                         "FW_CLR_PFC2_D, METHOD, PARTIAL_INFO, ",
+                                         "BASELINE_TYPE,TPR, FPR ",
+                                         "FROM datasets LEFT JOIN characteristics ",
+                                         "ON datasets.UUID=characteristics.UUID ",
+                                         "LEFT JOIN results ",
+                                         "ON (characteristics.UUID=results.UUID ",
+                                         "AND characteristics.partial=results.PARTIAL_INFO) ",
+                                         "WHERE BASELINE_TYPE='", use_baseline, "';"))
+    } else {
+      results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
+                                         "TOTALS_C_FC, TOTALS_C_D, ",
+                                         "TOTALS_C_MAX_D, TOTALS_C_MED_D, ",
+                                         "TOTALS_C_SD_D, CORR_RA_MED, CORR_RA_SD, ",
+                                         "CORR_RA_SKEW, CORR_LOG_MED, CORR_LOG_SD, ",
+                                         "CORR_LOG_SKEW, CORR_CLR_MED, CORR_CLR_SD, ",
+                                         "CORR_CLR_SKEW, COMP_C_P0_A, COMP_C_P0_B, ",
+                                         "COMP_C_P1_A, COMP_C_P1_B, COMP_C_P5_A, ",
+                                         "COMP_C_P5_B, COMP_RA_P01_A, COMP_RA_P01_B, ",
+                                         "COMP_RA_P1_A, COMP_RA_P1_B, COMP_RA_P5_A, ",
+                                         "COMP_RA_P5_B, COMP_RA_MAX_A, COMP_RA_MED_A, ",
+                                         "COMP_RA_SD_A, COMP_RA_SKEW_A, COMP_RA_MAX_B, ",
+                                         "COMP_RA_MED_B, COMP_RA_SD_B, COMP_RA_SKEW_B, ",
+                                         "COMP_C_ENT_A, COMP_C_ENT_B, FW_RA_MAX_D, ",
+                                         "FW_RA_MED_D, FW_RA_SD_D, FW_RA_PPOS_D, ",
+                                         "FW_RA_PNEG_D, FW_RA_PFC05_D, ",
+                                         "FW_RA_PFC2_D, FW_LOG_MAX_D, FW_LOG_MED_D, ",
+                                         "FW_LOG_SD_D, FW_LOG_PPOS_D, FW_LOG_PNEG_D, ",
+                                         "FW_LOG_PFC05_D, FW_LOG_PFC1_D, ",
+                                         "FW_LOG_PFC2_D, FW_CLR_MAX_D, ",
+                                         "FW_CLR_PPOS_D, ",
+                                         "FW_CLR_PFC05_D, FW_CLR_PFC1_D, ",
+                                         "FW_CLR_PFC2_D, METHOD, PARTIAL_INFO, ",
+                                         "BASELINE_TYPE,TPR, FPR ",
+                                         "FROM datasets LEFT JOIN characteristics ",
+                                         "ON datasets.UUID=characteristics.UUID ",
+                                         "LEFT JOIN results ",
+                                         "ON (characteristics.UUID=results.UUID ",
+                                         "AND characteristics.partial=results.PARTIAL_INFO) ",
+                                         "WHERE BASELINE_TYPE='", use_baseline, "';"))
+    }
     dbDisconnect(conn)
   }
 
@@ -338,12 +387,7 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
   }
   
   results <- results %>%
-    select(!c("FC_PARTIAL", "FC_RELATIVE", "PARTIAL_INFO"))
-  
-  if(!fit_full) {
-    results <- results %>%
-      select(!c("FC_ABSOLUTE", "PERCENT_DIFF_REALIZ"))
-  }
+    select(!PARTIAL_INFO)
   
   if(exclude_independent) {
     # Filter out uncorrelated-feature simulations
@@ -360,7 +404,7 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
   results <- results %>%
     filter(METHOD %in% DE_methods) %>%
     select(-c(UUID, CORRP, BASELINE_TYPE))
-
+  
   return(results)
 }
 
@@ -376,7 +420,8 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
 #' @param exclude_independent flag indicating whether to exclude simulations 
 #' with uncorrelated features
 #' @param train_percent percent of simulated datasets to train on
-#' @param fit_full fit model with true fold change information
+#' @param abs_feature_list optional predictive feature list from absolute 
+#' abundance data to use
 #' @param save_slug optional file path and name for saved predictive model (e.g.
 #' /output/allmethods_oracle, to which _TPR.rds and _FPR.rds will be appended
 #' @param save_training_data flag indicating whether or not to save training data
@@ -393,7 +438,7 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                                  exclude_partials = TRUE,
                                  exclude_independent = FALSE,
                                  train_percent = 0.8,
-                                 fit_full = FALSE,
+                                 abs_feature_list = NULL,
                                  save_slug = NULL,
                                  save_training_data = TRUE) {
   
@@ -417,7 +462,7 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
   features <- pull_features(use_baseline = use_baseline,
                             exclude_partials = exclude_partials,
                             exclude_independent = exclude_independent,
-                            fit_full = fit_full)
+                            abs_feature_list = abs_feature_list)
   
   # Subset to methods of interest
   features <- features %>%

@@ -11,7 +11,7 @@ fit_predictive_model(
   exclude_partials = TRUE,
   exclude_independent = FALSE,
   train_percent = 0.8,
-  fit_full = FALSE,
+  abs_feature_list = NULL,
   save_slug = NULL,
   save_training_data = TRUE
 )
@@ -33,7 +33,8 @@ with uncorrelated features}
 
 \item{train_percent}{percent of simulated datasets to train on}
 
-\item{fit_full}{fit model with true fold change information}
+\item{abs_feature_list}{optional predictive feature list from absolute 
+abundance data to use}
 
 \item{save_slug}{optional file path and name for saved predictive model (e.g.
 /output/allmethods_oracle, to which _TPR.rds and _FPR.rds will be appended}
