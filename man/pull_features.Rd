@@ -5,21 +5,31 @@
 \title{Generate simulated differential expression for two conditions}
 \usage{
 pull_features(
-  DE_method = "all",
+  DE_methods = c("ALDEx2", "DESeq2", "scran"),
   use_baseline = "self",
   exclude_partials = TRUE,
   exclude_independent = FALSE,
-  fit_full = FALSE
+  feature_list = NULL,
+  abs_feature_list = NULL
 )
 }
 \arguments{
+\item{DE_methods}{differential abundance calling methods to use}
+
+\item{use_baseline}{one of either "self" or "oracle"; baseline differential
+abundance calls against which we will score accuracy of calls made on 
+observed (relative) abundance data}
+
 \item{exclude_partials}{flag indicating whether to exclude simulations with 
 partial abundance information}
 
 \item{exclude_independent}{flag indicating whether to exclude simulations 
 with uncorrelated features}
 
-\item{fit_full}{fit model with true fold change information}
+\item{feature_list}{optional predictive feature list to use}
+
+\item{abs_feature_list}{optional predictive feature list from absolute 
+abundance data to use}
 }
 \value{
 data.frame with predictive model training features
