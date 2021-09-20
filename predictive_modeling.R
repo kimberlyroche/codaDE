@@ -12,7 +12,8 @@ fit_predictive_model(DE_methods = DE_methods,
                      use_baseline = use_baseline,
                      output_weights = TRUE,
                      exclude_partials = TRUE,
-                     exclude_independent = FALSE)
+                     exclude_independent = FALSE,
+                     fit_full = TRUE)
 
 for(use_result_type in c("TPR", "FPR")) {
   # Evaluate TPR model

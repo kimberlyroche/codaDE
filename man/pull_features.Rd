@@ -5,11 +5,12 @@
 \title{Generate simulated differential expression for two conditions}
 \usage{
 pull_features(
-  DE_method = "all",
+  DE_methods = c("ALDEx2", "DESeq2", "scran"),
   use_baseline = "self",
   exclude_partials = TRUE,
   exclude_independent = FALSE,
-  fit_full = FALSE
+  fit_full = FALSE,
+  feature_list = NULL
 )
 }
 \arguments{
