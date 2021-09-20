@@ -277,6 +277,7 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
   } else {
     results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
                                        "FC_ABSOLUTE, FC_PARTIAL, FC_RELATIVE, ",
+                                       "PERCENT_DIFF_REALIZ, ",
                                        "TOTALS_C_FC, TOTALS_C_D, ",
                                        "TOTALS_C_MAX_D, TOTALS_C_MED_D, ",
                                        "TOTALS_C_SD_D, CORR_RA_MED, CORR_RA_SD, ",
@@ -341,7 +342,7 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
   
   if(!fit_full) {
     results <- results %>%
-      select(!c("FC_ABSOLUTE"))
+      select(!c("FC_ABSOLUTE", "PERCENT_DIFF_REALIZ"))
   }
   
   if(exclude_independent) {
