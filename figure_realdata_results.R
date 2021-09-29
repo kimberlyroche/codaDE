@@ -36,9 +36,11 @@ for(file in result_files) {
                    temp)
 }
 
+# This loop also calculates R^2 for the real data x predictions
 for(use_result_type in c("TPR", "FPR")) {
   plots <- list()
   legend <- NULL
+  rsquared_df <- NULL
   for(this_dataset in datasets) {
     # Wrangle the poorly organized data
     plot_df <- results %>%
@@ -57,6 +59,8 @@ for(use_result_type in c("TPR", "FPR")) {
         filter(DE_method == plot_df$DE_method[i]) %>%
         pull(point)
     }
+    rsquared_df <- rbind(rsquared_df,
+                         plot_df %>% select(dataset, DE_method, point, true))
 
     pl <- ggplot(plot_df, aes(x = true, y = point)) +
       geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
@@ -84,6 +88,15 @@ for(use_result_type in c("TPR", "FPR")) {
     
     plots[[this_dataset]] <- pl
   }
+  
+  # Report R^2
+  cat(paste0("Overall ", use_result_type, " R^2: ", round(cor(rsquared_df$point, rsquared_df$true)**2, 3), "\n"))
+  for(DE_method in sort(unique(rsquared_df$DE_method))) {
+    idx <- which(rsquared_df$DE_method == DE_method)
+    cat(paste0("for ", DE_method, ": ", round(cor(rsquared_df$point[idx], rsquared_df$true[idx])**2, 3), "\n"))
+  }
+
+  # Plot
   prow1 <- plot_grid(plotlist = plots[1:4], ncol = 4, labels = c("a", "b", "c", "d"),
                      #hjust = -1.35,
                      vjust = -0.25, label_size = 24)
@@ -94,14 +107,14 @@ for(use_result_type in c("TPR", "FPR")) {
   pl <- pl +
     theme(plot.margin = ggplot2::margin(t = 25, r = 0, b = 0, l = 0, "pt"))
   # show(pl)
-  ggsave(file.path("output",
-                   "images",
-                   paste0("validations_",
-                          use_result_type,
-                          ".png")),
-         plot = pl,
-         dpi = 100,
-         units = "in",
-         height = 7.35,
-         width = 13)
+  # ggsave(file.path("output",
+  #                  "images",
+  #                  paste0("validations_",
+  #                         use_result_type,
+  #                         ".png")),
+  #        plot = pl,
+  #        dpi = 100,
+  #        units = "in",
+  #        height = 7.35,
+  #        width = 13)
 }

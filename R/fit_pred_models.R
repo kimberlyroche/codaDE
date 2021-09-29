@@ -405,6 +405,11 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
     filter(METHOD %in% DE_methods) %>%
     select(-c(UUID, CORRP, BASELINE_TYPE))
   
+  # With UUID
+  # results <- results %>%
+  #   filter(METHOD %in% DE_methods) %>%
+  #   select(-c(CORRP, BASELINE_TYPE))
+  
   return(results)
 }
 
@@ -426,6 +431,8 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
 #' /output/allmethods_oracle, to which _TPR.rds and _FPR.rds will be appended
 #' @param save_training_data flag indicating whether or not to save training data
 #' with the saved model output
+#' @param do_classify optional flag indicating whether or not to train a 
+#' classification model on "good" vs. "bad" outcomes
 #' @return NULL (fitted models are saved in output directory)
 #' @import randomForest
 #' @import dplyr
@@ -440,7 +447,8 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                                  train_percent = 0.8,
                                  abs_feature_list = NULL,
                                  save_slug = NULL,
-                                 save_training_data = TRUE) {
+                                 save_training_data = TRUE,
+                                 do_classify = FALSE) {
   
   if(!(use_baseline %in% c("self", "oracle"))) {
     stop(paste0("Invalid baseline: ", use_baseline, "!\n"))
@@ -506,6 +514,19 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
     test_response <- unname(unlist(response[test_idx,1]))
     if(use_result_type == "FPR") {
       test_response <- 1 - test_response
+    }
+    
+    if(do_classify) {
+      train_response <- sapply(train_response, function(x) {
+        # "Bad" outcomes (1) have less than 95% sensitivity or specificity
+        # "Good" outcomes (0) have at least 95% sensitivity or specificity
+        ifelse(x < 0.95, 1, 0)
+      })
+      train_response <- factor(train_response)
+      test_response <- sapply(test_response, function(x) {
+        ifelse(x < 0.95, 1, 0)
+      })
+      test_response <- factor(test_response)
     }
 
     if(is.null(save_slug)) {

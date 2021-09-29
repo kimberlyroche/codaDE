@@ -76,6 +76,6 @@ FEATURE-WISE CHANGES (B vs. A)
 	FW_CLR_SD_D: SD change in CLR
 	FW_CLR_PPOS_D: percent features with + change in CLR
 	FW_CLR_PNEG_D: percent features with - change in CLR
-	FW_CLR_PFC05_D: percent features with < 1 FC in CLR
+	FW_CLR_PFC05_D: percent features with < 0.5 FC in CLR
 	FW_CLR_PFC1_D: percent features with < 1 FC in CLR
 	FW_CLR_PFC2_D: percent features with < 2 FC in CLR
