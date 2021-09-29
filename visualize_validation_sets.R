@@ -74,6 +74,8 @@ plot_relab <- function(counts, groups, k = 20, use_groups = NULL, use_props = TR
       relab[,j] <- relab[,j] / sum(relab[,j])
     }
   }
+  
+  # START -- Comment out this section to force sample palettes
   feat_idx <- suppressMessages(data.frame(x = 1:nrow(relab), mu = rowMeans(relab)) %>%
                                  arrange(desc(mu)) %>%
                                  top_n(k) %>%
@@ -82,6 +84,7 @@ plot_relab <- function(counts, groups, k = 20, use_groups = NULL, use_props = TR
   relab1 <- relab[feat_idx,]
   relab2 <- colSums(relab[-feat_idx,])
   relab <- rbind(relab1, relab2)
+  # END -- Comment out
   
   # `relab` is oriented as FEATURES x SAMPLES
   n_samples <- ncol(relab)
