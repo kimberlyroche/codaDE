@@ -24,6 +24,7 @@ updates <- 0
 file_list <- list.files(dir, pattern = "output_rate")
 for(file in file_list) {
   results <- read.table(file.path(dir, file), sep = "\t", header = TRUE)
+  results <- results[complete.cases(results),]
   for(i in 1:nrow(results)) {
     job <- results[i,]
     updates <- updates + dbExecute(conn,

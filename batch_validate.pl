@@ -3,18 +3,13 @@ use warnings;
 use POSIX;
 use List::Util qw(min);
 
-#my @datasets =  qw(VieiraSilva Barlow Song Monaco Hagai Klein Owens Yu);
-#my @RAM =       qw(12          12     24   32     32    64    64    64);
-#my @hours =     qw(2           2      2    2      2     2     2     2);
-#my @threshold = qw(1           1      1    2      3     2     1     1);
-
-my @datasets = qw(Song Song Song Song Song Monaco Monaco Monaco Monaco Monaco Hagai Hagai Hagai Hagai Hagai Klein Klein Klein Klein Klein);
-my @RAM = qw(24 24 24 24 24 32 32 32 32 32 32 32 32 32 32 64 64 64 64 64);
-my @hours = qw(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1);
-my @threshold = qw(1 2 3 4 5 1 2 3 4 5 1 2 3 4 5 1 2 3 4 5);
+my @datasets =  qw(VieiraSilva Barlow Song Monaco Hagai Klein Owens Yu);
+my @RAM =       qw(12          12     24   32     32    64    64    64);
+my @hours =     qw(2           2      2    2      2     2     2     2);
+my @threshold = qw(1           1      1    2      1     1     1     1);
 
 my $baseline = "self";
-my $partial_flag = "nopartial";
+my $model_dir = "self_nopartial_wFC_ABSOLUTE";
 
 my $filename = "job.slurm";
 my $i = 0;
@@ -31,7 +26,7 @@ while($i <= $end) {
 
   print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";
 
-  print $fh 'srun Rscript validate.R --dataset='.$datasets[$i].' --baseline='.$baseline.' --threshold='.$threshold[$i].' --model_folder='.$baseline.'_'.$partial_flag."\n\n";
+  print $fh 'srun Rscript validate.R --dataset='.$datasets[$i].' --baseline='.$baseline.' --threshold='.$threshold[$i].' --model_folder='.$model_dir."\n\n";
 
   close $fh;
 

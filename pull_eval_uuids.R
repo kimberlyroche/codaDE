@@ -34,9 +34,9 @@ for(u in 1:length(all_uuids)) {
   #   3) method = ALDEx2, DESeq2, MAST, scran
   #
   # Look for any missing combos and add them to the wishlist
-  for(ref in c("self", "oracle")) {
-    for(par in c(0, 1)) {
-      for(method in c("ALDEx2", "DESeq2", "MAST", "scran")) {
+  for(ref in c("self")) {
+    for(par in c(0)) {
+      for(method in c("NBGLM")) {
         if(res %>% filter(BASELINE_TYPE == ref & PARTIAL_INFO == par & METHOD == method) %>% count() %>% pull(n) == 0) {
           wishlist <- rbind(wishlist,
                             data.frame(ID = counter, uuid = uuid, baseline = ref, partial_info = par, method = method))

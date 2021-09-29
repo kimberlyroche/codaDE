@@ -116,6 +116,7 @@ cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*1
 for(DE_method in methods_list) {
   # Pull saved calls on this data set x method if these exist
   save_fn <- file.path("output",
+                       "real_data_calls",
                        paste0("calls_",
                               use_baseline,
                               "_",
@@ -230,6 +231,7 @@ for(use_result_type in c("TPR", "FPR")) {
     # --------------------------------------------------------------------------
     
     save_fn <- file.path("output",
+                         "real_data_calls",
                          paste0("calls_",
                                 use_baseline,
                                 "_",
@@ -253,6 +255,8 @@ for(use_result_type in c("TPR", "FPR")) {
 
     save_fn <- file.path("output",
                          "predictive_fits",
+                         model_dir,
+                         "real_data_predictions",
                          paste0("predictions_",
                                 use_baseline,
                                 "_",
@@ -272,18 +276,6 @@ for(use_result_type in c("TPR", "FPR")) {
       pred_real <- predict(fit_obj$result, newdata = features, predict.all = TRUE)
       saveRDS(pred_real, save_fn)
     }
-    
-    save_df <- rbind(save_df,
-                     data.frame(true = ifelse(use_result_type == "TPR",
-                                              rates$TPR,
-                                              1 - rates$FPR),
-                                lower90 = unname(quantile(pred_real$individual[1,], probs = c(0.05))),
-                                lower50 = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
-                                upper50 = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
-                                upper90 = unname(quantile(pred_real$individual[1,], probs = c(0.95))),
-                                point = pred_real$aggregate,
-                                type = DE_method,
-                                pred_type = "prediction"))
     
     save_df <- rbind(save_df,
                      data.frame(dataset = dataset_name,
@@ -321,3 +313,7 @@ save_fn <- file.path("output",
                             threshold,
                             ".tsv"))
 write.table(save_df, save_fn, sep = "\t", quote = FALSE, row.names = FALSE)
+
+# LEFT OFF HERE
+# Need to add an FC_ABSOLUTE estimate and/or PERCENT_DE estimate for the real data feature set!
+# Just base this on model_dir
