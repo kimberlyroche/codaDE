@@ -13,7 +13,8 @@ fit_predictive_model(
   train_percent = 0.8,
   abs_feature_list = NULL,
   save_slug = NULL,
-  save_training_data = TRUE
+  save_training_data = TRUE,
+  do_classify = FALSE
 )
 }
 \arguments{
@@ -41,6 +42,9 @@ abundance data to use}
 
 \item{save_training_data}{flag indicating whether or not to save training data
 with the saved model output}
+
+\item{do_classify}{optional flag indicating whether or not to train a 
+classification model on "good" vs. "bad" outcomes}
 }
 \value{
 NULL (fitted models are saved in output directory)

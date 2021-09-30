@@ -22,6 +22,11 @@ option_list = list(
               default = "5",
               help = "minimum mean abundance to threshold on",
               metavar = "numeric"),
+  make_option(c("--norm"),
+              type = "logical",
+              default = "FALSE",
+              help = "normalize observed total abundances",
+              metavar = "logical"),
   make_option(c("--model_folder"),
               type = "character",
               default = "self_nopartial",
@@ -36,7 +41,7 @@ dataset_name <- opt$dataset
 use_baseline <- opt$baseline
 threshold <- opt$threshold
 model_dir <- opt$model_folder
-do_norm <- FALSE
+do_norm <- opt$norm
 testing <- FALSE
 
 methods_list <- c("ALDEx2", "DESeq2", "scran")
@@ -118,6 +123,7 @@ for(DE_method in methods_list) {
   # Pull saved calls on this data set x method if these exist
   save_fn <- file.path("output",
                        "real_data_calls",
+                       ifelse(do_norm, "norm", "no_norm"),
                        paste0("calls_",
                               use_baseline,
                               "_",
@@ -241,6 +247,7 @@ for(use_result_type in c("TPR", "FPR")) {
     
     save_fn <- file.path("output",
                          "real_data_calls",
+                         ifelse(do_norm, "norm", "no_norm"),
                          paste0("calls_",
                                 use_baseline,
                                 "_",
