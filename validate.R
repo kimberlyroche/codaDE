@@ -27,6 +27,11 @@ option_list = list(
               default = "FALSE",
               help = "normalize observed total abundances",
               metavar = "logical"),
+  make_option(c("--permodel"),
+              type = "logical",
+              default = "FALSE",
+              help = "use per-model predictive fits",
+              metavar = "logical"),
   make_option(c("--model_folder"),
               type = "character",
               default = "self_nopartial",
@@ -42,6 +47,7 @@ use_baseline <- opt$baseline
 threshold <- opt$threshold
 model_dir <- opt$model_folder
 do_norm <- opt$norm
+per_model <- opt$permodel
 testing <- FALSE
 
 methods_list <- c("ALDEx2", "DESeq2", "scran")
@@ -220,102 +226,130 @@ save_df <- NULL
 for(use_result_type in c("TPR", "FPR")) {
 
   # Load predictive model
-  model_fn <- file.path("output",
-                        "predictive_fits",
-                        model_dir,
-                        paste0(use_baseline,
-                               "_",
-                               use_result_type,
-                               ".rds"))
-  if(!file.exists(model_fn)) {
-    stop(paste0("Predictive model fit not found: ", model_fn, "!\n"))
+  model_list <- c("all")
+  if(per_model) {
+    model_list <- methods_list
   }
-  fit_obj <- readRDS(model_fn)
-
-  for(DE_method in methods_list) {
-    
-    if(!(DE_method %in% fit_obj$result$forest$xlevels$METHOD)) {
-      next;
-    }
-
-    cat(paste0("Evaluating ", use_result_type, " x ", DE_method, "\n"))
-
-    # --------------------------------------------------------------------------
-    #   Pull calls for chosen method
-    # --------------------------------------------------------------------------
-    
-    save_fn <- file.path("output",
-                         "real_data_calls",
-                         ifelse(do_norm, "norm", "no_norm"),
-                         paste0("calls_",
-                                use_baseline,
-                                "_",
-                                DE_method,
-                                "_",
-                                dataset_name,
-                                "_threshold",
-                                threshold,
-                                ".rds"))
-    if(!file.exists(save_fn)) {
-      stop(paste0("Missing file ", save_fn, "!"))
-    }
-    calls_obj <- readRDS(save_fn)
-    all_calls <- calls_obj$all_calls
-    rates <- calls_obj$rates
-    rm(calls_obj)
-
-    # --------------------------------------------------------------------------
-    #   Make predictions
-    # --------------------------------------------------------------------------
-
-    save_fn <- file.path("output",
-                         "predictive_fits",
-                         model_dir,
-                         "real_data_predictions",
-                         paste0("predictions_",
-                                use_baseline,
-                                "_",
-                                DE_method,
-                                "_",
-                                dataset_name,
-                                "_threshold",
-                                threshold,
-                                ".rds"))
-    if(file.exists(save_fn)) {
-      pred_real <- readRDS(save_fn)
+  for(model_type in model_list) {
+    if(model_type == "all") {
+      model_fn <- file.path("output",
+                            "predictive_fits",
+                            model_dir,
+                            paste0(use_baseline,
+                                   "_",
+                                   use_result_type,
+                                   ".rds"))
     } else {
-      features$METHOD <- DE_method
-      features$METHOD <- factor(features$METHOD,
-                                levels = fit_obj$result$forest$xlevels$METHOD)
-  
-      pred_real <- predict(fit_obj$result, newdata = features, predict.all = TRUE)
-      saveRDS(pred_real, save_fn)
+      model_fn <- file.path("output",
+                            "predictive_fits",
+                            model_dir,
+                            paste0(use_baseline,
+                                   "_",
+                                   use_result_type,
+                                   "_",
+                                   model_type,
+                                   ".rds"))
     }
-    
-    save_df <- rbind(save_df,
-                     data.frame(dataset = dataset_name,
-                                result_type = "true",
-                                DE_method = DE_method,
-                                threshold = threshold,
-                                score_type = use_result_type,
-                                lower90 = NA,
-                                lower50 = NA,
-                                upper50 = NA,
-                                upper90 = NA,
-                                point = ifelse(use_result_type == "TPR",
-                                               rates$TPR,
-                                               1 - rates$FPR)))
-    save_df <- rbind(save_df,
-                     data.frame(dataset = dataset_name,
-                                result_type = "predicted",
-                                DE_method = DE_method,
-                                threshold = threshold,
-                                score_type = use_result_type,
-                                lower90 = unname(quantile(pred_real$individual[1,], probs = c(0.05))),
-                                lower50 = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
-                                upper50 = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
-                                upper90 = unname(quantile(pred_real$individual[1,], probs = c(0.95))),
-                                point = pred_real$aggregate))
+    if(!file.exists(model_fn)) {
+      stop(paste0("Predictive model fit not found: ", model_fn, "!\n"))
+    }
+    fit_obj <- readRDS(model_fn)
+  
+    for(DE_method in methods_list) {
+      
+      # Skip this method if we're using model-specific predictions and this
+      # iteration doesn't match the outer loop
+      if(per_model & DE_method != model_type) {
+        next;
+      }
+      
+      # Skip this method if we didn't train on it!
+      if(!per_model & !(DE_method %in% fit_obj$result$forest$xlevels$METHOD)) {
+        next;
+      }
+  
+      cat(paste0("Evaluating ", use_result_type, " x ", DE_method, "\n"))
+  
+      # --------------------------------------------------------------------------
+      #   Pull calls for chosen method
+      # --------------------------------------------------------------------------
+      
+      save_fn <- file.path("output",
+                           "real_data_calls",
+                           ifelse(do_norm, "norm", "no_norm"),
+                           paste0("calls_",
+                                  use_baseline,
+                                  "_",
+                                  DE_method,
+                                  "_",
+                                  dataset_name,
+                                  "_threshold",
+                                  threshold,
+                                  ".rds"))
+      if(!file.exists(save_fn)) {
+        stop(paste0("Missing file ", save_fn, "!"))
+      }
+      calls_obj <- readRDS(save_fn)
+      all_calls <- calls_obj$all_calls
+      rates <- calls_obj$rates
+      rm(calls_obj)
+  
+      # --------------------------------------------------------------------------
+      #   Make predictions
+      # --------------------------------------------------------------------------
+  
+      # save_fn <- file.path("output",
+      #                      "predictive_fits",
+      #                      model_dir,
+      #                      "real_data_predictions",
+      #                      paste0("predictions_",
+      #                             use_baseline,
+      #                             "_",
+      #                             DE_method,
+      #                             "_",
+      #                             dataset_name,
+      #                             "_threshold",
+      #                             threshold,
+      #                             ".rds"))
+      # if(file.exists(save_fn)) {
+      #   pred_real <- readRDS(save_fn)
+      # } else {
+      
+      if(!per_model) {
+        features$METHOD <- DE_method
+        features$METHOD <- factor(features$METHOD,
+                                  levels = fit_obj$result$forest$xlevels$METHOD)
+      }
+      pred_real <- predict(fit_obj$result, newdata = features, predict.all = TRUE)
+        
+        # saveRDS(pred_real, save_fn)
+      # }
+      
+      save_df <- rbind(save_df,
+                       data.frame(dataset = dataset_name,
+                                  result_type = "true",
+                                  DE_method = DE_method,
+                                  threshold = threshold,
+                                  score_type = use_result_type,
+                                  lower90 = NA,
+                                  lower50 = NA,
+                                  upper50 = NA,
+                                  upper90 = NA,
+                                  point = ifelse(use_result_type == "TPR",
+                                                 rates$TPR,
+                                                 1 - rates$FPR)))
+      save_df <- rbind(save_df,
+                       data.frame(dataset = dataset_name,
+                                  result_type = "predicted",
+                                  DE_method = DE_method,
+                                  threshold = threshold,
+                                  score_type = use_result_type,
+                                  lower90 = unname(quantile(pred_real$individual[1,], probs = c(0.05))),
+                                  lower50 = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
+                                  upper50 = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
+                                  upper90 = unname(quantile(pred_real$individual[1,], probs = c(0.95))),
+                                  point = pred_real$aggregate))
+    }
   }
 }
 
@@ -328,7 +362,3 @@ save_fn <- file.path("output",
                             threshold,
                             ".tsv"))
 write.table(save_df, save_fn, sep = "\t", quote = FALSE, row.names = FALSE)
-
-# LEFT OFF HERE
-# Need to add an FC_ABSOLUTE estimate and/or PERCENT_DE estimate for the real data feature set!
-# Just base this on model_dir

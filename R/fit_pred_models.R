@@ -473,9 +473,15 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                             abs_feature_list = abs_feature_list)
   
   # Subset to methods of interest
-  features <- features %>%
-    filter(METHOD %in% DE_methods)
-  features$METHOD <- factor(features$METHOD)
+  if(length(DE_methods) > 1) {
+    features <- features %>%
+      filter(METHOD %in% DE_methods)
+    features$METHOD <- factor(features$METHOD)
+  } else {
+    features <- features %>%
+      filter(METHOD %in% DE_methods) %>%
+      select(!METHOD)
+  }
   
   # for(use_result_type in c("TPR", "FPR")) {
   for(use_result_type in c("TPR", "FPR")) {
@@ -534,9 +540,16 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                            paste0(use_baseline,
                                   "_",
                                   use_result_type,
+                                  ifelse(length(DE_methods) == 1, paste0("_", DE_methods), ""),
                                   ".rds"))
     } else {
-      save_fn <- paste0(save_slug, "_", use_baseline, "_", use_result_type, ".rds")
+      save_fn <- paste0(save_slug,
+                        "_",
+                        use_baseline,
+                        "_",
+                        use_result_type,
+                        ifelse(length(DE_methods) == 1, paste0("_", DE_methods), ""),
+                        ".rds")
     }
     cat(paste0("Predictive model saving/saved to: ", save_fn, "\n"))
     if(!file.exists(save_fn)) {
@@ -570,6 +583,7 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                         paste0(use_baseline,
                                "_",
                                use_result_type,
+                               ifelse(length(DE_methods) == 1, paste0("_", DE_methods), ""),
                                "_variable-importance.rds")))
     }
   }

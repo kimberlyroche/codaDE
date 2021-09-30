@@ -14,7 +14,7 @@ fit_predictive_model(DE_methods = DE_methods,
                      output_weights = TRUE,
                      exclude_partials = TRUE,
                      exclude_independent = FALSE,
-                     do_classify = TRUE)
+                     do_classify = FALSE)
                      # abs_feature_list = c("FC_ABSOLUTE"))
 
 for(use_result_type in c("TPR", "FPR")) {
