@@ -36,7 +36,7 @@ dataset_name <- opt$dataset
 use_baseline <- opt$baseline
 threshold <- opt$threshold
 model_dir <- opt$model_folder
-do_norm <- FALSE
+do_norm <- TRUE
 testing <- FALSE
 
 methods_list <- c("ALDEx2", "DESeq2", "scran")
@@ -100,6 +100,13 @@ groups <- groups[c(A_sample, B_sample)]
 ref_data <- apply(ref_data, c(1,2), as.integer)
 data <- apply(data, c(1,2), as.integer)
 
+# New 2021/09/09: normalize relative abundances
+# Each column should sum to roughly the same abundance
+if(do_norm) {
+  new_total_scale <- median(rowSums(data))
+  data <- t(apply(data, 1, function(x) round((x/sum(x))*new_total_scale)))
+}
+
 # Look at sparsity; filter out too-low features
 retain_features <- colMeans(ref_data) >= threshold & colMeans(data) >= threshold
 ref_data <- ref_data[,retain_features]
@@ -135,15 +142,7 @@ for(DE_method in methods_list) {
     } else {
       oracle_calls <- NULL
     }
-    # New 2021/09/09: normalize relative abundances
-    # Each column should sum to roughly the same abundance
-    if(do_norm) {
-      new_total_scale <- median(colSums(data))
-      props <- apply(data, 2, function(x) round((x/sum(x))*new_total_scale))
-      all_calls <- DA_wrapper(ref_data, props, groups, DE_method, oracle_calls)
-    } else {
-      all_calls <- DA_wrapper(ref_data, data, groups, DE_method, oracle_calls)
-    }
+    all_calls <- DA_wrapper(ref_data, data, groups, DE_method, oracle_calls)
     rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls)
     save_obj <- list(all_calls = all_calls, rates = rates)
     saveRDS(save_obj, save_fn)
