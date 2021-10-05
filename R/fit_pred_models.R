@@ -559,9 +559,9 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
       cat("Training model...\n")
       train_data <- cbind(train_features, response = train_response)
       res <- randomForest(response ~ .,
-                          data = train_data,
-                          mtry = round((ncol(train_data)-2)/3)) # train each tree
-                                                                # on 1/3 features
+                          data = train_data)
+                          #mtry = round((ncol(train_data)-2)/3)) # train each tree
+                          #                                      # on 1/3 features
       if(save_training_data) {
         saveRDS(list(result = res,
                      train_features = train_features,
