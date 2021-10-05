@@ -14,7 +14,8 @@ fit_predictive_model(
   abs_feature_list = NULL,
   save_slug = NULL,
   save_training_data = TRUE,
-  do_classify = FALSE
+  do_classify = FALSE,
+  alpha = 0.95
 )
 }
 \arguments{
@@ -45,6 +46,9 @@ with the saved model output}
 
 \item{do_classify}{optional flag indicating whether or not to train a 
 classification model on "good" vs. "bad" outcomes}
+
+\item{alpha}{optional threshold for classification indicating the minimum 
+sensitivity of specificity for "good" outcomes}
 }
 \value{
 NULL (fitted models are saved in output directory)

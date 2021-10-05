@@ -12,11 +12,6 @@ option_list = list(
               default = "Barlow",
               help = "data set to use: VieiraSilva, Barlow, Song, Monaco, Muraro, Hashimshony, Kimmerling",
               metavar = "character"),
-  make_option(c("--baseline"),
-              type = "character",
-              default = "self",
-              help = "calls to use as a reference: self, oracle",
-              metavar = "character"),
   make_option(c("--threshold"),
               type = "numeric",
               default = "5",
@@ -27,27 +22,46 @@ option_list = list(
               default = "FALSE",
               help = "normalize observed total abundances",
               metavar = "logical"),
-  make_option(c("--permodel"),
+  make_option(c("--classify"),
               type = "logical",
               default = "FALSE",
+              help = "classification (vs. regression) flag",
+              metavar = "logical"),
+  make_option(c("--alpha"),
+              type = "numeric",
+              default = "0.95",
+              help = "classification threshold",
+              metavar = "numeric"),
+  make_option(c("--permodel"),
+              type = "logical",
+              default = "TRUE",
               help = "use per-model predictive fits",
               metavar = "logical"),
-  make_option(c("--model_folder"),
-              type = "character",
-              default = "self_nopartial",
-              help = "folder containing fitted models from which to predict",
-              metavar = "character")
+  make_option(c("--selfbaseline"),
+              type = "logical",
+              default = "TRUE",
+              help = "use self calls as reference instead of oracle",
+              metavar = "logical"),
+  make_option(c("--partials"),
+              type = "logical",
+              default = "FALSE",
+              help = "flag indicating whether or not to use simulations with partially informative total abundances",
+              metavar = "logical")
 );
 
 opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
 
 dataset_name <- opt$dataset
-use_baseline <- opt$baseline
 threshold <- opt$threshold
-model_dir <- opt$model_folder
 do_norm <- opt$norm
+do_classify <- opt$classify
+alpha <- opt$alpha
 per_model <- opt$permodel
+
+use_self_baseline <- opt$selfbaseline
+use_partials <- opt$partials
+
 testing <- FALSE
 
 methods_list <- c("ALDEx2", "DESeq2", "scran")
@@ -57,16 +71,8 @@ if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song",
   stop(paste0("Invalid data set: ", dataset_name, "!\n"))
 }
 
-if(!(use_baseline %in% c("self", "oracle"))) {
-  stop(paste0("Invalid DA baseline: ", use_baseline, "!\n"))
-}
-
 if(threshold < 0) {
   stop(paste0("Invalid threshold: ", threshold, "!\n"))
-}
-
-if(!file.exists(file.path("output", "predictive_fits", model_dir))) {
-  stop(paste0("Model folder does not exist: ", model_dir, "\n"))
 }
 
 # ------------------------------------------------------------------------------
@@ -138,7 +144,7 @@ for(DE_method in methods_list) {
                        "real_data_calls",
                        ifelse(do_norm, "norm", "no_norm"),
                        paste0("calls_",
-                              use_baseline,
+                              ifelse(use_self_baseline, "self", "oracle"),
                               "_",
                               DE_method,
                               "_",
@@ -149,10 +155,10 @@ for(DE_method in methods_list) {
   if(!file.exists(save_fn)) {
     cat(paste0("Making calls for ", DE_method, " on ", dataset_name, "...\n"))
     # Get baseline differential abundance calls
-    if(use_baseline == "oracle") {
-      oracle_calls <- call_DA_NB(ref_data, groups)$pval
-    } else {
+    if(use_self_baseline) {
       oracle_calls <- NULL
+    } else {
+      oracle_calls <- call_DA_NB(ref_data, groups)$pval
     }
     all_calls <- DA_wrapper(ref_data, data, groups, DE_method, oracle_calls)
     rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls)
@@ -215,7 +221,7 @@ features <- features %>%
 # It's crucial we match the factor levels the model was trained on
 # Features will return all levels for METHOD (including methods we evaluated
 # on when testing but aren't reporting). Make sure these 
-# features_simulated <- pull_features(use_baseline = use_baseline,
+# features_simulated <- pull_features(use_baseline = ifelse(use_self_baseline, "self", "oracle"),
 #                                     feature_list = c("METHOD"))
 # features_simulated <- features_simulated %>%
 #     filter(METHOD %in% methods_list)
@@ -234,18 +240,19 @@ for(use_result_type in c("TPR", "FPR")) {
     if(model_type == "all") {
       model_fn <- file.path("output",
                             "predictive_fits",
-                            model_dir,
-                            paste0(use_baseline,
+                            paste0(ifelse(use_self_baseline, "self", "oracle"),
                                    "_",
-                                   use_result_type,
-                                   ".rds"))
+                                   ifelse(use_partials, "partial", "nopartial")),
+                            ifelse(do_classify, "classification", "regression"),
+                            paste0(use_result_type, ".rds"))
     } else {
       model_fn <- file.path("output",
                             "predictive_fits",
-                            model_dir,
-                            paste0(use_baseline,
+                            paste0(ifelse(use_self_baseline, "self", "oracle"),
                                    "_",
-                                   use_result_type,
+                                   ifelse(use_partials, "partial", "nopartial")),
+                            ifelse(do_classify, "classification", "regression"),
+                            paste0(use_result_type,
                                    "_",
                                    model_type,
                                    ".rds"))
@@ -278,7 +285,7 @@ for(use_result_type in c("TPR", "FPR")) {
                            "real_data_calls",
                            ifelse(do_norm, "norm", "no_norm"),
                            paste0("calls_",
-                                  use_baseline,
+                                  ifelse(use_self_baseline, "self", "oracle"),
                                   "_",
                                   DE_method,
                                   "_",
@@ -293,72 +300,84 @@ for(use_result_type in c("TPR", "FPR")) {
       all_calls <- calls_obj$all_calls
       rates <- calls_obj$rates
       rm(calls_obj)
+
+      if(use_result_type == "TPR") {
+        true_result <- ifelse(rates$TPR < alpha, 1, 0)
+      } else {
+        true_result <- ifelse(1 - rates$FPR < alpha, 1, 0)
+      }
+      true_result <- factor(true_result, levels = c(0, 1))
   
       # --------------------------------------------------------------------------
       #   Make predictions
       # --------------------------------------------------------------------------
   
-      # save_fn <- file.path("output",
-      #                      "predictive_fits",
-      #                      model_dir,
-      #                      "real_data_predictions",
-      #                      paste0("predictions_",
-      #                             use_baseline,
-      #                             "_",
-      #                             DE_method,
-      #                             "_",
-      #                             dataset_name,
-      #                             "_threshold",
-      #                             threshold,
-      #                             ".rds"))
-      # if(file.exists(save_fn)) {
-      #   pred_real <- readRDS(save_fn)
-      # } else {
-      
       if(!per_model) {
         features$METHOD <- DE_method
         features$METHOD <- factor(features$METHOD,
                                   levels = fit_obj$result$forest$xlevels$METHOD)
       }
+
       pred_real <- predict(fit_obj$result, newdata = features, predict.all = TRUE)
-        
-        # saveRDS(pred_real, save_fn)
-      # }
-      
-      save_df <- rbind(save_df,
-                       data.frame(dataset = dataset_name,
-                                  result_type = "true",
-                                  DE_method = DE_method,
-                                  threshold = threshold,
-                                  score_type = use_result_type,
-                                  lower90 = NA,
-                                  lower50 = NA,
-                                  upper50 = NA,
-                                  upper90 = NA,
-                                  point = ifelse(use_result_type == "TPR",
-                                                 rates$TPR,
-                                                 1 - rates$FPR)))
-      save_df <- rbind(save_df,
-                       data.frame(dataset = dataset_name,
-                                  result_type = "predicted",
-                                  DE_method = DE_method,
-                                  threshold = threshold,
-                                  score_type = use_result_type,
-                                  lower90 = unname(quantile(pred_real$individual[1,], probs = c(0.05))),
-                                  lower50 = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
-                                  upper50 = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
-                                  upper90 = unname(quantile(pred_real$individual[1,], probs = c(0.95))),
-                                  point = pred_real$aggregate))
+
+      if(do_classify) {
+        # Just use the aggregate prediction
+        save_df <- rbind(save_df,
+                         data.frame(dataset = dataset_name,
+                                    result_type = "true",
+                                    DE_method = DE_method,
+                                    threshold = threshold,
+                                    score_type = use_result_type,
+                                    point = true_result))
+        save_df <- rbind(save_df,
+                         data.frame(dataset = dataset_name,
+                                    result_type = "predicted",
+                                    DE_method = DE_method,
+                                    threshold = threshold,
+                                    score_type = use_result_type,
+                                    point = pred_real$aggregate))
+      } else {        
+        save_df <- rbind(save_df,
+                         data.frame(dataset = dataset_name,
+                                    result_type = "true",
+                                    DE_method = DE_method,
+                                    threshold = threshold,
+                                    score_type = use_result_type,
+                                    lower90 = NA,
+                                    lower50 = NA,
+                                    upper50 = NA,
+                                    upper90 = NA,
+                                    point = ifelse(use_result_type == "TPR",
+                                                   rates$TPR,
+                                                   1 - rates$FPR)))
+        save_df <- rbind(save_df,
+                         data.frame(dataset = dataset_name,
+                                    result_type = "predicted",
+                                    DE_method = DE_method,
+                                    threshold = threshold,
+                                    score_type = use_result_type,
+                                    lower90 = unname(quantile(pred_real$individual[1,], probs = c(0.05))),
+                                    lower50 = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
+                                    upper50 = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
+                                    upper90 = unname(quantile(pred_real$individual[1,], probs = c(0.95))),
+                                    point = pred_real$aggregate))
+      }
     }
   }
 }
 
 save_fn <- file.path("output",
                      "predictive_fits",
-                     model_dir,
+                     paste0(ifelse(use_self_baseline, "self", "oracle"),
+                                   "_",
+                                   ifelse(use_partials, "partial", "nopartial")),
+                     ifelse(do_classify, "classification", "regression"),
+                     "validation_results",
+                     ifelse(do_norm, "norm", "no_norm"),
                      paste0("results_",
                             dataset_name,
                             "_threshold",
                             threshold,
                             ".tsv"))
+cat(paste0("Saving output to: ", save_fn, "\n"))
 write.table(save_df, save_fn, sep = "\t", quote = FALSE, row.names = FALSE)

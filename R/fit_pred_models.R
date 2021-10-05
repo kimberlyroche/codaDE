@@ -433,6 +433,8 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
 #' with the saved model output
 #' @param do_classify optional flag indicating whether or not to train a 
 #' classification model on "good" vs. "bad" outcomes
+#' @param alpha optional threshold for classification indicating the minimum 
+#' sensitivity of specificity for "good" outcomes
 #' @return NULL (fitted models are saved in output directory)
 #' @import randomForest
 #' @import dplyr
@@ -448,7 +450,8 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                                  abs_feature_list = NULL,
                                  save_slug = NULL,
                                  save_training_data = TRUE,
-                                 do_classify = FALSE) {
+                                 do_classify = FALSE,
+                                 alpha = 0.95) {
   
   if(!(use_baseline %in% c("self", "oracle"))) {
     stop(paste0("Invalid baseline: ", use_baseline, "!\n"))
@@ -458,7 +461,10 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
     stop(paste0("Invalid DE calling method!\n"))
   }
 
-  save_path <- list("output", "predictive_fits")
+  save_path <- list("output",
+                    "predictive_fits",
+                    paste0(use_baseline, "_", ifelse(exclude_partials, "nopartial", "partial")),
+                    ifelse(do_classify, "classification", "regression"))
   for(i in 1:length(save_path)) {
     fp <- do.call(file.path, save_path[1:i])
     if(!dir.exists(fp)) {
@@ -526,30 +532,27 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
       train_response <- sapply(train_response, function(x) {
         # "Bad" outcomes (1) have less than 95% sensitivity or specificity
         # "Good" outcomes (0) have at least 95% sensitivity or specificity
-        ifelse(x < 0.95, 1, 0)
+        ifelse(x < alpha, 1, 0)
       })
       train_response <- factor(train_response)
       test_response <- sapply(test_response, function(x) {
-        ifelse(x < 0.95, 1, 0)
+        ifelse(x < alpha, 1, 0)
       })
       test_response <- factor(test_response)
     }
 
     if(is.null(save_slug)) {
       save_fn <- file.path(save_dir,
-                           paste0(use_baseline,
+                           paste0(use_result_type,
+                                  ifelse(length(DE_methods) == 1, paste0("_", DE_methods), ""),
+                                  ".rds"))
+    } else {
+      save_fn <- file.path(save_dir,
+                           paste0(save_slug,
                                   "_",
                                   use_result_type,
                                   ifelse(length(DE_methods) == 1, paste0("_", DE_methods), ""),
                                   ".rds"))
-    } else {
-      save_fn <- paste0(save_slug,
-                        "_",
-                        use_baseline,
-                        "_",
-                        use_result_type,
-                        ifelse(length(DE_methods) == 1, paste0("_", DE_methods), ""),
-                        ".rds")
     }
     cat(paste0("Predictive model saving/saved to: ", save_fn, "\n"))
     if(!file.exists(save_fn)) {
