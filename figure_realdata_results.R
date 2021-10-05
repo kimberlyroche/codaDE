@@ -13,8 +13,64 @@ dir.create(file.path("output", "images"), showWarnings = FALSE)
 
 datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
 thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
+# thresholds <- rep(2, length(datasets))
 names(thresholds) <- datasets
 model_dir <- "self_nopartial"
+
+# ------------------------------------------------------------------------------
+#   Classification accuracy
+# ------------------------------------------------------------------------------
+
+# Pull results files matching pattern
+
+result_files <- list.files(path = file.path("output",
+                                            "predictive_fits",
+                                            model_dir,
+                                            "classification",
+                                            "validation_results",
+                                            "no_norm"),
+                           pattern = "results_(.*?)_threshold(\\d+)\\.tsv",
+                           full.names = TRUE)
+results <- NULL
+for(file in result_files) {
+  temp <- read.table(file, sep = "\t", header = TRUE)
+  results <- rbind(results,
+                   temp)
+}
+
+# Filter for the correct thresholds
+keep_idx <- sapply(1:nrow(results), function(i) {
+  results$threshold[i] == thresholds[[results$dataset[i]]]
+})
+results <- results[keep_idx,]
+
+for(this_DE_method in unique(results$DE_method) ) {
+  results_wrangled <- results %>%
+    filter(DE_method == this_DE_method) %>%
+    select(dataset, result_type, score_type, point) %>%
+    pivot_wider(names_from = "result_type", values_from = "point") %>%
+    mutate(agree = (true == predicted))
+  tpr_agree_vec <- results_wrangled %>%
+    filter(score_type == "TPR") %>%
+    pull(agree)
+  misses_tpr <- results_wrangled %>%
+    filter(score_type == "TPR" & !agree) %>%
+    pull(dataset)
+  fpr_agree_vec <- results_wrangled %>%
+    filter(score_type == "FPR") %>%
+    pull(agree)
+  misses_fpr <- results_wrangled %>%
+    filter(score_type == "FPR" & !agree) %>%
+    pull(dataset)
+  cat(paste0(this_DE_method, " accuracy (TPR): ", sum(tpr_agree_vec) / length(tpr_agree_vec), " -- "))
+  cat(paste0("missed on: ", paste0(misses_tpr, collapse = " "), "\n"))
+  cat(paste0(this_DE_method, " accuracy (FPR): ", sum(fpr_agree_vec) / length(fpr_agree_vec), " -- "))
+  cat(paste0("missed on: ", paste0(misses_fpr, collapse = " "), "\n"))
+}
+
+# ------------------------------------------------------------------------------
+#   Regression accuracy
+# ------------------------------------------------------------------------------
 
 palette <- list(ALDEx2 = "#46A06B",
                 DESeq2 = "#FF5733",
@@ -26,7 +82,12 @@ plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 
 # Pull results files matching pattern
 
-result_files <- list.files(path = file.path("output", "predictive_fits", model_dir),
+result_files <- list.files(path = file.path("output",
+                                            "predictive_fits",
+                                            model_dir,
+                                            "regression",
+                                            "validation_results",
+                                            "no_norm"),
                            pattern = "results_(.*?)_threshold(\\d+)\\.tsv",
                            full.names = TRUE)
 results <- NULL
@@ -106,7 +167,7 @@ for(use_result_type in c("TPR", "FPR")) {
   pl <- plot_grid(prow1, prow2, legend, ncol = 1, rel_heights = c(1, 1, .1), scale = 0.9)
   pl <- pl +
     theme(plot.margin = ggplot2::margin(t = 25, r = 0, b = 0, l = 0, "pt"))
-  # show(pl)
+  show(pl)
   # ggsave(file.path("output",
   #                  "images",
   #                  paste0("validations_",
