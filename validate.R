@@ -27,6 +27,11 @@ option_list = list(
               default = "FALSE",
               help = "classification (vs. regression) flag",
               metavar = "logical"),
+  make_option(c("--alpha"),
+              type = "numeric",
+              default = "0.95",
+              help = "classification threshold",
+              metavar = "numeric"),
   make_option(c("--permodel"),
               type = "logical",
               default = "TRUE",
@@ -51,6 +56,7 @@ dataset_name <- opt$dataset
 threshold <- opt$threshold
 do_norm <- opt$norm
 do_classify <- opt$classify
+alpha <- opt$alpha
 per_model <- opt$permodel
 
 use_self_baseline <- opt$selfbaseline
@@ -296,9 +302,9 @@ for(use_result_type in c("TPR", "FPR")) {
       rm(calls_obj)
 
       if(use_result_type == "TPR") {
-        true_result <- ifelse(rates$TPR < 0.95, 1, 0)
+        true_result <- ifelse(rates$TPR < alpha, 1, 0)
       } else {
-        true_result <- ifelse(1 - rates$FPR < 0.95, 1, 0)
+        true_result <- ifelse(1 - rates$FPR < alpha, 1, 0)
       }
       true_result <- factor(true_result, levels = c(0, 1))
   

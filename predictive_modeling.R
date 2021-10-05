@@ -12,6 +12,11 @@ option_list = list(
               default = "FALSE",
               help = "classification (vs. regression) flag",
               metavar = "logical"),
+  make_option(c("--alpha"),
+              type = "numeric",
+              default = "0.95",
+              help = "classification threshold",
+              metavar = "numeric"),
   make_option(c("--permodel"),
               type = "logical",
               default = "TRUE",
@@ -33,6 +38,7 @@ opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
 
 do_classify <- opt$classify
+alpha <- opt$alpha
 per_model <- opt$permodel
 
 use_self_baseline <- opt$selfbaseline
@@ -49,20 +55,20 @@ for(use_result_type in c("TPR", "FPR")) {
     for(DE_method in DE_methods) {
       save_fn <- file.path("output",
                            "predictive_fits",
-                           "model_dir",
+                           model_dir,
                            ifelse(do_classify, "classification", "regression"),
                                 paste0(use_result_type,
                                           "_",
                                           DE_method,
                                           ".rds"))
       if(!file.exists(save_fn)) {
-        quit()
         fit_predictive_model(DE_methods = DE_method,
                              use_baseline = ifelse(use_self_baseline, "self", "oracle"),
                              output_weights = TRUE,
                              exclude_partials = !use_partials,
                              exclude_independent = FALSE,
-                             do_classify = do_classify)
+                             do_classify = do_classify,
+                             alpha = alpha)
       }
       fit_obj <- readRDS(save_fn)
 
@@ -71,12 +77,12 @@ for(use_result_type in c("TPR", "FPR")) {
 
       if(any(!(test_data$response %in% c(0,1)))) {
         # Regression
-        acc_str <- paste0("Overall R^2 (",use_result_type,"): ",
+        acc_str <- paste0(DE_method, " R^2 (", use_result_type, "): ",
                           round(cor(fit_obj$test_response, prediction)^2, 3))
       } else {
         # Classification
         acc_obj <- confusionMatrix(test_data$response, prediction)
-        acc_str <- paste0("Overall accuracy: ", round(acc_obj$overall[["Accuracy"]], 2), " (",
+        acc_str <- paste0(DE_method, " accuracy (", use_result_type, "): ", round(acc_obj$overall[["Accuracy"]], 2), " (",
                           "sensitivity: ", round(acc_obj$byClass[["Sensitivity"]], 2), " / ",
                           "specificity: ", round(acc_obj$byClass[["Specificity"]], 2), ")")
       }
@@ -86,17 +92,17 @@ for(use_result_type in c("TPR", "FPR")) {
   } else {
     save_fn <- file.path("output",
                          "predictive_fits",
-                         "model_dir",
+                         model_dir,
                          ifelse(do_classify, "classification", "regression"),
                          paste0(use_result_type, ".rds"))
     if(!file.exists(save_fn)) {
-      quit()
       fit_predictive_model(DE_methods = DE_methods,
                            use_baseline = ifelse(use_self_baseline, "self", "oracle"),
                            output_weights = TRUE,
                            exclude_partials = !use_partials,
                            exclude_independent = FALSE,
-                           do_classify = do_classify)
+                           do_classify = do_classify,
+                           alpha = alpha)
     }
     fit_obj <- readRDS(save_fn)
 
@@ -117,12 +123,12 @@ for(use_result_type in c("TPR", "FPR")) {
 
       if(any(!(test_data$response %in% c(0,1)))) {
         # Regression
-        acc_str <- paste0(prepend_str, "R^2 (",use_result_type,"): ",
+        acc_str <- paste0(prepend_str, "R^2 (", use_result_type, "): ",
                           round(cor(fit_obj$test_response, prediction)^2, 3))
       } else {
         # Classification
         acc_obj <- confusionMatrix(test_data$response[idx], prediction)
-        acc_str <- paste0(prepend_str, "accuracy: ", round(acc_obj$overall[["Accuracy"]], 2), " (",
+        acc_str <- paste0(prepend_str, "accuracy (", use_result_type, "): ", round(acc_obj$overall[["Accuracy"]], 2), " (",
                           "sensitivity: ", round(acc_obj$byClass[["Sensitivity"]], 2), " / ",
                           "specificity: ", round(acc_obj$byClass[["Specificity"]], 2), ")")
       }
