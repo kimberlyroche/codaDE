@@ -415,6 +415,7 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
 
 #' Generate simulated differential expression for two conditions
 #'
+#' @param model_type one of "RF" or "LR"
 #' @param DE_methods which DE calling method's results to predict; if "all",
 #' prediction is over all results together
 #' @param use_baseline "self" or "oracle"
@@ -440,8 +441,10 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
 #' @import dplyr
 #' @import tidyr
 #' @import caret
+#' @import glmnet
 #' @export
-fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
+fit_predictive_model <- function(model_type = "RF",
+                                 DE_methods = c("ALDEx2", "DESeq2", "scran"),
                                  use_baseline = "self",
                                  output_weights = TRUE,
                                  exclude_partials = TRUE,
@@ -452,6 +455,10 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                                  save_training_data = TRUE,
                                  do_classify = FALSE,
                                  alpha = 0.95) {
+  
+  if(!(model_type %in% c("RF", "LR"))) {
+    stop(paste0("Invalid model type: ", model_type, "!\n"))
+  }
   
   if(!(use_baseline %in% c("self", "oracle"))) {
     stop(paste0("Invalid baseline: ", use_baseline, "!\n"))
@@ -477,7 +484,43 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                             exclude_partials = exclude_partials,
                             exclude_independent = exclude_independent,
                             abs_feature_list = abs_feature_list)
-  
+
+  if(model_type == "LR") {
+    # Scale features
+    # 1) Read in any data in 'data/raw_features' and scale this with 
+    raw_features <- NULL
+    raw_features_fn <- list.files(file.path("data", "raw_features"),
+                                  full.names = FALSE)
+    validation_features_fn <- character(length(raw_features_fn))
+    if(length(raw_features_fn) > 0) {
+      for(i in 1:length(raw_features_fn)) {
+        fn <- raw_features_fn[i]
+        raw_features <- rbind(raw_features, readRDS(file.path("data", "raw_features", fn)))
+        fn_pieces <- strsplit(fn, "\\.")[[1]]
+        validation_features_fn[i] <- file.path("data", "scaled_features", paste0(fn_pieces[1], "_scaled.rds"))
+      }
+      # 2) Align features
+      mapping <- data.frame(fnames = colnames(features), idx1 = 1:ncol(features)) %>%
+        left_join(data.frame(fnames = colnames(raw_features), idx2 = 1:ncol(raw_features)), by = "fnames")
+      n <- nrow(features)
+      scaled_features <- rbind(features[,mapping %>% filter(!is.na(idx2)) %>% pull(idx1)],
+                               raw_features[,mapping %>% filter( !is.na(idx2)) %>% pull(idx2)])
+      # 3) Scale together
+      scaled_features <- apply(scaled_features, 2, scale)
+      unscaled_features <- features[,-c(mapping %>% filter(!is.na(idx2)) %>% pull(idx1))]
+      # 4) Extract them into separate data.frames
+      features <- cbind(scaled_features[1:n,], unscaled_features)
+      validation_features <- scaled_features[(n+1):nrow(scaled_features),]
+      for(i in 1:nrow(validation_features)) {
+        saveRDS(validation_features[i,], validation_features_fn[i])
+      }
+    } else {
+      # No other features to scale with this data set
+      scaled_features <- apply(features %>% select(-c(METHOD, TPR, FPR)), 2, scale)
+      features <- cbind(scaled_features, features %>% select(c(METHOD, TPR, FPR)))
+    }
+  }
+
   # Subset to methods of interest
   if(length(DE_methods) > 1) {
     features <- features %>%
@@ -558,10 +601,21 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
     if(!file.exists(save_fn)) {
       cat("Training model...\n")
       train_data <- cbind(train_features, response = train_response)
-      res <- randomForest(response ~ .,
-                          data = train_data)
-                          #mtry = round((ncol(train_data)-2)/3)) # train each tree
-                          #                                      # on 1/3 features
+      if(model_type == "LR") {
+        res <- cv.glmnet(x = model.matrix(response ~ ., train_data),
+                      y = factor(train_data %>% pull(response)),
+                      family = "binomial",
+                      alpha = 1)
+        # Predict as
+        # newx <- model.matrix(response ~ ., test_data)
+        # predictions <- predict(res, newx = newx, s = "lambda.1se", type = "class")
+        # confusionMatrix(factor(test_data$response), factor(predictions))
+      } else {
+        res <- randomForest(response ~ .,
+                            data = train_data)
+                            # mtry = round((ncol(train_data)-2)/3)) # train each tree
+                            #                                       # on 1/3 features
+      }
       if(save_training_data) {
         saveRDS(list(result = res,
                      train_features = train_features,
@@ -573,7 +627,7 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
       }
     }
 
-    if(output_weights) {
+    if(output_weights & model_type == "RF") {
       if(file.exists(save_fn)) {
         res_obj <- readRDS(save_fn)
         res <- res_obj$result
