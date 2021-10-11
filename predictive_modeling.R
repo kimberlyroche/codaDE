@@ -45,9 +45,10 @@ model_type <- "LR"
 
 alpha <- opt$alpha
 per_model <- opt$permodel
-
 use_self_baseline <- opt$selfbaseline
 use_partials <- opt$partials
+
+model_type <- "RF"
 
 DE_methods <- c("ALDEx2", "DESeq2", "scran")
 

@@ -75,48 +75,53 @@ mapping <- list(METHOD = "method",
                 FW_CLR_PFC1_D = "percent features with < 1 FC in CLR",
                 FW_CLR_PFC2_D = "percent features with < 2 FC in CLR")
 
-for(type in c("TPR", "FPR")) {
-  save_fn <- file.path("output",
-                       "predictive_fits",
-                       paste0(use_baseline, "_", partial_flag),
-                       paste0(use_baseline, "_", type, "_variable-importance.rds"))
-  if(file.exists(save_fn)) {
-    plot_df <- readRDS(save_fn)
-  } else {
-    stop("Variable importance results not found!")
+for(task in c("classification", "regression")) {
+  for(type in c("TPR", "FPR")) {
+    for(DE_method in c("ALDEx2", "DESeq2", "scran")) {
+      save_fn <- file.path("output",
+                           "predictive_fits",
+                           paste0(use_baseline, "_", partial_flag),
+                           task,
+                           paste0(use_baseline, "_", type, "_", DE_method, "_variable-importance.rds"))
+      if(file.exists(save_fn)) {
+        plot_df <- readRDS(save_fn)
+      } else {
+        stop("Variable importance results not found!")
+      }
+      
+      # Fix data.frame
+      plot_df$feature <- rownames(plot_df)
+      rownames(plot_df) <- NULL
+      colnames(plot_df) <- c("weight", "feature")
+      
+      # Map features to readable names
+      relabel <- suppressMessages(data.frame(feature = plot_df$feature) %>%
+        left_join(data.frame(feature = names(mapping), string = unname(unlist(mapping)))))
+      
+      plot_df$label <- relabel$string
+      
+      # Truncate by relative feature weight
+      plot_df <- plot_df %>%
+        arrange(desc(weight)) %>%
+        mutate(rel_weight = weight/sum(plot_df$weight)) #%>%
+        # filter(rel_weight > 0.01)
+      plot_df <- plot_df[1:10,]
+      
+      ggplot(plot_df, aes(x = weight, y = reorder(label, weight))) +
+        geom_bar(stat = "identity") +
+        theme_bw() +
+        labs(x = "feature weight",
+             y = paste0("feature in ", ifelse(type == "TPR", "sensitivity", "specificity"), " model")) +
+        theme(axis.title.x = element_text(margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
+              axis.title.y = element_text(margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0)))
+      ggsave(file.path("output",
+                       "images",
+                       paste0(task, "_varImp_", type, "-", DE_method, ".png")),
+             units = "in",
+             dpi = 100,
+             # height = ifelse(type == "TPR", 3, 6),
+             height = 3.5,
+             width = 7)
+    }
   }
-  
-  # Fix data.frame
-  plot_df$feature <- rownames(plot_df)
-  rownames(plot_df) <- NULL
-  colnames(plot_df) <- c("weight", "feature")
-  
-  # Map features to readable names
-  relabel <- suppressMessages(data.frame(feature = plot_df$feature) %>%
-    left_join(data.frame(feature = names(mapping), string = unname(unlist(mapping)))))
-  
-  plot_df$label <- relabel$string
-  
-  # Truncate by relative feature weight
-  plot_df <- plot_df %>%
-    arrange(desc(weight)) %>%
-    mutate(rel_weight = weight/sum(plot_df$weight)) #%>%
-    # filter(rel_weight > 0.01)
-  plot_df <- plot_df[1:10,]
-  
-  ggplot(plot_df, aes(x = weight, y = reorder(label, weight))) +
-    geom_bar(stat = "identity") +
-    theme_bw() +
-    labs(x = "feature weight",
-         y = paste0("feature in ", ifelse(type == "TPR", "sensitivity", "specificity"), " model")) +
-    theme(axis.title.x = element_text(margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
-          axis.title.y = element_text(margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0)))
-  ggsave(file.path("output",
-                   "images",
-                   paste0("varImp_", type, ".png")),
-         units = "in",
-         dpi = 100,
-         # height = ifelse(type == "TPR", 3, 6),
-         height = 3.5,
-         width = 7)
 }

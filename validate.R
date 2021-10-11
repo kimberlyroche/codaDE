@@ -61,16 +61,7 @@ per_model <- opt$permodel
 use_self_baseline <- opt$selfbaseline
 use_partials <- opt$partials
 
-model_type <- "LR"
-
-# dataset_name <- "Barlow"
-# threshold <- 1
-# do_norm <- FALSE
-# do_classify <- TRUE
-# alpha <- 0.95
-# per_model <- TRUE
-# use_self_baseline <- TRUE
-# use_partials <- FALSE
+model_type <- "RF"
 
 testing <- FALSE
 

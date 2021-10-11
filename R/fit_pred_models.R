@@ -10,6 +10,7 @@
 #' @import moments
 #' @export
 characterize_dataset <- function(counts_A, counts_B) {
+
   if(ncol(counts_A) != ncol(counts_B)) {
     stop("Different number of features in condition A vs. B!")
   }
@@ -130,6 +131,8 @@ characterize_dataset <- function(counts_A, counts_B) {
 
   COMP_C_ENT_A <- entropy(table(cut(relab_A, breaks = c(0, bins))))
   COMP_C_ENT_B <- entropy(table(cut(relab_B, breaks = c(0, bins))))
+  
+  # COMP_LOG_MEAN_D <- abs(mean(log(counts_A + pseudocount)) - mean(log(counts_B + pseudocount)))
   
   # --------------------------------------------------------------------------
   #   Characteristics assoc. with feature-wise change

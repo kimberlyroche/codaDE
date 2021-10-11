@@ -68,6 +68,23 @@ for(this_DE_method in unique(results$DE_method) ) {
   cat(paste0("missed on: ", paste0(misses_fpr, collapse = " "), "\n"))
 }
 
+# View actual calls
+for(this_dataset in datasets) {
+  for(use_result_type in c("FPR")) {
+    cat(paste0("DATASET: ", this_dataset, "   TYPE: ", use_result_type, "\n"))
+    res_table <- results %>%
+      filter(dataset == this_dataset & score_type == use_result_type) %>%
+      select(dataset, result_type, DE_method, point) %>%
+      pivot_wider(names_from = "result_type", values_from = "point")
+    a <- res_table %>% filter(DE_method == "ALDEx2")
+    cat(paste0("\tALDEx2: ", a$true, " / ", a$predicted, "\n"))
+    d <- res_table %>% filter(DE_method == "DESeq2")
+    cat(paste0("\tDESeq2: ", d$true, " / ", d$predicted, "\n"))
+    s <- res_table %>% filter(DE_method == "scran")
+    cat(paste0("\tscran: ", s$true, " / ", s$predicted, "\n"))
+  }
+}
+
 # ------------------------------------------------------------------------------
 #   Regression accuracy
 # ------------------------------------------------------------------------------
