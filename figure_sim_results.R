@@ -104,8 +104,7 @@ plot_ROC_flag <- function(data, method, p, logical_vec) {
     xlim(c(0,1)) +
     ylim(c(0,1)) +
     labs(x = "specificity (1 - FPR)",
-         y = "sensitivity (TPR)",
-         fill = fill_var_label) +
+         y = "sensitivity (TPR)") +
     theme_bw() +
     facet_wrap(. ~ METHOD, ncol = 4)
   return(pl)
@@ -144,7 +143,7 @@ plot_ROC_percentDE <- function(data, method, p) {
     ylim(c(-0.025,1.025)) +
     labs(x = paste0(method, " specificity (1 - FPR)"),
          y = paste0(method, " sensitivity (TPR)"),
-         fill = "Proportion differentially abundance features") +
+         fill = "Proportion differentially abundance features     ") +
     theme_bw() +
     theme(axis.title.x = element_text(margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
           axis.title.y = element_text(margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0))) +
@@ -171,6 +170,8 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#7E54DE", "#E3C012", "#B95D6E")
 dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
 
+method_list <- c("ALDEx2", "DESeq2", "scran")
+
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 # Define bins for absolute fold change
@@ -190,7 +191,7 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 qq <- c(0, 1.5, 2.5, 5, Inf)
 
 # ------------------------------------------------------------------------------
-#   ROC plot #1
+#   Sensitivity x specificity plot labeled by fold change
 #
 #   Sensitivity and specificity of calls made by all methods on absolute vs.
 #   relative abundances
@@ -206,7 +207,6 @@ p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
 p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
 p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
 legend <- NULL
-method_list <- sort(unique(data$METHOD))
 for(i in 1:length(method_list)) {
   method <- method_list[i]
   for(j in c(100, 1000, 5000)) {
@@ -240,16 +240,14 @@ ggsave(file.path("output", "images", "ROC_by_FC.png"),
 show(pl)
 
 # ------------------------------------------------------------------------------
-#   ROC plot #2
-#
-#   As above, but labelled by percent of features differentially abundant
+#   Sensitivity x specificity plot labeled by percent of features differentially
+#   abundant
 # ------------------------------------------------------------------------------
 
 p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
 p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
 p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
 legend <- NULL
-method_list <- sort(unique(data$METHOD))
 for(i in 1:length(method_list)) {
   method <- method_list[i]
   for(j in c(100, 1000, 5000)) {
@@ -283,21 +281,23 @@ ggsave(file.path("output", "images", "ROC_by_percentDE.png"),
 show(pl)
 
 # ------------------------------------------------------------------------------
-#   ROC plot #3
-#
-#   Simulations with A MAJORITY OF DIFFERENTIAL FEATURES and WITH HIGH OR V HIGH
-#   FOLD CHANGE are labeled
+#   Sensitivity x specificity plot labeled for majority differential features
+#   PLUS high or very high fold change
 # ------------------------------------------------------------------------------
 
 p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
 p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
 p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
 legend <- NULL
-method_list <- sort(unique(data$METHOD))
 for(i in 1:length(method_list)) {
   method <- method_list[i]
   for(j in c(100, 1000, 5000)) {
-    pl <- plot_ROC_flag(data, method, j, data$PERCENT_DIFF_REALIZ < 0.5 & data$FC_plot %in% levels(data$FC_plot)[3:4])
+    # pl <- plot_ROC_flag(data, method, j, data$PERCENT_DIFF_REALIZ < 0.5 & data$FC_plot %in% levels(data$FC_plot)[3:4])
+    plot_pieces <- plot_ROC_fc(data %>% filter(PERCENT_DIFF_REALIZ < 0.5 & FC_plot %in% levels(data$FC_plot)[3:4]), method, j)
+    pl <- plot_pieces$pl
+    if(is.null(legend)) {
+      legend <- plot_pieces$legend
+    }
     if(i == 1 & j == 100) p1_100 <<- pl
     if(i == 1 & j == 1000) p1_1000 <<- pl
     if(i == 1 & j == 5000) p1_5000 <<- pl
@@ -312,20 +312,25 @@ for(i in 1:length(method_list)) {
 prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
 prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
 prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
-pl <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
-ggsave(file.path("output", "images", "ROC_by_label.png"),
+# pl <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
+# ggsave(file.path("output", "images", "ROC_by_subset1.png"),
+ggsave(file.path("output", "images", "ROC_by_subset2.png"),
        plot = pl,
        units = "in",
        height = 10,
        width = 10,
        bg = "white")
-show(pl)
+# show(pl)
+
+temp <- data %>%
+  filter(METHOD == "scran" & FC_plot %in% levels(data$FC_plot)[4] & P == 5000)
+median(temp$FPR)
 
 # ------------------------------------------------------------------------------
-#   ROC plot #4
-#
-#   Sensitivity and specificity plot for but discrepancies against calls made by
-#   a NB GLM ("oracle method") on absolute abundances
+#   Sensitivity x specificity plot using discrepancies against calls made by a
+#   NB GLM ("oracle method") on absolute abundances
 # ------------------------------------------------------------------------------
 
 data <- pull_data(qq, use_baseline = "oracle")
@@ -335,11 +340,11 @@ p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
 p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
 p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
 legend <- NULL
-method_list <- sort(unique(data$METHOD))
 for(i in 1:length(method_list)) {
   method <- method_list[i]
   for(j in c(100, 1000, 5000)) {
-    plot_pieces <- plot_ROC_fc(data, method, j)
+    # plot_pieces <- plot_ROC_fc(data, method, j)
+    plot_pieces <- plot_ROC_percentDE(data, method, j)
     pl <- plot_pieces$pl
     if(is.null(legend)) {
       legend <- plot_pieces$legend

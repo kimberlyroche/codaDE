@@ -2,6 +2,7 @@ source("path_fix.R")
 
 library(codaDE)
 library(tidyverse)
+library(glmnet)
 library(caret)
 library(RColorBrewer)
 library(optparse)
@@ -40,9 +41,10 @@ opt = parse_args(opt_parser);
 do_classify <- opt$classify
 alpha <- opt$alpha
 per_model <- opt$permodel
-
 use_self_baseline <- opt$selfbaseline
 use_partials <- opt$partials
+
+model_type <- "RF"
 
 DE_methods <- c("ALDEx2", "DESeq2", "scran")
 
@@ -62,7 +64,8 @@ for(use_result_type in c("TPR", "FPR")) {
                                           DE_method,
                                           ".rds"))
       if(!file.exists(save_fn)) {
-        fit_predictive_model(DE_methods = DE_method,
+        fit_predictive_model(model_type = model_type,
+                             DE_methods = DE_method,
                              use_baseline = ifelse(use_self_baseline, "self", "oracle"),
                              output_weights = TRUE,
                              exclude_partials = !use_partials,
@@ -73,7 +76,13 @@ for(use_result_type in c("TPR", "FPR")) {
       fit_obj <- readRDS(save_fn)
 
       test_data <- cbind(fit_obj$test_features, response = fit_obj$test_response)
-      prediction <- predict(fit_obj$result, newdata = test_data) # predict.all = TRUE
+      
+      if(model_type == "LR") {
+        newx <- model.matrix(response ~ ., test_data)
+        prediction <- factor(predict(fit_obj$result, newx = newx, s = "lambda.1se", type = "class"))
+      } else {
+        prediction <- predict(fit_obj$result, newx = test_data) # predict.all = TRUE
+      }
 
       if(any(!(test_data$response %in% c(0,1)))) {
         # Regression
@@ -96,7 +105,8 @@ for(use_result_type in c("TPR", "FPR")) {
                          ifelse(do_classify, "classification", "regression"),
                          paste0(use_result_type, ".rds"))
     if(!file.exists(save_fn)) {
-      fit_predictive_model(DE_methods = DE_methods,
+      fit_predictive_model(model_type = model_type,
+                           DE_methods = DE_methods,
                            use_baseline = ifelse(use_self_baseline, "self", "oracle"),
                            output_weights = TRUE,
                            exclude_partials = !use_partials,

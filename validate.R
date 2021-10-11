@@ -58,9 +58,10 @@ do_norm <- opt$norm
 do_classify <- opt$classify
 alpha <- opt$alpha
 per_model <- opt$permodel
-
 use_self_baseline <- opt$selfbaseline
 use_partials <- opt$partials
+
+model_type <- "RF"
 
 testing <- FALSE
 
@@ -79,24 +80,25 @@ if(threshold < 0) {
 #   Parse and wrangle validation data
 # ------------------------------------------------------------------------------
 
-save_feature_fn <- file.path("data", "raw_features", paste0(dataset_name, ".rds"))
-if(!file.exists(save_feature_fn))
+# save_feature_fn <- file.path("data", "raw_features", paste0(dataset_name, ".rds"))
+save_feature_fn <- file.path("data", "scaled_features", paste0(dataset_name, "_scaled.rds"))
+if(!file.exists(save_feature_fn)) {
   abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE))
   rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE))
-
+  
   if(testing & nrow(abs_data$counts) > 500) {
     k <- 500
     sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
     abs_data$counts <- abs_data$counts[sample_idx,]
     rel_data$counts <- rel_data$counts[sample_idx,]
   }
-
+  
   # Reorient as (samples x features)
   ref_data <- t(abs_data$counts)
   data <- t(rel_data$counts)
   groups <- abs_data$groups
   groups <- factor(groups)
-
+  
   # Subsample if tons of cells/samples
   downsample_limit <- 100 # was 100
   set.seed(100)
@@ -114,32 +116,32 @@ if(!file.exists(save_feature_fn))
   ref_data <- ref_data[c(A_sample, B_sample),]
   data <- data[c(A_sample, B_sample),]
   groups <- groups[c(A_sample, B_sample)]
-
+  
   # Convert to integers, just for DESeq2
   ref_data <- apply(ref_data, c(1,2), as.integer)
   data <- apply(data, c(1,2), as.integer)
-
+  
   # New 2021/09/09: normalize relative abundances
   # Each column should sum to roughly the same abundance
   if(do_norm) {
     new_total_scale <- median(rowSums(data))
     data <- t(apply(data, 1, function(x) round((x/sum(x))*new_total_scale)))
   }
-
+  
   # Look at sparsity; filter out too-low features
   retain_features <- colMeans(ref_data) >= threshold & colMeans(data) >= threshold
   ref_data <- ref_data[,retain_features]
   data <- data[,retain_features]
-
+  
   cat(paste0("Dataset dimensions: ", nrow(ref_data), " x ", ncol(ref_data), "\n"))
   cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
-
+  
   # ------------------------------------------------------------------------------
   #   Call discrepancy by each method; save to file if doesn't already exist
   #
   #   This can be time-consuming!
   # ------------------------------------------------------------------------------
-
+  
   for(DE_method in methods_list) {
     # Pull saved calls on this data set x method if these exist
     save_fn <- file.path("output",
@@ -168,11 +170,11 @@ if(!file.exists(save_feature_fn))
       saveRDS(save_obj, save_fn)
     }
   }
-
+  
   # ------------------------------------------------------------------------------
   #   Wrangle data for prediction-making
   # ------------------------------------------------------------------------------
-
+  
   # Get info we need from data to make a prediction
   if(dataset_name == "VieiraSilva") {
     counts_A <- data[groups == "mHC",]
@@ -206,21 +208,27 @@ if(!file.exists(save_feature_fn))
     counts_A <- data[groups == "Brn",]
     counts_B <- data[groups == "Lvr",]
   }
-
+  
   # This takes 2-3 min. to run on 15K features
   features <- as.data.frame(characterize_dataset(counts_A, counts_B))
-
+  
   # Add a few more
   features$P <- ncol(counts_A)
-
+  
   # Save raw features for this data set
   saveRDS(features, save_feature_fn)
+  
+  features <- features %>%
+    select(c(-FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
+  
 } else {
-  features <- readRDS(save_feature_fn)
+  features <- data.frame(readRDS(save_feature_fn))
+  # features$feature <- rownames(features)
+  # colnames(features) <- c("value", "feature")
+  # rownames(features) <- NULL
+  # features <- pivot_wider(features, everything(), names_from = "feature", values_from = "value")
+  # saveRDS(features, save_feature_fn)
 }
-
-features <- features %>%
-  select(c(-FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
 
 # ------------------------------------------------------------------------------
 #   Make predictions on simulations and real data and visualize these together
@@ -244,8 +252,8 @@ for(use_result_type in c("TPR", "FPR")) {
   if(per_model) {
     model_list <- methods_list
   }
-  for(model_type in model_list) {
-    if(model_type == "all") {
+  for(method_type in model_list) {
+    if(method_type == "all") {
       model_fn <- file.path("output",
                             "predictive_fits",
                             paste0(ifelse(use_self_baseline, "self", "oracle"),
@@ -262,7 +270,7 @@ for(use_result_type in c("TPR", "FPR")) {
                             ifelse(do_classify, "classification", "regression"),
                             paste0(use_result_type,
                                    "_",
-                                   model_type,
+                                   method_type,
                                    ".rds"))
     }
     if(!file.exists(model_fn)) {
@@ -274,7 +282,7 @@ for(use_result_type in c("TPR", "FPR")) {
       
       # Skip this method if we're using model-specific predictions and this
       # iteration doesn't match the outer loop
-      if(per_model & DE_method != model_type) {
+      if(per_model & DE_method != method_type) {
         next;
       }
       
@@ -326,26 +334,52 @@ for(use_result_type in c("TPR", "FPR")) {
                                   levels = fit_obj$result$forest$xlevels$METHOD)
       }
 
-      pred_real <- predict(fit_obj$result, newdata = features, predict.all = TRUE)
+      if(model_type == "LR") {
+        # Pare down excess features not in predictive model
+        features <- features[,colnames(features) %in% colnames(fit_obj$test_features)]
+        prediction <- factor(predict(fit_obj$result, newx = model.matrix(~ ., features), s = "lambda.1se", type = "class"))
+      } else {
+        pred_real <- predict(fit_obj$result, newdata = features, predict.all = TRUE)
+      }
 
       if(do_classify) {
-        # Just use the aggregate prediction
-        save_df <- rbind(save_df,
-                         data.frame(dataset = dataset_name,
-                                    result_type = "true",
-                                    DE_method = DE_method,
-                                    threshold = threshold,
-                                    score_type = use_result_type,
-                                    percent_agreement = NA,
-                                    point = true_result))
-        save_df <- rbind(save_df,
-                         data.frame(dataset = dataset_name,
-                                    result_type = "predicted",
-                                    DE_method = DE_method,
-                                    threshold = threshold,
-                                    score_type = use_result_type,
-                                    percent_agreement = sum(pred_real$individual == pred_real$aggregate)/length(pred_real$individual),
-                                    point = pred_real$aggregate))
+        if(model_type == "LR") {
+          # Just use the aggregate prediction
+          save_df <- rbind(save_df,
+                           data.frame(dataset = dataset_name,
+                                      result_type = "true",
+                                      DE_method = DE_method,
+                                      threshold = threshold,
+                                      score_type = use_result_type,
+                                      percent_agreement = NA,
+                                      point = true_result))
+          save_df <- rbind(save_df,
+                           data.frame(dataset = dataset_name,
+                                      result_type = "predicted",
+                                      DE_method = DE_method,
+                                      threshold = threshold,
+                                      score_type = use_result_type,
+                                      percent_agreement = NA,
+                                      point = prediction))
+        } else {
+          # Just use the aggregate prediction
+          save_df <- rbind(save_df,
+                           data.frame(dataset = dataset_name,
+                                      result_type = "true",
+                                      DE_method = DE_method,
+                                      threshold = threshold,
+                                      score_type = use_result_type,
+                                      percent_agreement = NA,
+                                      point = true_result))
+          save_df <- rbind(save_df,
+                           data.frame(dataset = dataset_name,
+                                      result_type = "predicted",
+                                      DE_method = DE_method,
+                                      threshold = threshold,
+                                      score_type = use_result_type,
+                                      percent_agreement = sum(pred_real$individual == pred_real$aggregate)/length(pred_real$individual),
+                                      point = pred_real$aggregate))
+        }
       } else {        
         save_df <- rbind(save_df,
                          data.frame(dataset = dataset_name,
