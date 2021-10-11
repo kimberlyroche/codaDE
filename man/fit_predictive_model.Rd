@@ -5,6 +5,7 @@
 \title{Generate simulated differential expression for two conditions}
 \usage{
 fit_predictive_model(
+  model_type = "RF",
   DE_methods = c("ALDEx2", "DESeq2", "scran"),
   use_baseline = "self",
   output_weights = TRUE,
@@ -19,6 +20,8 @@ fit_predictive_model(
 )
 }
 \arguments{
+\item{model_type}{one of "RF" or "LR"}
+
 \item{DE_methods}{which DE calling method's results to predict; if "all",
 prediction is over all results together}
 
