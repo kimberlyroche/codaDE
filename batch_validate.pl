@@ -6,12 +6,13 @@ use List::Util qw(min);
 my @datasets =  qw(VieiraSilva Barlow Song Monaco Hagai Klein Owens Yu);
 my @RAM =       qw(12          12     24   32     32    64    64    64);
 my @hours =     qw(2           2      2    2      2     2     2     2);
-my @threshold = qw(1           1      1    2      1     1     1     1);
+#my @threshold = qw(1           1      1    2      1     1     1     1);
+my @threshold = qw(2           2      2    2      2     2     2     2);
 
 my $model_dir = "self_nopartial";
 my $norm = "FALSE";
 my $classify = "TRUE";
-my $alpha = 0.95;
+my $alpha = 0.9;
 my $permodel = "TRUE";
 my $self_baseline = "TRUE";
 my $partials = "FALSE";

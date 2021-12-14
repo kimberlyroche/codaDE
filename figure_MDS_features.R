@@ -10,7 +10,8 @@ library(ggbiplot)
 start <- Sys.time()
 
 datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
-thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
+#thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
+thresholds <- rep(2, 8)
 
 save_fn <- file.path("output", "MDS_features.rds")
 if(file.exists(save_fn)) {
@@ -139,13 +140,19 @@ subsample_idx <- c(sample(sim_idx, size = 1000), real_idx)
 mds_features <- mds_features[subsample_idx,]
 labels <- labels[subsample_idx]
 
+# Remove features related to totals
+mds_features <- mds_features[,!(colnames(mds_features) %in% c("TOTALS_C_FC", "TOTALS_C_D", "TOTALS_C_MAX_D", "TOTALS_C_MED_D", "TOTALS_C_SD_D"))]
+
 # 1) Diagnostic biplot
 
-# features.pca <- prcomp(mds_features, scale. = FALSE)
-# p0 <- ggbiplot(features.pca, obs.scale = 1, var.scale = 1,
-#   groups = labels) +
-#   scale_color_discrete(name = '')
-# saveRDS(p0, "temp.rds")
+if(FALSE) {
+  features.pca <- prcomp(mds_features, scale. = FALSE)
+  saveRDS(list(features.pca, labels), "temp.rds")
+  p0 <- ggbiplot(features.pca, obs.scale = 1, var.scale = 1,
+    groups = labels) +
+    scale_color_discrete(name = '')
+}
+
 # ggsave("temp.png",
 #        p0,
 #        dpi = 100,
@@ -154,9 +161,6 @@ labels <- labels[subsample_idx]
 #        width = 10)
 
 # 2) Regular PCA plot
-
-# Remove features related to totals
-mds_features <- mds_features[,!(colnames(mds_features) %in% c(TOTALS_C_FC, TOTALS_C_D, TOTALS_C_MAX_D, TOTALS_C_MED_D, TOTALS_C_SD_D))]
 
 feature_dist <- dist(mds_features)
 coords <- cmdscale(feature_dist, k = 4)

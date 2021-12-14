@@ -41,12 +41,25 @@ results in the `temp` folder.
 # --------------------------------------------------------------------------------------------------------
 
 1) Run `pull_char_uuids.R` to enumerate jobs as:
-   > Rscript pull_char_uuids.R --p=100 --file=input
+   > Rscript pull_char_uuids.R --p=100
 
 2) Run `batch_char.pl`, setting P and JOB START and END LINE NUMBERS in the script.
    This will put the results in the `temp` folder.
 
 3) Run `store_char_results.R`
+   This will add ANY results that exist in files in the `temp` directory to the DB!
+
+# --------------------------------------------------------------------------------------------------------
+#   EVALUATING THE PERCENT REALIZED DIFFERENTIAL ABUNDANCE IN DATA SETS
+# --------------------------------------------------------------------------------------------------------
+
+1) Run `pull_quantDA_uuids.R` to enumerate jobs as:
+   > Rscript pull_quantDA_uuids.R --p=100
+
+2) Run `batch_quantDA.pl`, setting P and JOB START and END LINE NUMBERS in the script.
+   This will put the results in the `temp` folder.
+
+3) Run `store_quantDA_results.R`
    This will add ANY results that exist in files in the `temp` directory to the DB!
 
 # --------------------------------------------------------------------------------------------------------

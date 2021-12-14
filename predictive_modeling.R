@@ -39,10 +39,6 @@ opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
 
 do_classify <- opt$classify
-
-do_classify <- TRUE
-model_type <- "LR"
-
 alpha <- opt$alpha
 per_model <- opt$permodel
 use_self_baseline <- opt$selfbaseline
@@ -85,7 +81,7 @@ for(use_result_type in c("TPR", "FPR")) {
         newx <- model.matrix(response ~ ., test_data)
         prediction <- factor(predict(fit_obj$result, newx = newx, s = "lambda.1se", type = "class"))
       } else {
-        prediction <- predict(fit_obj$result, newx = test_data) # predict.all = TRUE
+        prediction <- predict(fit_obj$result, newdata = fit_obj$test_features) # predict.all = TRUE
       }
 
       if(any(!(test_data$response %in% c(0,1)))) {

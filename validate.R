@@ -80,9 +80,9 @@ if(threshold < 0) {
 #   Parse and wrangle validation data
 # ------------------------------------------------------------------------------
 
-# save_feature_fn <- file.path("data", "raw_features", paste0(dataset_name, ".rds"))
-save_feature_fn <- file.path("data", "scaled_features", paste0(dataset_name, "_scaled.rds"))
-if(!file.exists(save_feature_fn)) {
+#save_feature_fn <- file.path("data", "raw_features", paste0(dataset_name, ".rds"))
+#save_feature_fn <- file.path("data", "scaled_features", paste0(dataset_name, "_scaled.rds"))
+#if(!file.exists(save_feature_fn)) {
   abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE))
   rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE))
   
@@ -216,19 +216,19 @@ if(!file.exists(save_feature_fn)) {
   features$P <- ncol(counts_A)
   
   # Save raw features for this data set
-  saveRDS(features, save_feature_fn)
+  #saveRDS(features, save_feature_fn)
   
   features <- features %>%
     select(c(-FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
   
-} else {
-  features <- data.frame(readRDS(save_feature_fn))
+#} else {
+#  features <- data.frame(readRDS(save_feature_fn))
   # features$feature <- rownames(features)
   # colnames(features) <- c("value", "feature")
   # rownames(features) <- NULL
   # features <- pivot_wider(features, everything(), names_from = "feature", values_from = "value")
   # saveRDS(features, save_feature_fn)
-}
+#}
 
 # ------------------------------------------------------------------------------
 #   Make predictions on simulations and real data and visualize these together
