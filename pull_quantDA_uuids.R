@@ -12,7 +12,7 @@ option_list = list(
 opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
 
-measured_by <- "fc_2.0"
+measured_by <- "fc_1.33"
 p <- opt$p
 file <- paste0("input_quantDA_", p, ".txt")
 
