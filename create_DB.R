@@ -6,11 +6,11 @@ library(RSQLite)
 # Create DB (if doesn't exist?)
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
-#discard <- dbExecute(conn, paste0("CREATE TABLE da_realized(",
-#                                  "UUID VARCHAR(36), ",
-#                                  "MEASURED_BY VARCHAR(64), ",
-#                                  "PERCENT_DIFF_REALIZ REAL, ",
-#                                  "PRIMARY KEY (UUID, MEASURED_BY));"))
+discard <- dbExecute(conn, paste0("CREATE TABLE da_realized(",
+                                  "UUID VARCHAR(36), ",
+                                  "MEASURED_BY VARCHAR(64), ",
+                                  "CALLS VARCHAR(100000), ",
+                                  "PRIMARY KEY (UUID, MEASURED_BY));"))
 
 #discard <- dbExecute(conn, paste0("CREATE TABLE datasets(",
 #                                  "UUID VARCHAR(36) PRIMARY KEY, ",

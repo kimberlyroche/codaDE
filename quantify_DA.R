@@ -22,6 +22,8 @@ opt = parse_args(opt_parser);
 #  Validate input
 # ------------------------------------------------------------------------------
 
+threshold <- 2.0
+
 input <- opt$input
 output <- opt$output
 start <- opt$start
@@ -41,7 +43,7 @@ output_fn <- file.path("temp", paste0(output, "_", start, "-", end, ".txt"))
 
 # Initialize output
 output_file <- file(output_fn)
-writeLines(paste0(c("ID", "uuid", "measured_by", "percent_diff_realiz"),
+writeLines(paste0(c("ID", "uuid", "measured_by", "calls"),
                   collapse = "\t"),
            output_file)
 close(output_file)
@@ -69,7 +71,7 @@ for(i in 1:nrow(wishlist)) {
   abundances <- data$simulation$abundances
   counts <- data$simulation$observed_counts1
   
-  results_row <- cbind(job, "fc_1.5", calc_threshold_DA(counts, fc_lower = 1/1.5, fc_upper = 1.5))
+  results_row <- cbind(job, paste0("fc_", threshold), paste0(round(calc_threshold_DA(counts, fc_lower = 1/threshold, fc_upper = threshold), 10), collapse = ";"))
   
   write_delim(results_row, output_fn, delim = "\t", append = TRUE)
   counter <- counter + 1
