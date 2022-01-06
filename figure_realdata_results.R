@@ -11,11 +11,17 @@ source("ggplot_fix.R")
 dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
 
+# datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
+# thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
+
 datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
-thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
+# thresholds <- c(1, 1, 1, 2, 1, 1, 1)
+thresholds <- rep(2, length(datasets))
+
 # thresholds <- rep(2, length(datasets))
 names(thresholds) <- datasets
-model_dir <- "self_nopartial"
+# model_dir <- "self_nopartial"
+model_dir <- "oracle_nopartial"
 
 # ------------------------------------------------------------------------------
 #   Classification accuracy
@@ -23,67 +29,67 @@ model_dir <- "self_nopartial"
 
 # Pull results files matching pattern
 
-result_files <- list.files(path = file.path("output",
-                                            "predictive_fits",
-                                            model_dir,
-                                            "classification",
-                                            "validation_results",
-                                            "no_norm"),
-                           pattern = "results_(.*?)_threshold(\\d+)\\.tsv",
-                           full.names = TRUE)
-results <- NULL
-for(file in result_files) {
-  temp <- read.table(file, sep = "\t", header = TRUE)
-  results <- rbind(results,
-                   temp)
-}
-
-# Filter for the correct thresholds
-keep_idx <- sapply(1:nrow(results), function(i) {
-  results$threshold[i] == thresholds[[results$dataset[i]]]
-})
-results <- results[keep_idx,]
-
-for(this_DE_method in unique(results$DE_method) ) {
-  results_wrangled <- results %>%
-    filter(DE_method == this_DE_method) %>%
-    select(dataset, result_type, score_type, point) %>%
-    pivot_wider(names_from = "result_type", values_from = "point") %>%
-    mutate(agree = (true == predicted))
-  tpr_agree_vec <- results_wrangled %>%
-    filter(score_type == "TPR") %>%
-    pull(agree)
-  misses_tpr <- results_wrangled %>%
-    filter(score_type == "TPR" & !agree) %>%
-    pull(dataset)
-  fpr_agree_vec <- results_wrangled %>%
-    filter(score_type == "FPR") %>%
-    pull(agree)
-  misses_fpr <- results_wrangled %>%
-    filter(score_type == "FPR" & !agree) %>%
-    pull(dataset)
-  cat(paste0(this_DE_method, " accuracy (TPR): ", sum(tpr_agree_vec) / length(tpr_agree_vec), " -- "))
-  cat(paste0("missed on: ", paste0(misses_tpr, collapse = " "), "\n"))
-  cat(paste0(this_DE_method, " accuracy (FPR): ", sum(fpr_agree_vec) / length(fpr_agree_vec), " -- "))
-  cat(paste0("missed on: ", paste0(misses_fpr, collapse = " "), "\n"))
-}
-
-# View actual calls
-for(this_dataset in datasets) {
-  for(use_result_type in c("FPR")) {
-    cat(paste0("DATASET: ", this_dataset, "   TYPE: ", use_result_type, "\n"))
-    res_table <- results %>%
-      filter(dataset == this_dataset & score_type == use_result_type) %>%
-      select(dataset, result_type, DE_method, point) %>%
-      pivot_wider(names_from = "result_type", values_from = "point")
-    a <- res_table %>% filter(DE_method == "ALDEx2")
-    cat(paste0("\tALDEx2: ", a$true, " / ", a$predicted, "\n"))
-    d <- res_table %>% filter(DE_method == "DESeq2")
-    cat(paste0("\tDESeq2: ", d$true, " / ", d$predicted, "\n"))
-    s <- res_table %>% filter(DE_method == "scran")
-    cat(paste0("\tscran: ", s$true, " / ", s$predicted, "\n"))
-  }
-}
+# result_files <- list.files(path = file.path("output",
+#                                             "predictive_fits",
+#                                             model_dir,
+#                                             "classification",
+#                                             "validation_results",
+#                                             "no_norm"),
+#                            pattern = "results_(.*?)_threshold(\\d+)\\.tsv",
+#                            full.names = TRUE)
+# results <- NULL
+# for(file in result_files) {
+#   temp <- read.table(file, sep = "\t", header = TRUE)
+#   results <- rbind(results,
+#                    temp)
+# }
+# 
+# # Filter for the correct thresholds
+# keep_idx <- sapply(1:nrow(results), function(i) {
+#   results$threshold[i] == thresholds[[results$dataset[i]]]
+# })
+# results <- results[keep_idx,]
+# 
+# for(this_DE_method in unique(results$DE_method) ) {
+#   results_wrangled <- results %>%
+#     filter(DE_method == this_DE_method) %>%
+#     select(dataset, result_type, score_type, point) %>%
+#     pivot_wider(names_from = "result_type", values_from = "point") %>%
+#     mutate(agree = (true == predicted))
+#   tpr_agree_vec <- results_wrangled %>%
+#     filter(score_type == "TPR") %>%
+#     pull(agree)
+#   misses_tpr <- results_wrangled %>%
+#     filter(score_type == "TPR" & !agree) %>%
+#     pull(dataset)
+#   fpr_agree_vec <- results_wrangled %>%
+#     filter(score_type == "FPR") %>%
+#     pull(agree)
+#   misses_fpr <- results_wrangled %>%
+#     filter(score_type == "FPR" & !agree) %>%
+#     pull(dataset)
+#   cat(paste0(this_DE_method, " accuracy (TPR): ", sum(tpr_agree_vec) / length(tpr_agree_vec), " -- "))
+#   cat(paste0("missed on: ", paste0(misses_tpr, collapse = " "), "\n"))
+#   cat(paste0(this_DE_method, " accuracy (FPR): ", sum(fpr_agree_vec) / length(fpr_agree_vec), " -- "))
+#   cat(paste0("missed on: ", paste0(misses_fpr, collapse = " "), "\n"))
+# }
+# 
+# # View actual calls
+# for(this_dataset in datasets) {
+#   for(use_result_type in c("FPR")) {
+#     cat(paste0("DATASET: ", this_dataset, "   TYPE: ", use_result_type, "\n"))
+#     res_table <- results %>%
+#       filter(dataset == this_dataset & score_type == use_result_type) %>%
+#       select(dataset, result_type, DE_method, point) %>%
+#       pivot_wider(names_from = "result_type", values_from = "point")
+#     a <- res_table %>% filter(DE_method == "ALDEx2")
+#     cat(paste0("\tALDEx2: ", a$true, " / ", a$predicted, "\n"))
+#     d <- res_table %>% filter(DE_method == "DESeq2")
+#     cat(paste0("\tDESeq2: ", d$true, " / ", d$predicted, "\n"))
+#     s <- res_table %>% filter(DE_method == "scran")
+#     cat(paste0("\tscran: ", s$true, " / ", s$predicted, "\n"))
+#   }
+# }
 
 # ------------------------------------------------------------------------------
 #   Regression accuracy

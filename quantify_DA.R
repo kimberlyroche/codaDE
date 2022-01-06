@@ -69,8 +69,8 @@ for(i in 1:nrow(wishlist)) {
   abundances <- data$simulation$abundances
   counts <- data$simulation$observed_counts1
   
-  results_row <- cbind(job, "fc_1.5", calc_threshold_DA(counts, fc_lower = 1/1.5, fc_upper = 1.5))
-  
+  results_row <- cbind(job, "fc_1.5", paste0(round(calc_threshold_DA(counts, fc_lower = 1/1.5, fc_upper = 1.5), 10), collapse = ";"))
+
   write_delim(results_row, output_fn, delim = "\t", append = TRUE)
   counter <- counter + 1
 }
