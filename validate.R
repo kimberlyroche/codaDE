@@ -105,11 +105,13 @@ if(threshold < 0) {
   pairs <- table(groups)
   if(pairs[1] > downsample_limit) {
     A_sample <- sample(which(groups == names(pairs)[1]), size = downsample_limit)
+    # A_sample <- which(groups == names(pairs)[1])[1:downsample_limit]
   } else {
     A_sample <- which(groups == names(pairs)[1])
   }
   if(pairs[2] > downsample_limit) {
     B_sample <- sample(which(groups == names(pairs)[2]), size = downsample_limit)
+    # B_sample <- which(groups == names(pairs)[2])[1:downsample_limit]
   } else {
     B_sample <- which(groups == names(pairs)[2])
   }

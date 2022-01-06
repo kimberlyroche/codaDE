@@ -5,7 +5,8 @@ library(RSQLite)
 library(dplyr)
 library(ggplot2)
 
-threshold <- 1.33
+#threshold <- 1.33
+threshold <- 2
 percent_agreement <- NULL
 
 for(this_method in c("ALDEx2", "DESeq2", "scran")) {
