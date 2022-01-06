@@ -5,7 +5,8 @@ library(RSQLite)
 library(dplyr)
 library(ggplot2)
 
-threshold <- 1.33
+#threshold <- 1.33
+threshold <- 2
 percent_agreement <- NULL
 
 for(this_method in c("ALDEx2", "DESeq2", "scran")) {
@@ -39,15 +40,27 @@ for(this_method in c("ALDEx2", "DESeq2", "scran")) {
   }
 }
 
-p <- ggplot(percent_agreement, aes(x = percent_agree)) +
-  geom_histogram(color = "white") +
-  facet_wrap(. ~ method + P) +
-  theme_bw() +
-  labs(x = paste0("percent agreement: ", threshold, "x FC and calls on absolute counts"))
+# p <- ggplot(percent_agreement, aes(x = percent_agree)) +
+#   geom_histogram(color = "white") +
+#   facet_wrap(. ~ method + P) +
+#   theme_bw() +
+#   labs(x = paste0("percent agreement: ", threshold, "x FC and calls on absolute counts"))
+# ggsave(file.path("output", "images", paste0("FC_vs_baseline_calls_", threshold, ".png")),
+#        p,
+#        dpi = 100,
+#        units = "in",
+#        height = 9,
+#        width = 9)
+
+p <- ggplot(percent_agreement, aes(x = percent_agree, fill = as.factor(P))) +
+       geom_density(alpha = 0.5) +
+       facet_wrap(. ~ method) +
+       theme_bw() +
+       labs(x = paste0("percent agreement: ", threshold, "x FC and calls on absolute counts"),
+            fill = "Features")
 ggsave(file.path("output", "images", paste0("FC_vs_baseline_calls_", threshold, ".png")),
        p,
        dpi = 100,
        units = "in",
-       height = 9,
+       height = 3,
        width = 9)
-

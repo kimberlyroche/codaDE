@@ -11,12 +11,8 @@ source("ggplot_fix.R")
 dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
 
-# datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
-# thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
-
 datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
-# thresholds <- c(1, 1, 1, 2, 1, 1, 1)
-thresholds <- rep(2, length(datasets))
+thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
 
 # thresholds <- rep(2, length(datasets))
 names(thresholds) <- datasets
@@ -191,14 +187,16 @@ for(use_result_type in c("TPR", "FPR")) {
   pl <- pl +
     theme(plot.margin = ggplot2::margin(t = 25, r = 0, b = 0, l = 0, "pt"))
   show(pl)
-  # ggsave(file.path("output",
-  #                  "images",
-  #                  paste0("validations_",
-  #                         use_result_type,
-  #                         ".png")),
-  #        plot = pl,
-  #        dpi = 100,
-  #        units = "in",
-  #        height = 7.35,
-  #        width = 13)
+  ggsave(file.path("output",
+                   "images",
+                   paste0("validations_",
+                          model_dir,
+                          "_",
+                          use_result_type,
+                          ".png")),
+         plot = pl,
+         dpi = 100,
+         units = "in",
+         height = 7.35,
+         width = 13)
 }
