@@ -7,7 +7,7 @@ my $p = 100;
 my $input = "input_quantDA_".$p.".txt";
 my $output = "output_quantDA_".$p;
 my $start = 1;
-my $end = 1000;
+my $end = 1875;
 my $chunks = 10; # was 20
 
 my $filename = "job.slurm";

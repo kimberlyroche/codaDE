@@ -27,8 +27,8 @@ for(file in file_list) {
   for(i in 1:nrow(results)) {
     job <- results[i,]
     updates <- updates + dbExecute(conn,
-                                   paste0("INSERT OR REPLACE INTO da_realized(UUID, MEASURED_BY, PERCENT_DIFF_REALIZ) ",
-                                          "VALUES('", job$uuid, "', '",job$measured_by,"', job$percent_diff_realize);"))
+                                   paste0("INSERT OR REPLACE INTO da_realized(UUID, MEASURED_BY, CALLS) ",
+                                          "VALUES('", job$uuid, "', '",job$measured_by,"', '", job$calls, "');"))
   }
   cat(paste0("Succeeded on ", updates, " rows\n"))
 }

@@ -12,7 +12,7 @@ option_list = list(
 opt_parser = OptionParser(option_list = option_list);
 opt = parse_args(opt_parser);
 
-measured_by <- "fc_1.5"
+measured_by <- "fc_1.33"
 p <- opt$p
 file <- paste0("input_quantDA_", p, ".txt")
 
@@ -30,7 +30,7 @@ for(u in 1:length(all_uuids)) {
                                    "WHERE UUID = '",uuid,"' AND ",
                                    "MEASURED_BY='", measured_by, "';"))
     # Look for any missing fields
-    if(nrow(res) == 0 || any(is.na(res %>% select(PERCENT_DIFF_REALIZ)))) {
+    if(nrow(res) == 0 || any(is.na(res %>% select(CALLS)))) {
       wishlist <- rbind(wishlist,
                         data.frame(ID = counter, uuid = uuid))
       counter <- counter + 1
