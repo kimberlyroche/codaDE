@@ -651,3 +651,77 @@ fit_predictive_model <- function(model_type = "RF",
     }
   }
 }
+
+#' Scale counts using ALDEx2-like size factors
+#'
+#' @param counts count table oriented as samples (rows) x features (columns)
+#' @param pseudocount small count to augment whole matrix by in order to 
+#' eliminate zero counts
+#' @return scaled count table oriented as samples (rows) x features (columns)
+#' @import ALDEx2
+#' @export
+scaled_counts_ALDEx2 <- function(counts, pseudocount = 0.5) {
+  counts <- t(counts)
+  scaled_counts <- apply(counts, 2, function(x) {
+    # Compute IQR
+    bounds <- quantile(x, probs = c(0.25, 0.75))
+    # Pull counts/features within these boundaries
+    y <- x[x >= bounds[1] & x <= bounds[2]]
+    # Compute geometric mean of these counts/features
+    sf <- exp(mean(log(y + pseudocount)))
+    # Scale counts
+    x/sf
+  })
+  t(scaled_counts)
+}
+
+#' Scale counts using DESeq2-like size factors
+#'
+#' @param counts count table oriented as samples (rows) x features (columns)
+#' @param groups group or treatment labels for columns
+#' @param pseudocount small count to augment whole matrix by in order to 
+#' eliminate zero counts
+#' @return scaled count table oriented as samples (rows) x features (columns)
+#' @import DESeq2
+#' @export
+scaled_counts_DESeq2 <- function(counts, groups, pseudocount = 0.5) {
+  counts <- t(counts)
+  coldata <- data.frame(treatment = groups)
+  coldata$treatment <- factor(coldata$treatment, levels = c(0, 1))
+  levels(coldata$treatment) <- c("control", "treatment")
+  dds <- suppressMessages(DESeqDataSetFromMatrix(countData = counts, colData = coldata, design = ~ treatment))
+  dds <- estimateSizeFactors(dds)
+  sf <- sizeFactors(dds)
+  scaled_counts <- t(counts)/sf
+  scaled_counts
+}
+
+#' Scale counts using scran-like size factors
+#'
+#' @param counts count table oriented as samples (rows) x features (columns)
+#' @param groups group or treatment labels for columns
+#' @param pseudocount small count to augment whole matrix by in order to 
+#' eliminate zero counts
+#' @return scaled count table oriented as samples (rows) x features (columns)
+#' @import scran
+#' @export
+scaled_counts_scran <- function(counts, groups, pseudocount = 0.5) {
+  counts <- t(counts)
+  count_table <- counts # features x samples
+  n_genes <- nrow(count_table)
+  cell_metadata <- data.frame(condition = groups)
+  rownames(cell_metadata) <- colnames(count_table)
+  rownames(count_table) <- paste0("gene", 1:n_genes)
+  colnames(count_table) <- paste0("cell", 1:ncol(count_table))
+  sce <- SingleCellExperiment(assays = list(counts = count_table),
+                              colData = cell_metadata)
+  # Specify clusters
+  clusters <- as.numeric(as.factor(groups))
+  if(min(clusters) == 0) {
+    clusters <- clusters + 1
+  }
+  sce <- suppressWarnings(computeSumFactors(sce, clusters = clusters))
+  sf <- sizeFactors(sce)
+  scaled_counts <- t(counts)/sf
+  scaled_counts
+}

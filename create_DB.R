@@ -11,6 +11,7 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 #                                  "MEASURED_BY VARCHAR(64), ",
 #                                  "CALLS VARCHAR(100000), ",
 #                                  "PRIMARY KEY (UUID, MEASURED_BY));"))
+
 #discard <- dbExecute(conn, paste0("CREATE TABLE datasets(",
 #                                  "UUID VARCHAR(36) PRIMARY KEY, ",
 #                                  "P INTEGER, ",
