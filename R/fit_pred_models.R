@@ -251,230 +251,94 @@ characterize_dataset <- function(counts_A, counts_B) {
 #' @param use_baseline one of either "self" or "oracle"; baseline differential
 #' abundance calls against which we will score accuracy of calls made on 
 #' observed (relative) abundance data
-#' @param exclude_partials flag indicating whether to exclude simulations with 
-#' partial abundance information
-#' @param exclude_independent flag indicating whether to exclude simulations 
-#' with uncorrelated features
-#' @param feature_list optional predictive feature list to use
-#' @param abs_feature_list optional predictive feature list from absolute 
-#' abundance data to use
+#' @param use_totals pull fold change in total estimate from absolute counts
+#' @param use_renorm_counts pull features generated from method-renormalized
+#' data
 #' @return data.frame with predictive model training features
 #' @import dplyr
 #' @import RSQLite
 #' @export
 pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
-                          use_baseline = "self",
-                          exclude_partials = TRUE,
-                          exclude_independent = FALSE,
-                          feature_list = NULL,
-                          abs_feature_list = NULL) {
+                          use_baseline = "oracle",
+                          use_totals = FALSE,
+                          use_renorm_counts = FALSE) {
 
   conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
+  
+  # Even though I'm using a SQLite database, it seems much quicker to pull 
+  # individual tables and join them in dplyr (ironically) than to do some in the
+  # SQL query.
   
   # Note: I'm not pulling FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D
   # because these predictors appear to be strongly correlated.
   
-  if(!is.null(feature_list) & length(feature_list > 0)) {
-    if(!is.null(abs_feature_list) & length(abs_feature_list > 0)) {
-      results <- dbGetQuery(conn, paste0("SELECT ", paste(unique(c(feature_list, abs_feature_list)), collapse = ", "), " ",
-                                         "FROM datasets LEFT JOIN characteristics ",
-                                         "ON datasets.UUID=characteristics.UUID ",
-                                         "LEFT JOIN results ",
-                                         "ON (characteristics.UUID=results.UUID ",
-                                         "AND characteristics.partial=results.PARTIAL_INFO) ",
-                                         "WHERE BASELINE_TYPE='", use_baseline, "';"))
-    } else {
-      results <- dbGetQuery(conn, paste0("SELECT ", paste(feature_list, collapse = ", "), " ",
-                                       "FROM datasets LEFT JOIN characteristics ",
-                                       "ON datasets.UUID=characteristics.UUID ",
-                                       "LEFT JOIN results ",
-                                       "ON (characteristics.UUID=results.UUID ",
-                                       "AND characteristics.partial=results.PARTIAL_INFO) ",
-                                       "WHERE BASELINE_TYPE='", use_baseline, "';"))
-    }
-    dbDisconnect(conn)
-    return(results)
+  if(use_totals) {
+    datasets <- dbGetQuery(conn, paste0("SELECT UUID, P, FC_ABSOLUTE FROM datasets"))
   } else {
-    if(!is.null(abs_feature_list) & length(abs_feature_list > 0)) {
-      results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
-                                         paste0(paste(abs_feature_list, collapse = ", "), ", "),
-                                         "TOTALS_C_FC, TOTALS_C_D, ",
-                                         "TOTALS_C_MAX_D, TOTALS_C_MED_D, ",
-                                         "TOTALS_C_SD_D, CORR_RA_MED, CORR_RA_SD, ",
-                                         "CORR_RA_SKEW, CORR_LOG_MED, CORR_LOG_SD, ",
-                                         "CORR_LOG_SKEW, CORR_CLR_MED, CORR_CLR_SD, ",
-                                         "CORR_CLR_SKEW, COMP_C_P0_A, COMP_C_P0_B, ",
-                                         "COMP_C_P1_A, COMP_C_P1_B, COMP_C_P5_A, ",
-                                         "COMP_C_P5_B, COMP_RA_P01_A, COMP_RA_P01_B, ",
-                                         "COMP_RA_P1_A, COMP_RA_P1_B, COMP_RA_P5_A, ",
-                                         "COMP_RA_P5_B, COMP_RA_MAX_A, COMP_RA_MED_A, ",
-                                         "COMP_RA_SD_A, COMP_RA_SKEW_A, COMP_RA_MAX_B, ",
-                                         "COMP_RA_MED_B, COMP_RA_SD_B, COMP_RA_SKEW_B, ",
-                                         "COMP_C_ENT_A, COMP_C_ENT_B, FW_RA_MAX_D, ",
-                                         "FW_RA_MED_D, FW_RA_SD_D, FW_RA_PPOS_D, ",
-                                         "FW_RA_PNEG_D, FW_RA_PFC05_D, ",
-                                         "FW_RA_PFC2_D, FW_LOG_MAX_D, FW_LOG_MED_D, ",
-                                         "FW_LOG_SD_D, FW_LOG_PPOS_D, FW_LOG_PNEG_D, ",
-                                         "FW_LOG_PFC05_D, FW_LOG_PFC1_D, ",
-                                         "FW_LOG_PFC2_D, FW_CLR_MAX_D, ",
-                                         "FW_CLR_PPOS_D, ",
-                                         "FW_CLR_PFC05_D, FW_CLR_PFC1_D, ",
-                                         "FW_CLR_PFC2_D, METHOD, PARTIAL_INFO, ",
-                                         "BASELINE_TYPE,TPR, FPR ",
-                                         "FROM datasets LEFT JOIN characteristics ",
-                                         "ON datasets.UUID=characteristics.UUID ",
-                                         "LEFT JOIN results ",
-                                         "ON (characteristics.UUID=results.UUID ",
-                                         "AND characteristics.partial=results.PARTIAL_INFO) ",
-                                         "WHERE BASELINE_TYPE='", use_baseline, "';"))
-    } else {
-      results <- dbGetQuery(conn, paste0("SELECT datasets.UUID AS UUID, P, CORRP, ",
-                                         "TOTALS_C_FC, TOTALS_C_D, ",
-                                         "TOTALS_C_MAX_D, TOTALS_C_MED_D, ",
-                                         "TOTALS_C_SD_D, CORR_RA_MED, CORR_RA_SD, ",
-                                         "CORR_RA_SKEW, CORR_LOG_MED, CORR_LOG_SD, ",
-                                         "CORR_LOG_SKEW, CORR_CLR_MED, CORR_CLR_SD, ",
-                                         "CORR_CLR_SKEW, COMP_C_P0_A, COMP_C_P0_B, ",
-                                         "COMP_C_P1_A, COMP_C_P1_B, COMP_C_P5_A, ",
-                                         "COMP_C_P5_B, COMP_RA_P01_A, COMP_RA_P01_B, ",
-                                         "COMP_RA_P1_A, COMP_RA_P1_B, COMP_RA_P5_A, ",
-                                         "COMP_RA_P5_B, COMP_RA_MAX_A, COMP_RA_MED_A, ",
-                                         "COMP_RA_SD_A, COMP_RA_SKEW_A, COMP_RA_MAX_B, ",
-                                         "COMP_RA_MED_B, COMP_RA_SD_B, COMP_RA_SKEW_B, ",
-                                         "COMP_C_ENT_A, COMP_C_ENT_B, FW_RA_MAX_D, ",
-                                         "FW_RA_MED_D, FW_RA_SD_D, FW_RA_PPOS_D, ",
-                                         "FW_RA_PNEG_D, FW_RA_PFC05_D, ",
-                                         "FW_RA_PFC2_D, FW_LOG_MAX_D, FW_LOG_MED_D, ",
-                                         "FW_LOG_SD_D, FW_LOG_PPOS_D, FW_LOG_PNEG_D, ",
-                                         "FW_LOG_PFC05_D, FW_LOG_PFC1_D, ",
-                                         "FW_LOG_PFC2_D, FW_CLR_MAX_D, ",
-                                         "FW_CLR_PPOS_D, ",
-                                         "FW_CLR_PFC05_D, FW_CLR_PFC1_D, ",
-                                         "FW_CLR_PFC2_D, METHOD, PARTIAL_INFO, ",
-                                         "BASELINE_TYPE,TPR, FPR ",
-                                         "FROM datasets LEFT JOIN characteristics ",
-                                         "ON datasets.UUID=characteristics.UUID ",
-                                         "LEFT JOIN results ",
-                                         "ON (characteristics.UUID=results.UUID ",
-                                         "AND characteristics.partial=results.PARTIAL_INFO) ",
-                                         "WHERE BASELINE_TYPE='", use_baseline, "';"))
-    }
-    dbDisconnect(conn)
+    datasets <- dbGetQuery(conn, paste0("SELECT UUID, P FROM datasets"))
   }
-
-  if(exclude_partials) {
-    # Filter out results with partial information
-    results <- results %>%
-      filter(PARTIAL_INFO == 0)
+  if(use_renorm_counts) {
+    characteristics <- dbGetQuery(conn, paste0("SELECT * FROM characteristics WHERE PARTIAL=0"))
   } else {
-    # Filter simulations with partial abundances to those that are "informative"
-    # i.e. those with an a fold change intermediate between the observed FC (~1)
-    # and the true FC
-    results$include <- FALSE
-    results$include[results$PARTIAL_INFO == 0] <- TRUE
-    # Decreases
-    results$include[(results$PARTIAL_INFO == 1 &
-                       results$FC_ABSOLUTE > 0.5 &
-                       results$FC_ABSOLUTE < 1 &
-                       results$FC_ABSOLUTE < results$FC_PARTIAL &
-                       results$FC_PARTIAL < results$FC_RELATIVE)] <- TRUE
-    # Increases
-    results$include[(results$PARTIAL_INFO == 1 &
-                       results$FC_ABSOLUTE < 2 &
-                       results$FC_ABSOLUTE > 1 &
-                       results$FC_ABSOLUTE > results$FC_PARTIAL &
-                       results$FC_PARTIAL > results$FC_RELATIVE)] <- TRUE
-    results <- results %>%
-      filter(include) %>%
-      select(!c("include"))
+    characteristics <- dbGetQuery(conn, paste0("SELECT * FROM characteristics WHERE PARTIAL=0 AND type='relative_abundances'"))
   }
+  results <- dbGetQuery(conn, paste0("SELECT UUID, METHOD, TPR, FPR FROM results WHERE PARTIAL_INFO=0 AND BASELINE_TYPE='", use_baseline, "'"))
+    
+  # Subset to reasonable combinations (i.e. we don't care about joining features
+  # for counts that have been scaled by ALDEx2 and had differential abundance
+  # called on them by scran because we won't be training the predictive model on
+  # that scenario).
+  combo_df <- datasets %>%
+    left_join(characteristics, by = "UUID") %>%
+    left_join(results, by = "UUID") %>%
+    filter(METHOD %in% DE_methods) %>%
+    select(-c(PARTIAL, FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D)) %>%
+    filter(TYPE == "relative_abundances" |
+             (TYPE == "scaled_ALDEx2" & METHOD == "ALDEx2") |
+             (TYPE == "scaled_DESeq2" & METHOD == "DESeq2") |
+             (TYPE == "scaled_scran" & METHOD == "scran"))
   
-  results <- results %>%
-    select(!PARTIAL_INFO)
+  dbDisconnect(conn)
   
-  if(exclude_independent) {
-    # Filter out uncorrelated-feature simulations
-    results <- results %>%
-      filter(CORRP != 0)
-  }
-  
-  # Strip "result-less" entries
-  results <- results %>%
+  # Strip "result-less" entries which occasionally result from simulations
+  # which don't have any meaningful differential abundance
+  combo_df <- combo_df %>%
     filter(!is.na(TPR) & !is.na(FPR))
   
-  # Pull out the features we won't predict on
-  uuids <- results$UUID
-  results <- results %>%
-    filter(METHOD %in% DE_methods) %>%
-    select(-c(UUID, CORRP, BASELINE_TYPE))
-  
-  # With UUID
-  # results <- results %>%
-  #   filter(METHOD %in% DE_methods) %>%
-  #   select(-c(CORRP, BASELINE_TYPE))
-  
-  return(results)
+  return(combo_df)
 }
 
 #' Generate simulated differential expression for two conditions
 #'
-#' @param model_type one of "RF" or "LR"
 #' @param DE_methods which DE calling method's results to predict; if "all",
 #' prediction is over all results together
 #' @param use_baseline "self" or "oracle"
+#' @param use_totals pull fold change in total estimate from absolute counts
+#' @param use_renorm_counts pull features generated from method-renormalized
+#' data
 #' @param output_weights flag indicating whether or not to plot some visualization
 #' of feature weights
-#' @param exclude_partials flag indicating whether to exclude simulations with 
-#' partial abundance information
-#' @param exclude_independent flag indicating whether to exclude simulations 
-#' with uncorrelated features
 #' @param train_percent percent of simulated datasets to train on
-#' @param abs_feature_list optional predictive feature list from absolute 
-#' abundance data to use
-#' @param save_slug optional file path and name for saved predictive model (e.g.
-#' /output/allmethods_oracle, to which _TPR.rds and _FPR.rds will be appended
-#' @param save_training_data flag indicating whether or not to save training data
-#' with the saved model output
-#' @param do_classify optional flag indicating whether or not to train a 
-#' classification model on "good" vs. "bad" outcomes
-#' @param alpha optional threshold for classification indicating the minimum 
-#' sensitivity of specificity for "good" outcomes
 #' @return NULL (fitted models are saved in output directory)
 #' @import randomForest
 #' @import dplyr
 #' @import tidyr
-#' @import caret
-#' @import glmnet
 #' @export
-fit_predictive_model <- function(model_type = "RF",
-                                 DE_methods = c("ALDEx2", "DESeq2", "scran"),
-                                 use_baseline = "self",
+fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
+                                 use_baseline = "oracle",
+                                 use_totals = FALSE,
+                                 use_renorm_counts = FALSE,
                                  output_weights = TRUE,
-                                 exclude_partials = TRUE,
-                                 exclude_independent = FALSE,
-                                 train_percent = 0.8,
-                                 abs_feature_list = NULL,
-                                 save_slug = NULL,
-                                 save_training_data = TRUE,
-                                 do_classify = FALSE,
-                                 alpha = 0.95) {
-  
-  if(!(model_type %in% c("RF", "LR"))) {
-    stop(paste0("Invalid model type: ", model_type, "!\n"))
-  }
+                                 train_percent = 0.8) {
   
   if(!(use_baseline %in% c("self", "oracle"))) {
     stop(paste0("Invalid baseline: ", use_baseline, "!\n"))
   }
   
-  if(!any(DE_methods %in% c("ALDEx2", "DESeq2", "MAST", "scran"))) {
-    stop(paste0("Invalid DE calling method!\n"))
-  }
-
   save_path <- list("output",
                     "predictive_fits",
-                    paste0(use_baseline, "_", ifelse(exclude_partials, "nopartial", "partial")),
-                    ifelse(do_classify, "classification", "regression"))
+                    use_baseline,
+                    "regression")
   for(i in 1:length(save_path)) {
     fp <- do.call(file.path, save_path[1:i])
     if(!dir.exists(fp)) {
@@ -483,65 +347,47 @@ fit_predictive_model <- function(model_type = "RF",
   }
   save_dir <- fp
   
-  features <- pull_features(use_baseline = use_baseline,
-                            exclude_partials = exclude_partials,
-                            exclude_independent = exclude_independent,
-                            abs_feature_list = abs_feature_list)
+  features <- pull_features(DE_methods = DE_methods,
+                            use_baseline = use_baseline,
+                            use_totals = use_totals,
+                            use_renorm_counts = use_renorm_counts)
 
-  if(model_type == "LR") {
-    # Scale features
-    # 1) Read in any data in 'data/raw_features' and scale this with 
-    raw_features <- NULL
-    raw_features_fn <- list.files(file.path("data", "raw_features"),
-                                  full.names = FALSE)
-    validation_features_fn <- character(length(raw_features_fn))
-    if(length(raw_features_fn) > 0) {
-      for(i in 1:length(raw_features_fn)) {
-        fn <- raw_features_fn[i]
-        raw_features <- rbind(raw_features, readRDS(file.path("data", "raw_features", fn)))
-        fn_pieces <- strsplit(fn, "\\.")[[1]]
-        validation_features_fn[i] <- file.path("data", "scaled_features", paste0(fn_pieces[1], "_scaled.rds"))
-      }
-      # 2) Align features
-      mapping <- data.frame(fnames = colnames(features), idx1 = 1:ncol(features)) %>%
-        left_join(data.frame(fnames = colnames(raw_features), idx2 = 1:ncol(raw_features)), by = "fnames")
-      n <- nrow(features)
-      scaled_features <- rbind(features[,mapping %>% filter(!is.na(idx2)) %>% pull(idx1)],
-                               raw_features[,mapping %>% filter( !is.na(idx2)) %>% pull(idx2)])
-      # 3) Scale together
-      scaled_features <- apply(scaled_features, 2, scale)
-      unscaled_features <- features[,-c(mapping %>% filter(!is.na(idx2)) %>% pull(idx1))]
-      # 4) Extract them into separate data.frames
-      features <- cbind(scaled_features[1:n,], unscaled_features)
-      validation_features <- scaled_features[(n+1):nrow(scaled_features),]
-      for(i in 1:nrow(validation_features)) {
-        saveRDS(validation_features[i,], validation_features_fn[i])
-      }
-    } else {
-      # No other features to scale with this data set
-      scaled_features <- apply(features %>% select(-c(METHOD, TPR, FPR)), 2, scale)
-      features <- cbind(scaled_features, features %>% select(c(METHOD, TPR, FPR)))
-    }
-  }
-
-  # Subset to methods of interest
-  if(length(DE_methods) > 1) {
-    features <- features %>%
-      filter(METHOD %in% DE_methods)
-    features$METHOD <- factor(features$METHOD)
-  } else {
-    features <- features %>%
-      filter(METHOD %in% DE_methods) %>%
-      select(!METHOD)
+  if(use_renorm_counts) {
+    # Combine features from relative abundances and renormalized counts for the 
+    # same data set
+    f1 <- features %>%
+      filter(TYPE == "relative_abundances")
+    f2 <- features %>%
+      filter(TYPE != "relative_abundances")
+    
+    # Drop duplicate columns
+    f1 <- f1 %>%
+      select(-c(P, FC_ABSOLUTE, TYPE, METHOD, TPR, FPR))
+    
+    ignore_columns <- c("UUID", "P", "FC_ABSOLUTE", "TYPE", "METHOD", "TPR", "FPR")
+    rename_flag <- !(colnames(f1) %in% ignore_columns)
+    colnames(f1)[rename_flag] <- paste0(colnames(f1)[rename_flag], "_rel")
+    rename_flag <- !(colnames(f2) %in% ignore_columns)
+    colnames(f2)[rename_flag] <- paste0(colnames(f2)[rename_flag], "_scaled")
+    
+    features <- f1 %>%
+      left_join(f2, by = "UUID")
   }
   
-  # for(use_result_type in c("TPR", "FPR")) {
+  features <- features %>%
+    select(-c(TYPE))
+  
+  if(length(DE_methods) == 1) {
+    features <- features %>%
+      select(-c(METHOD))
+  }
+  
   for(use_result_type in c("TPR", "FPR")) {
     cat(paste0("Modeling ", use_result_type, "\n"))
     
     # Pull out the features we won't predict on
     uuids <- features$UUID
-
+    
     # Remove result type we're not interested in and separate data into a
     # features and response data.frame
     features_result_type <- features %>%
@@ -574,70 +420,35 @@ fit_predictive_model <- function(model_type = "RF",
       test_response <- 1 - test_response
     }
     
-    if(do_classify) {
-      train_response <- sapply(train_response, function(x) {
-        # "Bad" outcomes (1) have less than 95% sensitivity or specificity
-        # "Good" outcomes (0) have at least 95% sensitivity or specificity
-        ifelse(x < alpha, 1, 0)
-      })
-      train_response <- factor(train_response)
-      test_response <- sapply(test_response, function(x) {
-        ifelse(x < alpha, 1, 0)
-      })
-      test_response <- factor(test_response)
-    }
-
-    if(is.null(save_slug)) {
-      save_fn <- file.path(save_dir,
-                           paste0(use_result_type,
-                                  ifelse(length(DE_methods) == 1, paste0("_", DE_methods), ""),
-                                  ".rds"))
-    } else {
-      save_fn <- file.path(save_dir,
-                           paste0(save_slug,
-                                  "_",
-                                  use_result_type,
-                                  ifelse(length(DE_methods) == 1, paste0("_", DE_methods), ""),
-                                  ".rds"))
-    }
+    save_fn <- file.path(save_dir,
+                         paste0(use_result_type,
+                                ifelse(length(DE_methods) == 1, paste0("_", DE_methods), ""),
+                                ".rds"))
+    
     cat(paste0("Predictive model saving/saved to: ", save_fn, "\n"))
-    if(!file.exists(save_fn)) {
+    # if(!file.exists(save_fn)) {
       cat("Training model...\n")
       train_data <- cbind(train_features, response = train_response)
-      if(model_type == "LR") {
-        res <- cv.glmnet(x = model.matrix(response ~ ., train_data),
-                      y = factor(train_data %>% pull(response)),
-                      family = "binomial",
-                      alpha = 1)
-        # Predict as
-        # newx <- model.matrix(response ~ ., test_data)
-        # predictions <- predict(res, newx = newx, s = "lambda.1se", type = "class")
-        # confusionMatrix(factor(test_data$response), factor(predictions))
-      } else {
-        res <- randomForest(response ~ .,
-                            data = train_data)
-                            # mtry = round((ncol(train_data)-2)/3)) # train each tree
-                            #                                       # on 1/3 features
-      }
-      if(save_training_data) {
-        saveRDS(list(result = res,
-                     train_features = train_features,
-                     train_response = train_response,
-                     test_features = test_features,
-                     test_response = test_response), save_fn)
-      } else {
-        saveRDS(list(result = res), save_fn)
-      }
-    }
+      res <- randomForest(response ~ .,
+                          data = train_data)
+      # mtry = round((ncol(train_data)-2)/3)) # train each tree
+      #                                       # on 1/3 features
+      # Save training data
+      saveRDS(list(result = res,
+                   train_features = train_features,
+                   train_response = train_response,
+                   test_features = test_features,
+                   test_response = test_response), save_fn)
+    # }
 
-    if(output_weights & model_type == "RF") {
+    if(output_weights) {
       if(file.exists(save_fn)) {
         res_obj <- readRDS(save_fn)
         res <- res_obj$result
-        train_features <- res_obj$train_features
-        train_response <- res_obj$train_response
-        test_features <- res_obj$test_features
-        test_response <- res_obj$test_response
+        train_features <- res$train_features
+        train_response <- res$train_response
+        test_features <- res$test_features
+        test_response <- res$test_response
       } else {
         stop(paste0("Model not found at: ", save_fn, "!\n"))
       }

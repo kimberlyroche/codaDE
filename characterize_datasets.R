@@ -41,7 +41,7 @@ output_fn <- file.path("temp", paste0(output, "_", start, "-", end, ".txt"))
 
 # Initialize output
 output_file <- file(output_fn)
-writeLines(paste0(c("ID", "uuid", "partial_info", "med_abs", "med_rel",
+writeLines(paste0(c("ID", "uuid", "partial_info", "type", "med_abs", "med_rel",
                     "TOTALS_C_FC", "TOTALS_C_D", "TOTALS_C_MAX_D",
                     "TOTALS_C_MED_D", "TOTALS_C_SD_D", "CORR_RA_MED",
                     "CORR_RA_SD", "CORR_RA_SKEW", "CORR_LOG_MED",
@@ -104,11 +104,26 @@ for(i in 1:nrow(wishlist)) {
   med_rel <- mean(rowSums(counts))
 
   n <- nrow(counts)/2
-  counts_A <- counts[1:n,]
-  counts_B <- counts[(n+1):(n*2),]
-  
+
+  if(job$type == "relative_abundances") {
+    counts_A <- counts[1:n,]
+    counts_B <- counts[(n+1):(n*2),]
+  } else if(job$type == "scaled_ALDEx2") {
+    scaled_counts <- scaled_counts_ALDEx2(counts)
+    counts_A <- scaled_counts[1:n,]
+    counts_B <- scaled_counts[(n+1):(n*2),]
+  } else if(job$type == "scaled_DESeq2") {
+    scaled_counts <- scaled_counts_DESeq2(counts, data$simulation$groups)
+    counts_A <- scaled_counts[1:n,]
+    counts_B <- scaled_counts[(n+1):(n*2),]
+  } else if(job$type == "scaled_ALDEx2") {
+    scaled_counts <- scaled_counts_scran(counts, data$simulation$groups)
+    counts_A <- scaled_counts[1:n,]
+    counts_B <- scaled_counts[(n+1):(n*2),]
+  }
+
   results_row <- cbind(job, med_abs, med_rel, characterize_dataset(counts_A, counts_B))
-  
+
   write_delim(results_row, output_fn, delim = "\t", append = TRUE)
   counter <- counter + 1
 }

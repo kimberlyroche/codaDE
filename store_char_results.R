@@ -27,7 +27,7 @@ for(file in file_list) {
   for(i in 1:nrow(results)) {
     job <- results[i,]
   
-    if(job$partial_info == 0) {
+    if(job$partial_info == 0 & job$type == "relative_abundances") {
           updates <- updates + dbExecute(conn,
                                          paste0("UPDATE datasets SET ",
                                                 "MED_ABS_TOTAL=", job$med_abs, ", ",
@@ -37,6 +37,7 @@ for(file in file_list) {
 
     updates <- updates + dbExecute(conn,
                                    paste0("INSERT OR REPLACE INTO characteristics(UUID, PARTIAL, ",
+                                          "TYPE, ",
                                           "TOTALS_C_FC, ",
                                           "TOTALS_C_D, ",
                                           "TOTALS_C_MAX_D, ",
@@ -99,6 +100,7 @@ for(file in file_list) {
                                           "FW_CLR_PFC2_D) ",
                                           "VALUES(",
                                           "'", job$uuid, "', ",job$partial_info,", ",
+                                          "'", job$type, "', ",
                                           job$TOTALS_C_FC, ", ",
                                           job$TOTALS_C_D, ", ",
                                           job$TOTALS_C_MAX_D, ", ",

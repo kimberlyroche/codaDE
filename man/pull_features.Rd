@@ -6,11 +6,9 @@
 \usage{
 pull_features(
   DE_methods = c("ALDEx2", "DESeq2", "scran"),
-  use_baseline = "self",
-  exclude_partials = TRUE,
-  exclude_independent = FALSE,
-  feature_list = NULL,
-  abs_feature_list = NULL
+  use_baseline = "oracle",
+  use_totals = FALSE,
+  use_renorm_counts = FALSE
 )
 }
 \arguments{
@@ -20,16 +18,10 @@ pull_features(
 abundance calls against which we will score accuracy of calls made on 
 observed (relative) abundance data}
 
-\item{exclude_partials}{flag indicating whether to exclude simulations with 
-partial abundance information}
+\item{use_totals}{pull fold change in total estimate from absolute counts}
 
-\item{exclude_independent}{flag indicating whether to exclude simulations 
-with uncorrelated features}
-
-\item{feature_list}{optional predictive feature list to use}
-
-\item{abs_feature_list}{optional predictive feature list from absolute 
-abundance data to use}
+\item{use_renorm_counts}{pull features generated from method-renormalized
+data}
 }
 \value{
 data.frame with predictive model training features

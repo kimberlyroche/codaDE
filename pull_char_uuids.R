@@ -25,15 +25,28 @@ for(u in 1:length(all_uuids)) {
     cat(paste0("UUID ", u, " / ", length(all_uuids), "\n"))
   }
   uuid <- all_uuids[u]
-  for(par in c(0, 1)) {
-    res <- dbGetQuery(conn, paste0("SELECT * FROM characteristics ",
-                                   "WHERE UUID = '",uuid,"' AND ",
-                                   "PARTIAL=", par, ";"))
-    # Look for any missing fields
-    if(nrow(res) == 0 || any(is.na(res %>% select(-c(UUID, PARTIAL))))) {
-      wishlist <- rbind(wishlist,
-                        data.frame(ID = counter, uuid = uuid, partial_info = par))
-      counter <- counter + 1
+  for(type in c("relative_abundances", "scaled_ALDEx2", "scaled_DESeq2", "scaled_scran")) {
+    if(type == "relative_abundances") {
+      for(par in c(0, 1)) {
+        res <- dbGetQuery(conn, paste0("SELECT * FROM characteristics ",
+                                       "WHERE UUID = '",uuid,"' AND ",
+                                       "PARTIAL=", par, " AND TYPE='relative_abundances';"))
+        # Look for any missing fields
+        if(nrow(res) == 0 || any(is.na(res %>% select(-c(UUID, PARTIAL))))) {
+          wishlist <- rbind(wishlist,
+                            data.frame(ID = counter, uuid = uuid, partial_info = par, type = "relative_abundances"))
+          counter <- counter + 1
+        }
+      }
+    } else {
+      res <- dbGetQuery(conn, paste0("SELECT * FROM characteristics ",
+                                       "WHERE UUID = '",uuid,"' AND TYPE='",type,"';"))
+      # Look for any missing fields
+      if(nrow(res) == 0 || any(is.na(res %>% select(-c(UUID, PARTIAL, TYPE))))) {
+        wishlist <- rbind(wishlist,
+                          data.frame(ID = counter, uuid = uuid, partial_info = 0, type = type))
+        counter <- counter + 1
+      }
     }
   }
 }
