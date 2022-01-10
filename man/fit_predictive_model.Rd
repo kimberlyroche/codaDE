@@ -5,53 +5,29 @@
 \title{Generate simulated differential expression for two conditions}
 \usage{
 fit_predictive_model(
-  model_type = "RF",
   DE_methods = c("ALDEx2", "DESeq2", "scran"),
-  use_baseline = "self",
+  use_baseline = "oracle",
+  use_totals = FALSE,
+  use_renorm_counts = FALSE,
   output_weights = TRUE,
-  exclude_partials = TRUE,
-  exclude_independent = FALSE,
-  train_percent = 0.8,
-  abs_feature_list = NULL,
-  save_slug = NULL,
-  save_training_data = TRUE,
-  do_classify = FALSE,
-  alpha = 0.95
+  train_percent = 0.8
 )
 }
 \arguments{
-\item{model_type}{one of "RF" or "LR"}
-
 \item{DE_methods}{which DE calling method's results to predict; if "all",
 prediction is over all results together}
 
 \item{use_baseline}{"self" or "oracle"}
 
+\item{use_totals}{pull fold change in total estimate from absolute counts}
+
+\item{use_renorm_counts}{pull features generated from method-renormalized
+data}
+
 \item{output_weights}{flag indicating whether or not to plot some visualization
 of feature weights}
 
-\item{exclude_partials}{flag indicating whether to exclude simulations with 
-partial abundance information}
-
-\item{exclude_independent}{flag indicating whether to exclude simulations 
-with uncorrelated features}
-
 \item{train_percent}{percent of simulated datasets to train on}
-
-\item{abs_feature_list}{optional predictive feature list from absolute 
-abundance data to use}
-
-\item{save_slug}{optional file path and name for saved predictive model (e.g.
-/output/allmethods_oracle, to which _TPR.rds and _FPR.rds will be appended}
-
-\item{save_training_data}{flag indicating whether or not to save training data
-with the saved model output}
-
-\item{do_classify}{optional flag indicating whether or not to train a 
-classification model on "good" vs. "bad" outcomes}
-
-\item{alpha}{optional threshold for classification indicating the minimum 
-sensitivity of specificity for "good" outcomes}
 }
 \value{
 NULL (fitted models are saved in output directory)
