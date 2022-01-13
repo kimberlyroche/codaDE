@@ -16,8 +16,10 @@ thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
 
 # thresholds <- rep(2, length(datasets))
 names(thresholds) <- datasets
-# model_dir <- "self_nopartial"
-model_dir <- "oracle_nopartial"
+# model_dir <- "self"
+model_dir <- "oracle"
+
+submodel_dir <- "regression_baseline"
 
 # ------------------------------------------------------------------------------
 #   Classification accuracy
@@ -104,7 +106,7 @@ plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 result_files <- list.files(path = file.path("output",
                                             "predictive_fits",
                                             model_dir,
-                                            "regression",
+                                            submodel_dir,
                                             "validation_results",
                                             "no_norm"),
                            pattern = "results_(.*?)_threshold(\\d+)\\.tsv",
@@ -186,7 +188,7 @@ for(use_result_type in c("TPR", "FPR")) {
   pl <- plot_grid(prow1, prow2, legend, ncol = 1, rel_heights = c(1, 1, .1), scale = 0.9)
   pl <- pl +
     theme(plot.margin = ggplot2::margin(t = 25, r = 0, b = 0, l = 0, "pt"))
-  show(pl)
+  # show(pl)
   ggsave(file.path("output",
                    "images",
                    paste0("validations_",

@@ -280,7 +280,7 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
   if(use_renorm_counts) {
     characteristics <- dbGetQuery(conn, paste0("SELECT * FROM characteristics WHERE PARTIAL=0"))
   } else {
-    characteristics <- dbGetQuery(conn, paste0("SELECT * FROM characteristics WHERE PARTIAL=0 AND type='relative_abundances'"))
+    characteristics <- dbGetQuery(conn, paste0("SELECT * FROM characteristics WHERE PARTIAL=0 AND TYPE='relative_abundances'"))
   }
   results <- dbGetQuery(conn, paste0("SELECT UUID, METHOD, TPR, FPR FROM results WHERE PARTIAL_INFO=0 AND BASELINE_TYPE='", use_baseline, "'"))
     
