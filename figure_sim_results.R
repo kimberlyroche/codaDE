@@ -110,12 +110,22 @@ plot_ROC_flag <- function(data, method, p, logical_vec) {
   return(pl)
 }
 
-plot_ROC_fc <- function(data, method, p) {
-  pl <- ggplot() +
-    geom_point(data %>% filter(METHOD == method & P == p),
-               mapping = aes(x = FPR, y = TPR, fill = FC_plot),
-               size = 2,
-               shape = 21) +
+plot_ROC_fc <- function(data, method, p = NULL) {
+  pl <- ggplot()
+  if(is.null(p)) {
+    pl <- pl +
+      geom_point(data %>% filter(METHOD == method),
+                 mapping = aes(x = FPR, y = TPR, fill = FC_plot),
+                 size = 2,
+                 shape = 21)
+  } else {
+    pl <- pl +
+      geom_point(data %>% filter(METHOD == method & P == p),
+                 mapping = aes(x = FPR, y = TPR, fill = FC_plot),
+                 size = 2,
+                 shape = 21)
+  }
+  pl <- pl +
     xlim(c(-0.025,1.025)) +
     ylim(c(-0.025,1.025)) +
     labs(x = paste0(method, " specificity (1 - FPR)"),
@@ -133,12 +143,22 @@ plot_ROC_fc <- function(data, method, p) {
   return(list(pl = pl, legend = legend))
 }
 
-plot_ROC_percentDE <- function(data, method, p) {
-  pl <- ggplot() +
-    geom_point(data %>% filter(METHOD == method & P == p),
-               mapping = aes(x = FPR, y = TPR, fill = PERCENT_DIFF_REALIZ),
-               size = 2,
-               shape = 21) +
+plot_ROC_percentDE <- function(data, method, p = NULL) {
+  pl <- ggplot()
+  if(is.null(p)) {
+    pl <- pl +
+      geom_point(data %>% filter(METHOD == method),
+                 mapping = aes(x = FPR, y = TPR, fill = PERCENT_DIFF_REALIZ),
+                 size = 2,
+                 shape = 21)
+  } else {
+    pl <- pl +
+      geom_point(data %>% filter(METHOD == method & P == p),
+                 mapping = aes(x = FPR, y = TPR, fill = PERCENT_DIFF_REALIZ),
+                 size = 2,
+                 shape = 21)
+  }
+  pl <- pl +
     xlim(c(-0.025,1.025)) +
     ylim(c(-0.025,1.025)) +
     labs(x = paste0(method, " specificity (1 - FPR)"),
@@ -200,7 +220,7 @@ qq <- c(0, 1.5, 2.5, 5, Inf)
 #   needs to be global?) so it's duplicated below.
 # ------------------------------------------------------------------------------
 
-data <- pull_data(qq, use_baseline = "self")
+data <- pull_data(qq, use_baseline = "oracle")
 data$FPR <- 1 - data$FPR
 
 p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
@@ -281,97 +301,164 @@ ggsave(file.path("output", "images", "ROC_by_percentDE.png"),
 show(pl)
 
 # ------------------------------------------------------------------------------
-#   Sensitivity x specificity plot labeled for majority differential features
-#   PLUS high or very high fold change
+#   Sensitivity x specificity plot labeled by percent of features differentially
+#   abundant; here ROWS ARE SETTINGS
 # ------------------------------------------------------------------------------
 
-p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
-p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
-p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
+p1_1 <- NULL; p1_2 <- NULL; p1_3 <- NULL
+p2_1 <- NULL; p2_2 <- NULL; p2_3 <- NULL
+p3_1 <- NULL; p3_2 <- NULL; p3_3 <- NULL
 legend <- NULL
 for(i in 1:length(method_list)) {
   method <- method_list[i]
-  for(j in c(100, 1000, 5000)) {
-    # pl <- plot_ROC_flag(data, method, j, data$PERCENT_DIFF_REALIZ < 0.5 & data$FC_plot %in% levels(data$FC_plot)[3:4])
-    plot_pieces <- plot_ROC_fc(data %>% filter(PERCENT_DIFF_REALIZ < 0.5 & FC_plot %in% levels(data$FC_plot)[3:4]), method, j)
+  setting_label <- "n/a"
+  for(j in 1:3) { # iterate settings
+    subdata <- data
+    if(j == 1) {
+      subdata <- subdata %>%
+        filter(P <= 1000 & PERTURBATION >= 1.2)
+      setting_label <- "Microbial"
+    } else if(j == 2) {
+      subdata <- subdata %>%
+        filter(P >= 1000 & PERTURBATION >= 0.8 & PERTURBATION <= 1.2)
+      setting_label <- "Transcriptomic"
+    } else if(j == 3) {
+      subdata <- subdata %>%
+        filter(P == 5000 & PERTURBATION <= 0.8)
+      setting_label <- "Bulk transcriptomic"
+    }
+    prop_high_fpr <- subdata %>%
+      filter(METHOD == method) %>%
+      mutate(high_FPR = ifelse(FPR < 0.95, "high", "low")) %>%
+      group_by(high_FPR) %>%
+      tally() %>%
+      mutate(prop = n/sum(n)) %>%
+      filter(high_FPR == "high") %>%
+      pull(prop)
+    cat(paste0("Method: ", method, ", setting: ", setting_label, ", high FPR prop: ", round(prop_high_fpr, 3), "\n"))
+    # plot_pieces <- plot_ROC_percentDE(subdata, method)
+    plot_pieces <- plot_ROC_fc(subdata, method)
     pl <- plot_pieces$pl
     if(is.null(legend)) {
       legend <- plot_pieces$legend
     }
-    if(i == 1 & j == 100) p1_100 <<- pl
-    if(i == 1 & j == 1000) p1_1000 <<- pl
-    if(i == 1 & j == 5000) p1_5000 <<- pl
-    if(i == 2 & j == 100) p2_100 <<- pl
-    if(i == 2 & j == 1000) p2_1000 <<- pl
-    if(i == 2 & j == 5000) p2_5000 <<- pl
-    if(i == 3 & j == 100) p3_100 <<- pl
-    if(i == 3 & j == 1000) p3_1000 <<- pl
-    if(i == 3 & j == 5000) p3_5000 <<- pl
+    if(i == 1 & j == 1) p1_1 <<- pl
+    if(i == 1 & j == 2) p1_2 <<- pl
+    if(i == 1 & j == 3) p1_3 <<- pl
+    if(i == 2 & j == 1) p2_1 <<- pl
+    if(i == 2 & j == 2) p2_2 <<- pl
+    if(i == 2 & j == 3) p2_3 <<- pl
+    if(i == 3 & j == 1) p3_1 <<- pl
+    if(i == 3 & j == 2) p3_2 <<- pl
+    if(i == 3 & j == 3) p3_3 <<- pl
   }
 }
-prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
-prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
-prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
-# pl <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+prow1 <- plot_grid(p1_1, p2_1, p3_1, ncol = 3)
+prow2 <- plot_grid(p1_2, p2_2, p3_2, ncol = 3)
+prow3 <- plot_grid(p1_3, p2_3, p3_3, ncol = 3)
 pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
 pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
-# ggsave(file.path("output", "images", "ROC_by_subset1.png"),
-ggsave(file.path("output", "images", "ROC_by_subset2.png"),
-       plot = pl,
-       units = "in",
-       height = 10,
-       width = 10,
-       bg = "white")
-# show(pl)
-
-temp <- data %>%
-  filter(METHOD == "scran" & FC_plot %in% levels(data$FC_plot)[4] & P == 5000)
-median(temp$FPR)
-
-# ------------------------------------------------------------------------------
-#   Sensitivity x specificity plot using discrepancies against calls made by a
-#   NB GLM ("oracle method") on absolute abundances
-# ------------------------------------------------------------------------------
-
-data <- pull_data(qq, use_baseline = "oracle")
-data$FPR <- 1 - data$FPR
-
-p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
-p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
-p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
-legend <- NULL
-for(i in 1:length(method_list)) {
-  method <- method_list[i]
-  for(j in c(100, 1000, 5000)) {
-    # plot_pieces <- plot_ROC_fc(data, method, j)
-    plot_pieces <- plot_ROC_percentDE(data, method, j)
-    pl <- plot_pieces$pl
-    if(is.null(legend)) {
-      legend <- plot_pieces$legend
-    }
-    if(i == 1 & j == 100) p1_100 <<- pl
-    if(i == 1 & j == 1000) p1_1000 <<- pl
-    if(i == 1 & j == 5000) p1_5000 <<- pl
-    if(i == 2 & j == 100) p2_100 <<- pl
-    if(i == 2 & j == 1000) p2_1000 <<- pl
-    if(i == 2 & j == 5000) p2_5000 <<- pl
-    if(i == 3 & j == 100) p3_100 <<- pl
-    if(i == 3 & j == 1000) p3_1000 <<- pl
-    if(i == 3 & j == 5000) p3_5000 <<- pl
-  }
-}
-prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
-prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
-prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
-pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
-pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
-ggsave(file.path("output", "images", "ROC_by_FC_NBGLM.png"),
+# ggsave(file.path("output", "images", "ROC_by_percentDE-settings.png"),
+ggsave(file.path("output", "images", "ROC_by_FC-settings.png"),
        plot = pl,
        units = "in",
        height = 10.5,
        width = 10,
        bg = "white")
 show(pl)
+
+# ------------------------------------------------------------------------------
+#   Sensitivity x specificity plot labeled for majority differential features
+#   PLUS high or very high fold change
+# ------------------------------------------------------------------------------
+
+# p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
+# p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
+# p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
+# legend <- NULL
+# for(i in 1:length(method_list)) {
+#   method <- method_list[i]
+#   for(j in c(100, 1000, 5000)) {
+#     # pl <- plot_ROC_flag(data, method, j, data$PERCENT_DIFF_REALIZ < 0.5 & data$FC_plot %in% levels(data$FC_plot)[3:4])
+#     plot_pieces <- plot_ROC_fc(data %>% filter(PERCENT_DIFF_REALIZ < 0.5 & FC_plot %in% levels(data$FC_plot)[3:4]), method, j)
+#     pl <- plot_pieces$pl
+#     if(is.null(legend)) {
+#       legend <- plot_pieces$legend
+#     }
+#     if(i == 1 & j == 100) p1_100 <<- pl
+#     if(i == 1 & j == 1000) p1_1000 <<- pl
+#     if(i == 1 & j == 5000) p1_5000 <<- pl
+#     if(i == 2 & j == 100) p2_100 <<- pl
+#     if(i == 2 & j == 1000) p2_1000 <<- pl
+#     if(i == 2 & j == 5000) p2_5000 <<- pl
+#     if(i == 3 & j == 100) p3_100 <<- pl
+#     if(i == 3 & j == 1000) p3_1000 <<- pl
+#     if(i == 3 & j == 5000) p3_5000 <<- pl
+#   }
+# }
+# prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
+# prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
+# prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
+# # pl <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+# pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+# pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
+# # ggsave(file.path("output", "images", "ROC_by_subset1.png"),
+# ggsave(file.path("output", "images", "ROC_by_subset2.png"),
+#        plot = pl,
+#        units = "in",
+#        height = 10,
+#        width = 10,
+#        bg = "white")
+# # show(pl)
+# 
+# temp <- data %>%
+#   filter(METHOD == "scran" & FC_plot %in% levels(data$FC_plot)[4] & P == 5000)
+# median(temp$FPR)
+
+# ------------------------------------------------------------------------------
+#   Sensitivity x specificity plot using discrepancies against calls made by a
+#   NB GLM ("oracle method") on absolute abundances
+# ------------------------------------------------------------------------------
+
+# data <- pull_data(qq, use_baseline = "oracle")
+# data$FPR <- 1 - data$FPR
+# 
+# p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
+# p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
+# p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
+# legend <- NULL
+# for(i in 1:length(method_list)) {
+#   method <- method_list[i]
+#   for(j in c(100, 1000, 5000)) {
+#     # plot_pieces <- plot_ROC_fc(data, method, j)
+#     plot_pieces <- plot_ROC_percentDE(data, method, j)
+#     pl <- plot_pieces$pl
+#     if(is.null(legend)) {
+#       legend <- plot_pieces$legend
+#     }
+#     if(i == 1 & j == 100) p1_100 <<- pl
+#     if(i == 1 & j == 1000) p1_1000 <<- pl
+#     if(i == 1 & j == 5000) p1_5000 <<- pl
+#     if(i == 2 & j == 100) p2_100 <<- pl
+#     if(i == 2 & j == 1000) p2_1000 <<- pl
+#     if(i == 2 & j == 5000) p2_5000 <<- pl
+#     if(i == 3 & j == 100) p3_100 <<- pl
+#     if(i == 3 & j == 1000) p3_1000 <<- pl
+#     if(i == 3 & j == 5000) p3_5000 <<- pl
+#   }
+# }
+# prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
+# prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
+# prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
+# pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+# pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
+# ggsave(file.path("output", "images", "ROC_by_FC_NBGLM.png"),
+#        plot = pl,
+#        units = "in",
+#        height = 10.5,
+#        width = 10,
+#        bg = "white")
+# show(pl)
 
 # ------------------------------------------------------------------------
 #   What proportion of calls exceed an FDR of 5% here?

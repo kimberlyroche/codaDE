@@ -253,6 +253,12 @@ parse_Monaco <- function(absolute = TRUE) {
     paste0(pieces[2:length(pieces)], collapse = "_")
   })
   
+  A_idx <- which(groups == "PBMC")
+  B_idx <- which(groups == "CD4_naive")
+  data <- data[,c(A_idx,B_idx)]
+  spike_counts <- spike_counts[,c(A_idx,B_idx)]
+  groups <- groups[c(A_idx,B_idx)]
+  
   # Re-normalize
   sf <- compute_sf(data[spike_idx,])
   counts <- data[-spike_idx,]
@@ -276,6 +282,7 @@ parse_Monaco <- function(absolute = TRUE) {
   reorder <- order(groups)
   counts <- counts[,reorder]
   groups <- groups[reorder]
+  groups <- unname(groups)
   
   # View differences in average totals across cell types
   # palette <- generate_highcontrast_palette(40)
@@ -293,10 +300,10 @@ parse_Monaco <- function(absolute = TRUE) {
   #        fill = "Cell type")
   
   # Subset to PBMCs vs. naive CD4 cells
-  A_idx <- which(groups == "PBMC")
-  B_idx <- which(groups == "CD4_naive")
-  counts <- counts[,c(A_idx, B_idx)]
-  groups <- unname(groups[c(A_idx, B_idx)])
+  # A_idx <- which(groups == "PBMC")
+  # B_idx <- which(groups == "CD4_naive")
+  # counts <- counts[,c(A_idx, B_idx)]
+  # groups <- unname(groups[c(A_idx, B_idx)])
   
   parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
   return(parsed_obj)

@@ -10,7 +10,7 @@ library(optparse)
 option_list = list(
   make_option(c("--selfbaseline"),
               type = "logical",
-              default = "TRUE",
+              default = "FALSE",
               help = "use self calls as reference instead of oracle",
               metavar = "logical"),
   make_option(c("--usetotals"),
