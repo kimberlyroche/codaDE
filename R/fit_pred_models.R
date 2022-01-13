@@ -273,7 +273,7 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
   # because these predictors appear to be strongly correlated.
   
   if(use_totals) {
-    datasets <- dbGetQuery(conn, paste0("SELECT UUID, P, FC_ABSOLUTE FROM datasets"))
+    datasets <- dbGetQuery(conn, paste0("SELECT UUID, P, FC_ABSOLUTE, PERCENT_DIFF_REALIZ FROM datasets"))
   } else {
     datasets <- dbGetQuery(conn, paste0("SELECT UUID, P FROM datasets"))
   }
@@ -362,9 +362,13 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
     
     # Drop duplicate columns
     f1 <- f1 %>%
-      select(-c(P, FC_ABSOLUTE, TYPE, METHOD, TPR, FPR))
+      select(-c(P, TYPE, METHOD, TPR, FPR))
+    if(use_totals) {
+      f1 <- f1 %>%
+        select(-c(FC_ABSOLUTE, PERCENT_DIFF_REALIZ))
+    }
     
-    ignore_columns <- c("UUID", "P", "FC_ABSOLUTE", "TYPE", "METHOD", "TPR", "FPR")
+    ignore_columns <- c("UUID", "P", "FC_ABSOLUTE", "PERCENT_DIFF_REALIZ", "TYPE", "METHOD", "TPR", "FPR")
     rename_flag <- !(colnames(f1) %in% ignore_columns)
     colnames(f1)[rename_flag] <- paste0(colnames(f1)[rename_flag], "_rel")
     rename_flag <- !(colnames(f2) %in% ignore_columns)
@@ -396,6 +400,9 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
       select(one_of(use_result_type))
     features_result_type <- features_result_type %>%
       select(-one_of(use_result_type))
+
+    features_result_type <- features_result_type %>%
+      select(-c(UUID))
     
     # Subset for testing
     # idx <- sample(1:nrow(features), size = 1000)
@@ -498,7 +505,7 @@ scaled_counts_ALDEx2 <- function(counts, pseudocount = 0.5) {
 scaled_counts_DESeq2 <- function(counts, groups, pseudocount = 0.5) {
   counts <- t(counts)
   coldata <- data.frame(treatment = groups)
-  coldata$treatment <- factor(coldata$treatment, levels = c(0, 1))
+  coldata$treatment <- factor(coldata$treatment)
   levels(coldata$treatment) <- c("control", "treatment")
   dds <- suppressMessages(DESeqDataSetFromMatrix(countData = counts, colData = coldata, design = ~ treatment))
   dds <- estimateSizeFactors(dds)
