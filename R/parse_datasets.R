@@ -275,6 +275,7 @@ parse_Monaco <- function(absolute = TRUE) {
                               prob = counts[,i] / sum(counts[,i]))
     }
   }
+  feature_names <- rownames(counts)
   counts <- data.matrix(counts)
   colnames(counts) <- NULL
   rownames(counts) <- NULL
@@ -305,7 +306,7 @@ parse_Monaco <- function(absolute = TRUE) {
   # counts <- counts[,c(A_idx, B_idx)]
   # groups <- unname(groups[c(A_idx, B_idx)])
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  parsed_obj <- list(counts = counts, groups = groups, tax = feature_names)
   return(parsed_obj)
 }
 
@@ -528,7 +529,7 @@ parse_Klein <- function(absolute = TRUE) {
   colnames(counts) <- NULL
   counts <- data.matrix(counts)
 
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  parsed_obj <- list(counts = counts, groups = groups, tax = gene_IDs[-gapdh_idx])
   return(parsed_obj)
 }
 

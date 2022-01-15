@@ -87,6 +87,7 @@ ref_data <- t(abs_data$counts)
 data <- t(rel_data$counts)
 groups <- abs_data$groups
 groups <- factor(groups)
+tax <- abs_data$tax
 
 # Subsample if tons of cells/samples
 downsample_limit <- 100 # was 100
@@ -116,9 +117,9 @@ data <- apply(data, c(1,2), as.integer)
 retain_features <- colMeans(ref_data) >= threshold & colMeans(data) >= threshold
 ref_data <- ref_data[,retain_features]
 data <- data[,retain_features]
-
-cat(paste0("Dataset dimensions: ", nrow(ref_data), " x ", ncol(ref_data), "\n"))
-cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
+if(!is.null(tax)) {
+  tax <- tax[retain_features]
+}
 
 # ------------------------------------------------------------------------------
 #   Call discrepancy by each method; save to file if doesn't already exist
@@ -126,6 +127,8 @@ cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*1
 #   This can be time-consuming!
 # ------------------------------------------------------------------------------
 
+# Save this estimate for later; we'll print it out with other statistics
+percent_DE <- NULL
 for(DE_method in methods_list) {
   # Pull saved calls on this data set x method if these exist
   save_fn <- file.path("output",
@@ -153,6 +156,10 @@ for(DE_method in methods_list) {
     save_obj <- list(all_calls = all_calls, rates = rates)
     saveRDS(save_obj, save_fn)
   }
+  if(is.null(percent_DE)) {
+    oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < 0.05
+    percent_DE <- sum(oracle_calls) / length(oracle_calls)
+  }
 }
 
 # ------------------------------------------------------------------------------
@@ -163,65 +170,131 @@ for(DE_method in methods_list) {
 if(dataset_name == "VieiraSilva") {
   counts_A <- data[groups == "mHC",]
   counts_B <- data[groups == "CD",]
-  if(use_totals) {
-    counts_A_abs <- ref_data[groups == "mHC",]
-    counts_B_abs <- ref_data[groups == "CD",]
-  }
+  counts_A_abs <- ref_data[groups == "mHC",]
+  counts_B_abs <- ref_data[groups == "CD",]
 }
 if(dataset_name == "Barlow") {
   counts_A <- data[groups == "control",]
   counts_B <- data[groups == "keto",]
-  if(use_totals) {
-    counts_A_abs <- ref_data[groups == "control",]
-    counts_B_abs <- ref_data[groups == "keto",]
-  }
+  counts_A_abs <- ref_data[groups == "control",]
+  counts_B_abs <- ref_data[groups == "keto",]
 }
 if(dataset_name == "Song") {
   counts_A <- data[groups == "lung",]
   counts_B <- data[groups == "brain",]
-  if(use_totals) {
-    counts_A_abs <- ref_data[groups == "lung",]
-    counts_B_abs <- ref_data[groups == "brain",]
-  }
+  counts_A_abs <- ref_data[groups == "lung",]
+  counts_B_abs <- ref_data[groups == "brain",]
 }
 if(dataset_name == "Monaco") {
   counts_A <- data[groups == "CD4_naive",]
   counts_B <- data[groups == "PBMC",]
-  if(use_totals) {
-    counts_A_abs <- ref_data[groups == "CD4_naive",]
-    counts_B_abs <- ref_data[groups == "PBMC",]
-  }
+  counts_A_abs <- ref_data[groups == "CD4_naive",]
+  counts_B_abs <- ref_data[groups == "PBMC",]
 }
 if(dataset_name == "Hagai") {
   counts_A <- data[groups == "unstimulated",]
   counts_B <- data[groups == "pIC4",]
-  if(use_totals) {
-    counts_A_abs <- ref_data[groups == "unstimulated",]
-    counts_B_abs <- ref_data[groups == "pIC4",]
-  }
+  counts_A_abs <- ref_data[groups == "unstimulated",]
+  counts_B_abs <- ref_data[groups == "pIC4",]
 }
 if(dataset_name == "Owens") {
   counts_A <- data[groups == "early_series",]
   counts_B <- data[groups == "late_series",]
-  if(use_totals) {
-    counts_A_abs <- ref_data[groups == "early_series",]
-    counts_B_abs <- ref_data[groups == "late_series",]
-  }
+  counts_A_abs <- ref_data[groups == "early_series",]
+  counts_B_abs <- ref_data[groups == "late_series",]
 }
 if(dataset_name == "Klein") {
   counts_A <- data[groups == "unstimulated",]
   counts_B <- data[groups == "LIF-2hr",]
-  if(use_totals) {
-    counts_A_abs <- ref_data[groups == "unstimulated",]
-    counts_B_abs <- ref_data[groups == "LIF-2hr",]
-  }
+  counts_A_abs <- ref_data[groups == "unstimulated",]
+  counts_B_abs <- ref_data[groups == "LIF-2hr",]
 }
 if(dataset_name == "Yu") {
   counts_A <- data[groups == "Brn",]
   counts_B <- data[groups == "Lvr",]
-  if(use_totals) {
-    counts_A_abs <- ref_data[groups == "Brn",]
-    counts_B_abs <- ref_data[groups == "Lvr",]
+  counts_A_abs <- ref_data[groups == "Brn",]
+  counts_B_abs <- ref_data[groups == "Lvr",]
+}
+
+# Report stats on this data set
+cat(paste0("Number of features (after filtering): ", ncol(counts_A), "\n"))
+cat(paste0("Number of samples: ", length(groups), "\n"))
+cat(paste0("Samples per condition (A, B): ", sum(groups == levels(groups)[1]), ", ",
+           sum(groups == levels(groups)[2]), "\n"))
+cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
+sA <- mean(rowSums(counts_A_abs))
+sB <- mean(rowSums(counts_B_abs))
+fc <- max(sA, sB) / min(sA, sB)
+cat(paste0("Approx. fold change between conditions: ", round(fc, 1), "\n"))
+cat(paste0("Approx. percent differential features: ", round(percent_DE, 2)*100, "%\n"))
+
+# Render some "misses" (discrepant genes between calls on absolute abundances
+# and calls on relative abundances) while we've got the data set parsed...
+if(dataset_name == "Monaco" | dataset_name == "Klein") {
+  if(dataset_name == "Monaco") {
+    method <- "ALDEx2"
+    gene_idx <- 1228 # an arbitrary false negative (Ensa), pulled from
+                     # calls_oracle_(method)_Monaco_threshold1.rds
+    scaled_counts <- scaled_counts_ALDEx2(rbind(counts_A, counts_B), pseudocount = 0.5)
+  } else {
+    method <- "scran"
+    gene_idx <- 552 # an arbitrary false positive (Cox7c), pulled from
+                    # calls_oracle_(method)_Klein_threshold1.rds
+    scaled_counts <- scaled_counts_scran(rbind(counts_A, counts_B), groups, pseudocount = 0.5)
+  }
+
+  scaled_counts_A <- scaled_counts[which(groups == levels(groups)[1]),]
+  scaled_counts_B <- scaled_counts[which(groups == levels(groups)[2]),]
+  
+  plot_df <- data.frame(x = 1:nrow(counts_A_abs),
+                        y = counts_A_abs[,gene_idx],
+                        type = "absolute abundance",
+                        type2 = levels(groups)[1])
+  plot_df <- rbind(plot_df,
+                   data.frame(x = (nrow(counts_A_abs) + 1):(nrow(counts_A_abs) + nrow(counts_B_abs)),
+                              y = counts_B_abs[,gene_idx],
+                              type = "absolute abundance",
+                              type2 = levels(groups)[2]))
+  plot_df <- rbind(plot_df,
+                   data.frame(x = 1:nrow(scaled_counts_A),
+                              y = scaled_counts_A[,gene_idx],
+                              type = "scaled abundance",
+                              type2 = levels(groups)[1]))
+  plot_df <- rbind(plot_df,
+                   data.frame(x = (nrow(scaled_counts_A) + 1):(nrow(scaled_counts_A) + nrow(scaled_counts_B)),
+                              y = scaled_counts_B[,gene_idx],
+                              type = "scaled abundance",
+                              type2 = levels(groups)[2]))
+  
+  if(dataset_name == "Monaco") {
+    plot_df$type2[plot_df$type2 == "CD4_naive"] <- "CD4 naive"
+  } else {
+    plot_df$type2[plot_df$type2 == "unstimulated"] <- "Unstimulated"
+  }
+  
+  p <- ggplot(plot_df, aes(x = x, y = y, fill = type2)) +
+    geom_point(size = 2, shape = 21) +
+    facet_wrap(. ~ type) +
+    theme_bw() +
+    labs(x = "sample index",
+         y = "abundance",
+         fill = "Condition or type") +
+    scale_fill_manual(values = c("#0771DE", "orange"))
+  if(dataset_name == "Monaco") {
+    ggsave("output/images/FN_Monaco.png",
+           p,
+           dpi = 100,
+           units = "in",
+           height = 2.5,
+           width = 6)
+  } else if(dataset_name == "Klein") {
+    show(p)
+    ggsave("output/images/FP_Klein.png",
+           p,
+           dpi = 100,
+           units = "in",
+           height = 2.5,
+           width = 6)
   }
 }
 

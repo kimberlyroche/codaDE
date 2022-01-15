@@ -12,7 +12,7 @@ dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
 
 datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
-thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
+thresholds <- c(1, 1, 1, 1, 1, 1, 1, 1)
 
 # thresholds <- rep(2, length(datasets))
 names(thresholds) <- datasets
