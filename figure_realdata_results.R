@@ -12,7 +12,7 @@ dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
 
 datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
-thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
+thresholds <- c(1, 1, 1, 1, 1, 1, 1, 1)
 
 # thresholds <- rep(2, length(datasets))
 names(thresholds) <- datasets
@@ -117,6 +117,12 @@ for(file in result_files) {
   results <- rbind(results,
                    temp)
 }
+
+# Filter out scran on Monaco et al. where the low sample number (4) causes
+# the computeSumFactors() scaling factor estimate to throw an error. In general,
+# scran seems to work best with an absolute MINIMUM of 5 samples.
+results <- results %>%
+  filter(!(dataset == "Monaco" & DE_method == "scran"))
 
 # This loop also calculates R^2 for the real data x predictions
 for(use_result_type in c("TPR", "FPR")) {
