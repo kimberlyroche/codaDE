@@ -1,58 +1,90 @@
-source("path_fix.R")
+library(tidyverse)
 
-library(codaDE)
+datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
+thresholds <- c(1, 1, 1, 1, 1, 1, 1, 1)
 
-datasets_names <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
-thresholds <- c(1, 1, 1, 2, 1, 1, 1, 1)
-
-for(i in 1:length(datasets_names)) {
-  name <- datasets_names[i]
-  ts <- thresholds[i]
-
-  abs_data <- do.call(paste0("parse_", name), list(absolute = TRUE))
-  rel_data <- do.call(paste0("parse_", name), list(absolute = FALSE))
-  
-  # Reorient as (samples x features)
-  ref_data <- t(abs_data$counts)
-  data <- t(rel_data$counts)
-  groups <- abs_data$groups
-  groups <- factor(groups)
-  
-  # Subsample if tons of cells/samples
-  downsample_limit <- 100 # was 100
-  set.seed(100)
-  pairs <- table(groups)
-  if(pairs[1] > downsample_limit) {
-    A_sample <- sample(which(groups == names(pairs)[1]), size = downsample_limit)
-  } else {
-    A_sample <- which(groups == names(pairs)[1])
+bar_components <- NULL
+compiled_stats <- NULL
+accuracy <- c()
+fpr <- c()
+tpr <- c()
+for(i in 1:length(datasets)) {
+  for(method in c("ALDEx2", "DESeq2", "scran")) {
+    if(datasets[i] == "Monaco" & method == "scran") next;
+    calls <- readRDS(file.path("output",
+                               "real_data_calls",
+                               "no_norm",
+                               paste0("calls_oracle_",method,"_",datasets[i],"_threshold",thresholds[i],".rds")))
+    TP <- sum(calls$rates$TP_calls)
+    TN <- sum(calls$rates$TN_calls)
+    FP <- sum(calls$rates$FP_calls)
+    FN <- sum(calls$rates$FN_calls)
+    
+    bar_components <- rbind(bar_components,
+                            data.frame(dataset = datasets[i], method = method, count = TP, type = "TP"))
+    bar_components <- rbind(bar_components,
+                            data.frame(dataset = datasets[i], method = method, count = FN, type = "FN"))
+    bar_components <- rbind(bar_components,
+                            data.frame(dataset = datasets[i], method = method, count = FP, type = "FP"))
+    bar_components <- rbind(bar_components,
+                            data.frame(dataset = datasets[i], method = method, count = TN, type = "TN"))
+    
+    accuracy <- c(accuracy,
+                  (TP+TN)/(TP+TN+FP+FN))
+    fpr <- c(fpr, FP/(FP+TN))
+    tpr <- c(tpr, TP/(TP+FN))
+    compiled_stats <- rbind(compiled_stats,
+                            data.frame(dataset = datasets[i],
+                                       method = method,
+                                       sensitivity = TP/(TP+FN),
+                                       specificity = 1 - FP/(FP+TN)))
   }
-  if(pairs[2] > downsample_limit) {
-    B_sample <- sample(which(groups == names(pairs)[2]), size = downsample_limit)
-  } else {
-    B_sample <- which(groups == names(pairs)[2])
-  }
-  ref_data <- ref_data[c(A_sample, B_sample),]
-  data <- data[c(A_sample, B_sample),]
-  groups <- groups[c(A_sample, B_sample)]
-  
-  # Convert to integers, just for DESeq2
-  ref_data <- apply(ref_data, c(1,2), as.integer)
-  data <- apply(data, c(1,2), as.integer)
-  
-  # Look at sparsity; filter out too-low features
-  retain_features <- colMeans(ref_data) >= ts & colMeans(data) >= ts
-  ref_data <- ref_data[,retain_features]
-  data <- data[,retain_features]
-  
-  cat(paste0("Dataset dimensions: ", nrow(ref_data), " samples x ", ncol(ref_data), " features\n"))
-
-  fc <- mean(rowSums(ref_data[groups == unique(groups)[1],])) / mean(rowSums(ref_data[groups == unique(groups)[2],]))
-  if(fc < 1) {
-    fc <- 1 / fc
-  }
-
-  cat(paste0("\tFC: ", round(fc, 1), "\n"))
-  cat(paste0("\tPercent DE (thresholded): ", 100*round(sum(calc_threshold_DA(ref_data, nA = sum(groups == unique(groups)[1]))) / ncol(ref_data), 2), "\n"))
-
 }
+
+bar_components$dataset <- factor(bar_components$dataset, levels = c("VieiraSilva",
+                                                                    "Barlow",
+                                                                    "Song",
+                                                                    "Monaco",
+                                                                    "Hagai",
+                                                                    "Owens",
+                                                                    "Klein",
+                                                                    "Yu"))
+levels(bar_components$dataset) <- c("Vieira-Silva et al.",
+                                    "Barlow et al.",
+                                    "Song et al.",
+                                    "Monaco et al.",
+                                    "Hagai et al.",
+                                    "Owens et al.",
+                                    "Klein et al.",
+                                    "Yu et al.")
+bar_components$type <- factor(bar_components$type, levels = c("TP", "TN", "FN", "FP"))
+levels(bar_components$type) <- c("True positive", "True negative", "False negative", "False positive")
+
+# Plot barplot
+p <- ggplot(bar_components, aes(x = method, y = count, fill = type, label = count)) +
+  geom_bar(stat = "identity") +
+  geom_text(size = 3, position = position_stack(vjust = 0.5)) +
+  facet_wrap(. ~ dataset, scales = "free", ncol = 4) +
+  theme_bw() +
+  scale_fill_brewer(palette = "GnBu") +
+  labs(fill = "",
+       x = "Differential abundance calling method")
+
+ggsave("output/temp2.png",
+       p,
+       dpi = 100,
+       units = "in",
+       height = 6,
+       width = 12)
+
+min(compiled_stats$sensitivity)
+median(compiled_stats$sensitivity)
+max(compiled_stats$sensitivity)
+
+min(compiled_stats %>% filter(method != "ALDEx2") %>% pull(sensitivity))
+median(compiled_stats %>% filter(method != "ALDEx2") %>% pull(sensitivity))
+max(compiled_stats %>% filter(method != "ALDEx2") %>% pull(sensitivity))
+
+compiled_stats %>% group_by(dataset) %>% summarize(ms = mean(specificity)) %>% arrange(desc(ms))
+
+

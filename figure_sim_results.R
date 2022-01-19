@@ -221,6 +221,48 @@ qq <- c(0, 1.5, 2.5, 5, Inf)
 # ------------------------------------------------------------------------------
 
 data <- pull_data(qq, use_baseline = "oracle")
+
+# ------------------------------------------------------------------------------
+#   Calculate some overall statistics
+# ------------------------------------------------------------------------------
+
+# Median specificity per method
+data %>%
+  group_by(METHOD) %>%
+  summarize("Median specificity" = 1 - median(FPR))
+
+# Exceeding k% FPR overall
+threshold <- 0.50
+data %>%
+  select(METHOD, FPR) %>%
+  mutate(high_FPR = ifelse(FPR > threshold, 1, 0)) %>%
+  mutate(low_FPR = ifelse(FPR <= threshold, 1, 0)) %>%
+  group_by(METHOD) %>%
+  summarize(n_high_FPR = sum(high_FPR),
+            n_low_FPR = sum(low_FPR)) %>%
+  mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2))
+
+# Exceeding k% FPR by setting
+threshold <- 0.05
+data %>%
+  select(METHOD, P, PERTURBATION, FPR) %>%
+  mutate(setting = ifelse(P <= 1000 & PERTURBATION >= 1.2,
+                          "1: Microbial",
+                          ifelse(P >= 1000 & PERTURBATION >= 0.8 & PERTURBATION <= 1.2,
+                                 "2: Cell transcriptomic",
+                                 ifelse(P == 5000 & PERTURBATION <= 0.8,
+                                        "3: Bulk transcriptomic",
+                                        NA)))) %>%
+  mutate(high_FPR = ifelse(FPR > threshold, 1, 0)) %>%
+  mutate(low_FPR = ifelse(FPR <= threshold, 1, 0)) %>%
+  group_by(METHOD, setting) %>%
+  summarize(median_specificity = 1 - median(FPR),
+            n_high_FPR = sum(high_FPR),
+            n_low_FPR = sum(low_FPR)) %>%
+  mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2)) %>%
+  arrange(setting, METHOD)
+
+# Turn FPR into specificity!
 data$FPR <- 1 - data$FPR
 
 p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL

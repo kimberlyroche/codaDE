@@ -48,6 +48,7 @@
 call_DA_NB <- function(data, groups) {
   pval_df <- data.frame(feature = paste0("feature", 1:ncol(data)),
                         pval = 1)
+  data <- spike_in_ones(data, groups)
   for(feature_idx in 1:ncol(data)) {
     gene_data <- data.frame(counts = data[,feature_idx], groups = groups)
     fit <- tryCatch({

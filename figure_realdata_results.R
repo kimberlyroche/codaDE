@@ -118,6 +118,12 @@ for(file in result_files) {
                    temp)
 }
 
+# Filter out scran on Monaco et al. where the low sample number (4) causes
+# the computeSumFactors() scaling factor estimate to throw an error. In general,
+# scran seems to work best with an absolute MINIMUM of 5 samples.
+results <- results %>%
+  filter(!(dataset == "Monaco" & DE_method == "scran"))
+
 # This loop also calculates R^2 for the real data x predictions
 for(use_result_type in c("TPR", "FPR")) {
   plots <- list()

@@ -18,16 +18,31 @@ resample_counts <- function(proportions, library_sizes) {
 #' Utility function to spike-in a one-count to prevent any fully unobserved taxa
 #'
 #' @param counts count table (samples x features)
+#' @param groups optional group labels; if included, a one is spiked into any
+#' feature with all-zero observations in a given group/condition
 #' @return counts with a minimum single observation of each feature
 #' @export
-spike_in_ones <- function(counts) {
-  all_zeros <- which(colSums(counts) == 0)
-  n <- nrow(counts)/2
-  for(idx in all_zeros) {
-    one_idx <- sample(1:n, size = 1)
-    counts[one_idx,idx] <- 1
-    one_idx <- sample((n+1):(n*2), size = 1)
-    counts[one_idx,idx] <- 1
+spike_in_ones <- function(counts, groups = NULL) {
+  if(!is.null(groups)) {
+    all_zeros_A <- which(colSums(counts[groups == levels(groups)[1],,drop=FALSE]) == 0)
+    all_zeros_B <- which(colSums(counts[groups == levels(groups)[2],,drop=FALSE]) == 0)
+    for(idx in all_zeros_A) {
+      one_idx <- sample(which(groups == levels(groups)[1]), size = 1)
+      counts[one_idx,idx] <- 1
+    }
+    for(idx in all_zeros_B) {
+      one_idx <- sample(which(groups == levels(groups)[2]), size = 1)
+      counts[one_idx,idx] <- 1
+    }
+  } else {
+    all_zeros <- which(colSums(counts) == 0)
+    n <- nrow(counts)/2
+    for(idx in all_zeros) {
+      one_idx <- sample(1:n, size = 1)
+      counts[one_idx,idx] <- 1
+      one_idx <- sample((n+1):(n*2), size = 1)
+      counts[one_idx,idx] <- 1
+    }
   }
   return(counts)
 }

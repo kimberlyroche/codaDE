@@ -216,6 +216,14 @@ if(dataset_name == "Yu") {
   counts_B_abs <- ref_data[groups == "Lvr",]
 }
 
+save_fn <- file.path("output",
+                     paste0("filtered_data_",dataset_name,"_threshold",threshold,".rds"))
+if(!file.exists(save_fn)) {
+  saveRDS(list(absolute = ref_data,
+               relative = data,
+               groups = groups), save_fn)
+}
+
 # Report stats on this data set
 cat(paste0("Number of features (after filtering): ", ncol(counts_A), "\n"))
 cat(paste0("Number of samples: ", length(groups), "\n"))
@@ -227,76 +235,6 @@ sB <- mean(rowSums(counts_B_abs))
 fc <- max(sA, sB) / min(sA, sB)
 cat(paste0("Approx. fold change between conditions: ", round(fc, 1), "\n"))
 cat(paste0("Approx. percent differential features: ", round(percent_DE, 2)*100, "%\n"))
-
-# Render some "misses" (discrepant genes between calls on absolute abundances
-# and calls on relative abundances) while we've got the data set parsed...
-if(dataset_name == "Monaco" | dataset_name == "Klein") {
-  if(dataset_name == "Monaco") {
-    method <- "ALDEx2"
-    gene_idx <- 1228 # an arbitrary false negative (Ensa), pulled from
-                     # calls_oracle_(method)_Monaco_threshold1.rds
-    scaled_counts <- scaled_counts_ALDEx2(rbind(counts_A, counts_B), pseudocount = 0.5)
-  } else {
-    method <- "scran"
-    gene_idx <- 552 # an arbitrary false positive (Cox7c), pulled from
-                    # calls_oracle_(method)_Klein_threshold1.rds
-    scaled_counts <- scaled_counts_scran(rbind(counts_A, counts_B), groups, pseudocount = 0.5)
-  }
-
-  scaled_counts_A <- scaled_counts[which(groups == levels(groups)[1]),]
-  scaled_counts_B <- scaled_counts[which(groups == levels(groups)[2]),]
-  
-  plot_df <- data.frame(x = 1:nrow(counts_A_abs),
-                        y = counts_A_abs[,gene_idx],
-                        type = "absolute abundance",
-                        type2 = levels(groups)[1])
-  plot_df <- rbind(plot_df,
-                   data.frame(x = (nrow(counts_A_abs) + 1):(nrow(counts_A_abs) + nrow(counts_B_abs)),
-                              y = counts_B_abs[,gene_idx],
-                              type = "absolute abundance",
-                              type2 = levels(groups)[2]))
-  plot_df <- rbind(plot_df,
-                   data.frame(x = 1:nrow(scaled_counts_A),
-                              y = scaled_counts_A[,gene_idx],
-                              type = "scaled abundance",
-                              type2 = levels(groups)[1]))
-  plot_df <- rbind(plot_df,
-                   data.frame(x = (nrow(scaled_counts_A) + 1):(nrow(scaled_counts_A) + nrow(scaled_counts_B)),
-                              y = scaled_counts_B[,gene_idx],
-                              type = "scaled abundance",
-                              type2 = levels(groups)[2]))
-  
-  if(dataset_name == "Monaco") {
-    plot_df$type2[plot_df$type2 == "CD4_naive"] <- "CD4 naive"
-  } else {
-    plot_df$type2[plot_df$type2 == "unstimulated"] <- "Unstimulated"
-  }
-  
-  p <- ggplot(plot_df, aes(x = x, y = y, fill = type2)) +
-    geom_point(size = 2, shape = 21) +
-    facet_wrap(. ~ type) +
-    theme_bw() +
-    labs(x = "sample index",
-         y = "abundance",
-         fill = "Condition or type") +
-    scale_fill_manual(values = c("#0771DE", "orange"))
-  if(dataset_name == "Monaco") {
-    ggsave("output/images/FN_Monaco.png",
-           p,
-           dpi = 100,
-           units = "in",
-           height = 2.5,
-           width = 6)
-  } else if(dataset_name == "Klein") {
-    show(p)
-    ggsave("output/images/FP_Klein.png",
-           p,
-           dpi = 100,
-           units = "in",
-           height = 2.5,
-           width = 6)
-  }
-}
 
 # This takes 2-3 min. to run on 15K features
 features <- as.data.frame(characterize_dataset(counts_A, counts_B))
