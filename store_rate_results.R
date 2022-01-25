@@ -22,7 +22,7 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 updates <- 0
 file_list <- list.files(dir, pattern = "output_rate")
-for(file in file_list) {
+for(file in file_list[2:length(file_list)]) {
   results <- read.table(file.path(dir, file), sep = "\t", header = TRUE)
   results <- results[complete.cases(results),]
   for(i in 1:nrow(results)) {
@@ -35,7 +35,8 @@ for(file in file_list) {
                                           "UUID = '", job$uuid, "' AND ",
                                           "METHOD = '", job$method, "' AND ",
                                           "PARTIAL_INFO = ", job$partial_info, " AND ",
-                                          "BASELINE_TYPE = '", job$baseline, "'"))
+                                          "BASELINE_TYPE = '", job$baseline, "' AND ",
+                                          "OBSERVED_TYPE = '", job$type, "'"))
   }
   cat(paste0("Succeeded on ", updates, " rows\n"))
 }

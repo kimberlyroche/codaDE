@@ -24,6 +24,7 @@ wishlist <- data.frame(ID = c(),
                        baseline = c(),
                        partial_info = c(),
                        method = c(),
+                       type = c(),
                        baseline_calls = c(),
                        calls = c())
 counter <- 1
@@ -33,7 +34,7 @@ for(u in 1:length(all_uuids)) {
   }
   uuid <- all_uuids[u]
   res <- dbGetQuery(conn, paste0("SELECT results.UUID, METHOD, PARTIAL_INFO, ",
-                                 "BASELINE_TYPE, ",
+                                 "BASELINE_TYPE, OBSERVED_TYPE, ",
                                  "datasets.BASELINE_CALLS AS ORACLE_CALLS, ",
                                  "results.BASELINE_CALLS, CALLS, TPR, FPR ",
                                  "FROM results LEFT JOIN datasets ",
@@ -50,6 +51,7 @@ for(u in 1:length(all_uuids)) {
                                    baseline = job$BASELINE_TYPE,
                                    partial_info = job$PARTIAL_INFO,
                                    method = job$METHOD,
+                                   type = job$OBSERVED_TYPE,
                                    baseline_calls = ifelse(job$BASELINE_TYPE == "oracle", job$ORACLE_CALLS, job$BASELINE_CALLS),
                                    calls = job$CALLS))
       counter <- counter + 1

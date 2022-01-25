@@ -10,7 +10,7 @@ option_list = list(
   make_option(c("--dataset"),
               type = "character",
               default = "Barlow",
-              help = "data set to use: VieiraSilva, Barlow, Song, Monaco, Hagai, Owens, Klein, Yu",
+              help = "data set to use",
               metavar = "character"),
   make_option(c("--threshold"),
               type = "numeric",
@@ -41,6 +41,11 @@ option_list = list(
               type = "logical",
               default = "FALSE",
               help = "use features generated from renormalized counts",
+              metavar = "logical"),
+  make_option(c("--usecpm"),
+              type = "logical",
+              default = "FALSE",
+              help = "scale relative abundances to counts per million",
               metavar = "logical")
 );
 
@@ -54,15 +59,11 @@ per_model <- opt$permodel
 use_self_baseline <- opt$selfbaseline
 use_totals <- opt$usetotals
 use_renorm_counts <- opt$userenormcounts
+use_cpm <- opt$usecpm
 
 testing <- FALSE
 alpha <- 0.05
 methods_list <- c("ALDEx2", "DESeq2", "scran")
-
-if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song",
-                         "Monaco", "Hagai", "Owens", "Klein", "Yu"))) {
-  stop(paste0("Invalid data set: ", dataset_name, "!\n"))
-}
 
 if(threshold < 0) {
   stop(paste0("Invalid threshold: ", threshold, "!\n"))
@@ -75,6 +76,14 @@ if(threshold < 0) {
 abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE))
 rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE))
 
+print("A")
+
+if(use_cpm) {
+  # Convert to CPM
+  rel_data$counts <- apply(rel_data$counts, 2, function(x) x/sum(x))
+  rel_data$counts <- round(rel_data$counts*1e06)
+}
+
 if(testing & nrow(abs_data$counts) > 500) {
   k <- 500
   sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
@@ -82,13 +91,9 @@ if(testing & nrow(abs_data$counts) > 500) {
   rel_data$counts <- rel_data$counts[sample_idx,]
 }
 
-# Reorient as (samples x features)
-ref_data <- t(abs_data$counts)
-data <- t(rel_data$counts)
-groups <- abs_data$groups
-groups <- factor(groups)
-tax <- abs_data$tax
+print("B")
 
+groups <- abs_data$groups
 # Subsample if tons of cells/samples
 downsample_limit <- 100 # was 100
 set.seed(100)
@@ -105,13 +110,23 @@ if(pairs[2] > downsample_limit) {
 } else {
   B_sample <- which(groups == names(pairs)[2])
 }
-ref_data <- ref_data[c(A_sample, B_sample),]
-data <- data[c(A_sample, B_sample),]
+ref_data <- abs_data$counts[,c(A_sample, B_sample)]
+data <- rel_data$counts[,c(A_sample, B_sample)]
 groups <- groups[c(A_sample, B_sample)]
+
+# Reorient as (samples x features)
+ref_data <- t(ref_data)
+data <- t(data)
+groups <- factor(groups)
+tax <- abs_data$tax
+
+print("C")
 
 # Convert to integers, just for DESeq2
 ref_data <- apply(ref_data, c(1,2), as.integer)
 data <- apply(data, c(1,2), as.integer)
+
+print("D")
 
 # Look at sparsity; filter out too-low features
 retain_features <- colMeans(ref_data) >= threshold & colMeans(data) >= threshold
@@ -120,6 +135,8 @@ data <- data[,retain_features]
 if(!is.null(tax)) {
   tax <- tax[retain_features]
 }
+
+print("E")
 
 # ------------------------------------------------------------------------------
 #   Call discrepancy by each method; save to file if doesn't already exist
@@ -215,6 +232,32 @@ if(dataset_name == "Yu") {
   counts_A_abs <- ref_data[groups == "Brn",]
   counts_B_abs <- ref_data[groups == "Lvr",]
 }
+if(dataset_name == "Muraro") {
+  counts_A <- data[groups == "alpha",]
+  counts_B <- data[groups == "beta",]
+  counts_A_abs <- ref_data[groups == "alpha",]
+  counts_B_abs <- ref_data[groups == "beta",]
+}
+if(dataset_name == "Hashimshony") {
+  counts_A <- data[groups == "0",]
+  counts_B <- data[groups == "1",]
+  counts_A_abs <- ref_data[groups == "0",]
+  counts_B_abs <- ref_data[groups == "1",]
+}
+if(dataset_name == "Kimmerling") {
+  counts_A <- data[groups == "low_mass",]
+  counts_B <- data[groups == "high_mass",]
+  counts_A_abs <- ref_data[groups == "low_mass",]
+  counts_B_abs <- ref_data[groups == "high_mass",]
+}
+if(dataset_name == "Gruen") {
+  counts_A <- data[groups == "A",]
+  counts_B <- data[groups == "B",]
+  counts_A_abs <- ref_data[groups == "A",]
+  counts_B_abs <- ref_data[groups == "B",]
+}
+
+print("G")
 
 save_fn <- file.path("output",
                      paste0("filtered_data_",dataset_name,"_threshold",threshold,".rds"))
@@ -236,8 +279,19 @@ fc <- max(sA, sB) / min(sA, sB)
 cat(paste0("Approx. fold change between conditions: ", round(fc, 1), "\n"))
 cat(paste0("Approx. percent differential features: ", round(percent_DE, 2)*100, "%\n"))
 
+print("H")
+
 # This takes 2-3 min. to run on 15K features
 features <- as.data.frame(characterize_dataset(counts_A, counts_B))
+
+print("I")
+
+save_fn <- file.path("output",
+                     paste0("filtered_features_",dataset_name,"_threshold",threshold,".rds"))
+if(!file.exists(save_fn)) {
+  saveRDS(features, save_fn)
+}
+
 features <- features %>%
   select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
 
@@ -270,9 +324,13 @@ if(use_renorm_counts) {
 #   Make predictions on simulations and real data and visualize these together
 # ------------------------------------------------------------------------------
 
+print("J")
+
 save_df <- NULL
 
 for(use_result_type in c("TPR", "FPR")) {
+
+  print("K")
 
   # Load predictive model
   model_list <- c("all")

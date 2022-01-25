@@ -47,6 +47,7 @@ writeLines(paste0(c("ID",
                     "baseline",
                     "partial_info",
                     "method",
+                    "observed_type",
                     "baseline_calls",
                     "calls"), collapse = "\t"),
            output_file)
@@ -86,6 +87,12 @@ for(i in 1:nrow(wishlist)) {
   job <- wishlist[i,]
   data <- readRDS(file.path(output_dir, paste0(job$uuid, ".rds")))
 
+  if(job$observed_type == "cpm") {
+    data$simulation$observed_counts1 <- t(apply(data$simulation$observed_counts1, 1, function(x) x/sum(x)))
+    data$simulation$observed_counts1 <- data$simulation$observed_counts1*1e06
+    data$simulation$observed_counts1 <- round(data$simulation$observed_counts1)
+  }
+
   # Get baseline differential abundance calls
   if(job$baseline == "oracle") {
     oracle_calls <- as.numeric(strsplit(baseline_calls %>% filter(UUID == job$uuid) %>% pull(BASELINE_CALLS), ";")[[1]])
@@ -122,7 +129,8 @@ for(i in 1:nrow(wishlist)) {
       # The baseline calls are already present in the datasets table. In the interest of not
       # keeping multiple copies of these - which could get out of sync - we'll force ourselves
       # to refer back to the datasets table to find the oracle calls.
-      results_row <- cbind(job, baseline_calls = NA,
+      results_row <- cbind(job,
+                           baseline_calls = NA,
                            calls = paste0(round(all_calls$calls, 10), collapse = ";"))
     } else {
       results_row <- cbind(job,

@@ -22,6 +22,11 @@ option_list = list(
               type = "logical",
               default = "FALSE",
               help = "use features generated from renormalized counts",
+              metavar = "logical"),
+  make_option(c("--cpm"),
+              type = "logical",
+              default = "FALSE",
+              help = "convert relative abundances to counts per million",
               metavar = "logical")
 );
 
@@ -31,6 +36,7 @@ opt = parse_args(opt_parser);
 use_self_baseline <- opt$selfbaseline
 use_totals <- opt$usetotals
 use_renorm_counts <- opt$userenormcounts
+use_cpm <- opt$cpm
 
 DE_methods <- c("ALDEx2", "DESeq2", "scran")
 
@@ -41,8 +47,9 @@ for(DE_method in DE_methods) {
                        use_baseline = ifelse(use_self_baseline, "self", "oracle"),
                        use_totals = use_totals,
                        use_renorm_counts = use_renorm_counts,
-                       output_weights = FALSE,
-                       train_percent = 0.8)
+                       output_weights = TRUE,
+                       train_percent = 0.8,
+                       use_cpm = use_cpm)
 }
 
 # Evaluate performance

@@ -33,11 +33,12 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 #                                  "METHOD VARCHAR(64), ",
 #                                  "PARTIAL_INFO INT, ",
 #                                  "BASELINE_TYPE VARCHAR(16), ",
+#                                  "OBSERVED_TYPE VARCHAR(64), ",
 #                                  "BASELINE_CALLS VARCHAR(100000), ",
 #                                  "CALLS VARCHAR(100000), ",
 #                                  "TPR REAL, ",
 #                                  "FPR REAL, ",
-#                                  "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE));"))
+#                                  "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE));"))
 
 # discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",
 #                                  "UUID VARCHAR(36),",

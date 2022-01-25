@@ -10,7 +10,8 @@ fit_predictive_model(
   use_totals = FALSE,
   use_renorm_counts = FALSE,
   output_weights = TRUE,
-  train_percent = 0.8
+  train_percent = 0.8,
+  use_cpm = FALSE
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ data}
 of feature weights}
 
 \item{train_percent}{percent of simulated datasets to train on}
+
+\item{use_cpm}{use counts per million for relative abundances}
 }
 \value{
 NULL (fitted models are saved in output directory)
