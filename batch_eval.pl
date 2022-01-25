@@ -3,13 +3,14 @@ use warnings;
 use POSIX;
 use List::Util qw(min);
 
+# For P < 5000 12GB RAM is fine.
 # For P = 5000 settings, a conservative estimate is ~2 min. per setting. Use 32GB RAM.
 
 my $p = 5000;
 my $input = "input_eval_".$p.".txt";
 my $output = "output_eval_".$p;
 my $start = 1;
-my $end = 1875;
+my $end = 5625;
 my $chunks = 20;
 
 my $filename = "job.slurm";
@@ -23,9 +24,9 @@ while($i <= $end) {
   open(my $fh, '>', $filename);
   print $fh '#!/bin/bash'."\n";
   print $fh '#SBATCH -J eval_'.$i.'-'.$j."\n";
-  print $fh '#SBATCH --mem=12GB'."\n";
+  print $fh '#SBATCH --mem=32GB'."\n";
   print $fh '#SBATCH --get-user-env'."\n";
-  print $fh '#SBATCH --time=2:00:00'."\n";
+  print $fh '#SBATCH --time=16:00:00'."\n";
   print $fh '#'."\n\n";
 
   print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";

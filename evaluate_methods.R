@@ -47,6 +47,7 @@ writeLines(paste0(c("ID",
                     "baseline",
                     "partial_info",
                     "method",
+                    "observed_type",
                     "baseline_calls",
                     "calls"), collapse = "\t"),
            output_file)
@@ -89,6 +90,7 @@ for(i in 1:nrow(wishlist)) {
   if(job$observed_type == "cpm") {
     data$simulation$observed_counts1 <- t(apply(data$simulation$observed_counts1, 1, function(x) x/sum(x)))
     data$simulation$observed_counts1 <- data$simulation$observed_counts1*1e06
+    data$simulation$observed_counts1 <- round(data$simulation$observed_counts1)
   }
 
   # Get baseline differential abundance calls

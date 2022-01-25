@@ -54,8 +54,8 @@ characterize_dataset <- function(counts_A, counts_B) {
   #   Characteristics assoc. with correlation
   # --------------------------------------------------------------------------
   
-  if(ncol(relab_A) > 10000) {
-    ra_correlation <- cor(relab_A[,1:10000])
+  if(ncol(relab_A) > 5000) {
+    ra_correlation <- cor(relab_A[,1:5000])
   } else {
     ra_correlation <- cor(relab_A)
   }
@@ -69,16 +69,16 @@ characterize_dataset <- function(counts_A, counts_B) {
   if(length(remove_idx) > 0) {
     temp <- temp[,-remove_idx]
   }
-  if(ncol(temp) > 10000) {
-    log_correlation <- cor(temp[,1:10000])
+  if(ncol(temp) > 5000) {
+    log_correlation <- cor(temp[,1:5000])
   } else {
     log_correlation <- cor(temp)
   }
   log_correlation_vector <- log_correlation[upper.tri(log_correlation,
                                                       diag = FALSE)]
 
-  if(ncol(clr_A) > 10000) {
-    clr_correlation <- cor(clr_A[,1:10000])
+  if(ncol(clr_A) > 5000) {
+    clr_correlation <- cor(clr_A[,1:5000])
   } else {
     clr_correlation <- cor(clr_A)
   }
@@ -299,7 +299,8 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
     left_join(results, by = "UUID") %>%
     filter(METHOD %in% DE_methods) %>%
     select(-c(PARTIAL, FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D)) %>%
-    filter(TYPE == "relative_abundances" |
+    filter((TYPE == "cpm") |
+             (TYPE == "relative_abundances") |
              (TYPE == "scaled_ALDEx2" & METHOD == "ALDEx2") |
              (TYPE == "scaled_DESeq2" & METHOD == "DESeq2") |
              (TYPE == "scaled_scran" & METHOD == "scran"))

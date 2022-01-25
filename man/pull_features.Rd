@@ -8,7 +8,8 @@ pull_features(
   DE_methods = c("ALDEx2", "DESeq2", "scran"),
   use_baseline = "oracle",
   use_totals = FALSE,
-  use_renorm_counts = FALSE
+  use_renorm_counts = FALSE,
+  use_cpm = FALSE
 )
 }
 \arguments{
@@ -22,6 +23,8 @@ observed (relative) abundance data}
 
 \item{use_renorm_counts}{pull features generated from method-renormalized
 data}
+
+\item{use_cpm}{use counts per million for relative abundances}
 }
 \value{
 data.frame with predictive model training features

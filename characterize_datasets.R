@@ -98,6 +98,11 @@ for(i in 1:nrow(wishlist)) {
   } else {
     counts <- data$simulation$observed_counts1
   }
+
+  if(job$type == "cpm") {
+    counts <- t(apply(counts, 1, function(x) x/sum(x)))
+    counts <- counts*1e06
+  }
   
   if(job$type == "cpm") {
     counts <- t(apply(counts, 1, function(x) x/sum(x)))
@@ -109,7 +114,7 @@ for(i in 1:nrow(wishlist)) {
 
   n <- nrow(counts)/2
 
-  if(job$type == "relative_abundances") {
+  if(job$type == "relative_abundances" | job$type == "cpm") {
     counts_A <- counts[1:n,]
     counts_B <- counts[(n+1):(n*2),]
   } else if(job$type == "scaled_ALDEx2") {

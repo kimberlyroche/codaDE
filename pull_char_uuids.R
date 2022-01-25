@@ -25,7 +25,7 @@ for(u in 1:length(all_uuids)) {
     cat(paste0("UUID ", u, " / ", length(all_uuids), "\n"))
   }
   uuid <- all_uuids[u]
-  for(type in c("relative_abundances", "scaled_ALDEx2", "scaled_DESeq2", "scaled_scran")) {
+  for(type in c("relative_abundances", "scaled_ALDEx2", "scaled_DESeq2", "scaled_scran", "cpm")) {
     if(type == "relative_abundances") {
       for(par in c(0, 1)) {
         res <- dbGetQuery(conn, paste0("SELECT * FROM characteristics ",

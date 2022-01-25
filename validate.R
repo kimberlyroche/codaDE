@@ -10,7 +10,7 @@ option_list = list(
   make_option(c("--dataset"),
               type = "character",
               default = "Barlow",
-              help = "data set to use: VieiraSilva, Barlow, Song, Monaco, Hagai, Owens, Klein, Yu",
+              help = "data set to use",
               metavar = "character"),
   make_option(c("--threshold"),
               type = "numeric",
@@ -41,6 +41,11 @@ option_list = list(
               type = "logical",
               default = "FALSE",
               help = "use features generated from renormalized counts",
+              metavar = "logical"),
+  make_option(c("--usecpm"),
+              type = "logical",
+              default = "FALSE",
+              help = "scale relative abundances to counts per million",
               metavar = "logical")
 );
 
@@ -54,15 +59,11 @@ per_model <- opt$permodel
 use_self_baseline <- opt$selfbaseline
 use_totals <- opt$usetotals
 use_renorm_counts <- opt$userenormcounts
+use_cpm <- opt$usecpm
 
 testing <- FALSE
 alpha <- 0.05
 methods_list <- c("ALDEx2", "DESeq2", "scran")
-
-if(!(dataset_name %in% c("VieiraSilva", "Barlow", "Song",
-                         "Monaco", "Hagai", "Owens", "Klein", "Yu"))) {
-  stop(paste0("Invalid data set: ", dataset_name, "!\n"))
-}
 
 if(threshold < 0) {
   stop(paste0("Invalid threshold: ", threshold, "!\n"))
@@ -75,14 +76,11 @@ if(threshold < 0) {
 abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE))
 rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE))
 
-# Convert to proportions
-# temp <- apply(rel_data$counts, 2, function(x) x/sum(x))
-# cpm <- round(temp*1e06)
-# rel_data$counts <- cpm
-
-# Downsample
-abs_data$counts <- abs_data$counts/10
-rel_data$counts <- rel_data$counts/10
+if(use_cpm) {
+  # Convert to CPM
+  rel_data$counts <- apply(rel_data$counts, 2, function(x) x/sum(x))
+  rel_data$counts <- round(rel_data$counts*1e06)
+}
 
 if(testing & nrow(abs_data$counts) > 500) {
   k <- 500
@@ -91,13 +89,7 @@ if(testing & nrow(abs_data$counts) > 500) {
   rel_data$counts <- rel_data$counts[sample_idx,]
 }
 
-# Reorient as (samples x features)
-ref_data <- t(abs_data$counts)
-data <- t(rel_data$counts)
 groups <- abs_data$groups
-groups <- factor(groups)
-tax <- abs_data$tax
-
 # Subsample if tons of cells/samples
 downsample_limit <- 100 # was 100
 set.seed(100)
@@ -114,9 +106,15 @@ if(pairs[2] > downsample_limit) {
 } else {
   B_sample <- which(groups == names(pairs)[2])
 }
-ref_data <- ref_data[c(A_sample, B_sample),]
-data <- data[c(A_sample, B_sample),]
+ref_data <- abs_data$counts[,c(A_sample, B_sample)]
+data <- rel_data$counts[,c(A_sample, B_sample)]
 groups <- groups[c(A_sample, B_sample)]
+
+# Reorient as (samples x features)
+ref_data <- t(ref_data)
+data <- t(data)
+groups <- factor(groups)
+tax <- abs_data$tax
 
 # Convert to integers, just for DESeq2
 ref_data <- apply(ref_data, c(1,2), as.integer)
@@ -257,8 +255,27 @@ if(!file.exists(save_fn)) {
                groups = groups), save_fn)
 }
 
+# Report stats on this data set
+cat(paste0("Number of features (after filtering): ", ncol(counts_A), "\n"))
+cat(paste0("Number of samples: ", length(groups), "\n"))
+cat(paste0("Samples per condition (A, B): ", sum(groups == levels(groups)[1]), ", ",
+           sum(groups == levels(groups)[2]), "\n"))
+cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
+sA <- mean(rowSums(counts_A_abs))
+sB <- mean(rowSums(counts_B_abs))
+fc <- max(sA, sB) / min(sA, sB)
+cat(paste0("Approx. fold change between conditions: ", round(fc, 1), "\n"))
+cat(paste0("Approx. percent differential features: ", round(percent_DE, 2)*100, "%\n"))
+
 # This takes 2-3 min. to run on 15K features
 features <- as.data.frame(characterize_dataset(counts_A, counts_B))
+
+save_fn <- file.path("output",
+                     paste0("filtered_features_",dataset_name,"_threshold",threshold,".rds"))
+if(!file.exists(save_fn)) {
+  saveRDS(features, save_fn)
+}
+
 features <- features %>%
   select(-c(FW_RA_PFC1_D, FW_CLR_MED_D, FW_CLR_SD_D, FW_CLR_PNEG_D))
 
@@ -294,6 +311,8 @@ if(use_renorm_counts) {
 save_df <- NULL
 
 for(use_result_type in c("TPR", "FPR")) {
+
+  print("K")
 
   # Load predictive model
   model_list <- c("all")

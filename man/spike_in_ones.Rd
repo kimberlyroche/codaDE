@@ -4,10 +4,13 @@
 \alias{spike_in_ones}
 \title{Utility function to spike-in a one-count to prevent any fully unobserved taxa}
 \usage{
-spike_in_ones(counts)
+spike_in_ones(counts, groups = NULL)
 }
 \arguments{
 \item{counts}{count table (samples x features)}
+
+\item{groups}{optional group labels; if included, a one is spiked into any
+feature with all-zero observations in a given group/condition}
 }
 \value{
 counts with a minimum single observation of each feature
