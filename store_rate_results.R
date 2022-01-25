@@ -35,7 +35,8 @@ for(file in file_list) {
                                           "UUID = '", job$uuid, "' AND ",
                                           "METHOD = '", job$method, "' AND ",
                                           "PARTIAL_INFO = ", job$partial_info, " AND ",
-                                          "BASELINE_TYPE = '", job$baseline, "'"))
+                                          "BASELINE_TYPE = '", job$baseline, "' AND ",
+                                          "OBSERVED_TYPE = '", job$type, "'"))
   }
   cat(paste0("Succeeded on ", updates, " rows\n"))
 }

@@ -8,7 +8,7 @@ library(ggExtra)
 library(RColorBrewer)
 library(randomForest)
 
-source("ggplot_fix.R")
+# source("ggplot_fix.R")
 
 # This is only in use in some commented out code below
 string_to_calls <- function(call_string) {
@@ -17,7 +17,7 @@ string_to_calls <- function(call_string) {
   pvals < 0.05
 }
 
-pull_data <- function(qq, use_baseline = "self") {
+pull_data <- function(qq, use_baseline = "self", use_cpm = TRUE) {
   conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
   res <- dbGetQuery(conn, paste0("SELECT ",
                                  "datasets.UUID AS UUID, ",
@@ -44,6 +44,7 @@ pull_data <- function(qq, use_baseline = "self") {
                                  "results.UUID=datasets.UUID ",
                                  "WHERE PARTIAL_INFO=0 ",
                                  "AND BASELINE_TYPE='", use_baseline, "' ",
+                                 ifelse(use_cpm, "AND OBSERVED_TYPE='cpm' ", "AND OBSERVED_TYPE != 'cpm' "),
                                  "AND FC_ABSOLUTE <= 10 ",
                                  "AND FC_ABSOLUTE >= 0.1;"))
   dbDisconnect(conn)
@@ -220,7 +221,7 @@ qq <- c(0, 1.5, 2.5, 5, Inf)
 #   needs to be global?) so it's duplicated below.
 # ------------------------------------------------------------------------------
 
-data <- pull_data(qq, use_baseline = "oracle")
+data <- pull_data(qq, use_baseline = "oracle", use_cpm = TRUE)
 
 # ------------------------------------------------------------------------------
 #   Calculate some overall statistics
@@ -265,6 +266,68 @@ data %>%
 # Turn FPR into specificity!
 data$FPR <- 1 - data$FPR
 
+# ------------------------------------------------------------------------------
+#   Render real data outcomes on top of
+# ------------------------------------------------------------------------------
+
+DE_methods <- c("ALDEx2", "DESeq2", "scran")
+datasets <- c("Hagai", "Monaco", "Song", "Hashimshony", "Barlow", "Gruen",
+              "Muraro", "Owens", "VieiraSilva", "Kimmerling", "Yu", "Klein")
+thresholds <- rep(1, length(datasets))
+realdata <- NULL
+for(i in 1:length(datasets)) {
+  for(j in 1:length(DE_methods)) {
+    temp <- readRDS(file.path("output", "real_data_calls", "no_norm",
+                              paste0("calls_oracle_", DE_methods[j], "_", datasets[i], "_threshold", thresholds[i], ".rds")))
+    realdata <- rbind(realdata,
+                      data.frame(dataset = datasets[i],
+                                 method = DE_methods[j],
+                                 tpr = temp$rates$TPR,
+                                 fpr = 1 - temp$rates$FPR))
+  }
+}
+realdata$dataset <- factor(realdata$dataset, levels = datasets)
+
+plots <- list()
+for(i in 1:length(DE_methods)) {
+  pl <- ggplot() +
+    geom_point(data = data %>% filter(METHOD == DE_methods[i]),
+               mapping = aes(x = FPR, y = TPR), color = "#bbbbbb", alpha = 0.5) +
+    geom_point(data = realdata %>% filter(method == DE_methods[i]),
+               mapping = aes(x = fpr, y = tpr, fill = dataset),
+               shape = 21,
+               size = 3,
+               color = "black") +
+    xlim(c(-0.025,1.025)) +
+    ylim(c(-0.025,1.025)) +
+    labs(x = paste0(DE_methods[i], " specificity (1 - FPR)"),
+         y = paste0(DE_methods[i], " sensitivity (TPR)")) +
+    theme_bw() +
+    theme(axis.title.x = element_text(margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0)))
+  # pl <- ggMarginal(pl, margins = "both", type = "histogram", bins = 30,
+  #                  fill = "#888888", color = "#333333", size = 10)
+  if(i < 3) {
+    pl <- pl +
+      theme(legend.position = "none")
+  }
+  plots[[length(plots)+1]] <- pl
+}
+
+pl <- plot_grid(plotlist = plots, ncol = 3, rel_widths = c(1, 1, 1.3))
+ggsave("output/images/temp.png",
+       pl,
+       dpi = 100,
+       units = "in",
+       height = 4,
+       width = 14)
+
+# ------------------------------------------------------------------------------
+#
+#   OUTCOMES AND FACTORS AFFECTING THEM
+#
+# ------------------------------------------------------------------------------
+
 p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
 p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
 p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
@@ -293,7 +356,7 @@ prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
 prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
 pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
 pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
-ggsave(file.path("output", "images", "ROC_by_FC.png"),
+ggsave(file.path("output", "images", "ROC_by_FC_cpm.png"),
        plot = pl,
        units = "in",
        height = 10.5,
@@ -334,7 +397,7 @@ prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
 prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
 pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
 pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
-ggsave(file.path("output", "images", "ROC_by_percentDE.png"),
+ggsave(file.path("output", "images", "ROC_by_percentDE_cpm.png"),
        plot = pl,
        units = "in",
        height = 10.5,
@@ -378,8 +441,8 @@ for(i in 1:length(method_list)) {
       filter(high_FPR == "high") %>%
       pull(prop)
     cat(paste0("Method: ", method, ", setting: ", setting_label, ", high FPR prop: ", round(prop_high_fpr, 3), "\n"))
-    # plot_pieces <- plot_ROC_percentDE(subdata, method)
-    plot_pieces <- plot_ROC_fc(subdata, method)
+    plot_pieces <- plot_ROC_percentDE(subdata, method)
+    # plot_pieces <- plot_ROC_fc(subdata, method)
     pl <- plot_pieces$pl
     if(is.null(legend)) {
       legend <- plot_pieces$legend
@@ -400,8 +463,8 @@ prow2 <- plot_grid(p1_2, p2_2, p3_2, ncol = 3)
 prow3 <- plot_grid(p1_3, p2_3, p3_3, ncol = 3)
 pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
 pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
-# ggsave(file.path("output", "images", "ROC_by_percentDE-settings.png"),
-ggsave(file.path("output", "images", "ROC_by_FC-settings.png"),
+ggsave(file.path("output", "images", "ROC_by_percentDE-settings_cpm.png"),
+# ggsave(file.path("output", "images", "ROC_by_FC-settings_cpm.png"),
        plot = pl,
        units = "in",
        height = 10.5,

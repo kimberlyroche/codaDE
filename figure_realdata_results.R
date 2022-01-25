@@ -5,103 +5,23 @@ library(codaDE)
 library(cowplot)
 library(RColorBrewer)
 
-source("ggplot_fix.R")
-
 # Create directories manually
 dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
 
-datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
-thresholds <- c(1, 1, 1, 1, 1, 1, 1, 1)
+datasets <- c("Hagai", "Monaco", "Song", "Hashimshony", "Barlow", "Gruen",
+              "Muraro", "Owens", "VieiraSilva", "Kimmerling", "Yu", "Klein")
+thresholds <- rep(1, length(datasets))
 
-# thresholds <- rep(2, length(datasets))
 names(thresholds) <- datasets
-# model_dir <- "self"
 model_dir <- "oracle"
+submodel_dir <- "regression_cpm"
 
-submodel_dir <- "regression_baseline"
-
-# ------------------------------------------------------------------------------
-#   Classification accuracy
-# ------------------------------------------------------------------------------
-
-# Pull results files matching pattern
-
-# result_files <- list.files(path = file.path("output",
-#                                             "predictive_fits",
-#                                             model_dir,
-#                                             "classification",
-#                                             "validation_results",
-#                                             "no_norm"),
-#                            pattern = "results_(.*?)_threshold(\\d+)\\.tsv",
-#                            full.names = TRUE)
-# results <- NULL
-# for(file in result_files) {
-#   temp <- read.table(file, sep = "\t", header = TRUE)
-#   results <- rbind(results,
-#                    temp)
-# }
-# 
-# # Filter for the correct thresholds
-# keep_idx <- sapply(1:nrow(results), function(i) {
-#   results$threshold[i] == thresholds[[results$dataset[i]]]
-# })
-# results <- results[keep_idx,]
-# 
-# for(this_DE_method in unique(results$DE_method) ) {
-#   results_wrangled <- results %>%
-#     filter(DE_method == this_DE_method) %>%
-#     select(dataset, result_type, score_type, point) %>%
-#     pivot_wider(names_from = "result_type", values_from = "point") %>%
-#     mutate(agree = (true == predicted))
-#   tpr_agree_vec <- results_wrangled %>%
-#     filter(score_type == "TPR") %>%
-#     pull(agree)
-#   misses_tpr <- results_wrangled %>%
-#     filter(score_type == "TPR" & !agree) %>%
-#     pull(dataset)
-#   fpr_agree_vec <- results_wrangled %>%
-#     filter(score_type == "FPR") %>%
-#     pull(agree)
-#   misses_fpr <- results_wrangled %>%
-#     filter(score_type == "FPR" & !agree) %>%
-#     pull(dataset)
-#   cat(paste0(this_DE_method, " accuracy (TPR): ", sum(tpr_agree_vec) / length(tpr_agree_vec), " -- "))
-#   cat(paste0("missed on: ", paste0(misses_tpr, collapse = " "), "\n"))
-#   cat(paste0(this_DE_method, " accuracy (FPR): ", sum(fpr_agree_vec) / length(fpr_agree_vec), " -- "))
-#   cat(paste0("missed on: ", paste0(misses_fpr, collapse = " "), "\n"))
-# }
-# 
-# # View actual calls
-# for(this_dataset in datasets) {
-#   for(use_result_type in c("FPR")) {
-#     cat(paste0("DATASET: ", this_dataset, "   TYPE: ", use_result_type, "\n"))
-#     res_table <- results %>%
-#       filter(dataset == this_dataset & score_type == use_result_type) %>%
-#       select(dataset, result_type, DE_method, point) %>%
-#       pivot_wider(names_from = "result_type", values_from = "point")
-#     a <- res_table %>% filter(DE_method == "ALDEx2")
-#     cat(paste0("\tALDEx2: ", a$true, " / ", a$predicted, "\n"))
-#     d <- res_table %>% filter(DE_method == "DESeq2")
-#     cat(paste0("\tDESeq2: ", d$true, " / ", d$predicted, "\n"))
-#     s <- res_table %>% filter(DE_method == "scran")
-#     cat(paste0("\tscran: ", s$true, " / ", s$predicted, "\n"))
-#   }
-# }
-
-# ------------------------------------------------------------------------------
-#   Regression accuracy
-# ------------------------------------------------------------------------------
-
-palette <- list(ALDEx2 = "#46A06B",
-                DESeq2 = "#FF5733",
-                # MAST = "#EF82BB",
-                # NBGLM = "#7E54DE",
-                scran = "#E3C012")
+# palette <- list(ALDEx2 = "#46A06B",
+#                 DESeq2 = "#FF5733",
+#                 scran = "#E3C012")
 
 plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
-
-# Pull results files matching pattern
 
 result_files <- list.files(path = file.path("output",
                                             "predictive_fits",
@@ -124,87 +44,134 @@ for(file in result_files) {
 results <- results %>%
   filter(!(dataset == "Monaco" & DE_method == "scran"))
 
-# This loop also calculates R^2 for the real data x predictions
-for(use_result_type in c("TPR", "FPR")) {
-  plots <- list()
-  legend <- NULL
-  rsquared_df <- NULL
-  for(this_dataset in datasets) {
+plotlist <- list()
+for(i in 1:length(datasets)) {
+  this_dataset <- datasets[i]
+  
+  # ----------------------------------------------------------------------------
+  #   Plot 1: Parse absolute counts of true positives, false positives, etc.
+  # ----------------------------------------------------------------------------
+  
+  bar_components <- NULL
+  for(method in c("ALDEx2", "DESeq2", "scran")) {
+    if(this_dataset == "Monaco" & method == "scran") next;
+    calls <- readRDS(file.path("output",
+                               "real_data_calls",
+                               "no_norm",
+                               paste0("calls_oracle_",method,"_",this_dataset,"_threshold",thresholds[i],".rds")))
+    TP <- sum(calls$rates$TP_calls)
+    TN <- sum(calls$rates$TN_calls)
+    FP <- sum(calls$rates$FP_calls)
+    FN <- sum(calls$rates$FN_calls)
+    
+    bar_components <- rbind(bar_components,
+                            data.frame(dataset = this_dataset, method = method, count = TP, type = "TP"))
+    bar_components <- rbind(bar_components,
+                            data.frame(dataset = this_dataset, method = method, count = FN, type = "FN"))
+    bar_components <- rbind(bar_components,
+                            data.frame(dataset = this_dataset, method = method, count = FP, type = "FP"))
+    bar_components <- rbind(bar_components,
+                            data.frame(dataset = this_dataset, method = method, count = TN, type = "TN"))
+  }
+  
+  bar_components$dataset <- factor(bar_components$dataset, levels = datasets)
+  levels(bar_components$dataset) <- paste0(levels(bar_components$dataset), " et al.")
+  
+  bar_components$type <- factor(bar_components$type, levels = c("TP", "TN", "FN", "FP"))
+  # levels(bar_components$type) <- c("True positive", "True negative", "False negative", "False positive")
+  
+  p1 <- ggplot(bar_components, aes(x = method, y = count, fill = type, label = count)) +
+    geom_bar(stat = "identity") +
+    geom_text(size = 3, position = position_stack(vjust = 0.5), colour = "black", fontface = "bold") +
+    theme_bw() +
+    # scale_fill_brewer(palette = "GnBu") +
+    scale_fill_manual(values = c("#ec561d", "#ffaf60", "#217db4", "#9bd4e4")) +
+    labs(fill = "",
+         x = "")
+  
+  # ----------------------------------------------------------------------------
+  #   Plots 2-3: Parse predicted and observed outcomes
+  # ----------------------------------------------------------------------------
+  
+  for(use_result_type in c("TPR", "FPR")) {
+    legend <- NULL
     # Wrangle the poorly organized data
     plot_df <- results %>%
       filter(dataset == this_dataset) %>%
       filter(threshold == thresholds[[this_dataset]]) %>%
       filter(result_type == "predicted") %>%
       filter(score_type == use_result_type) %>%
-      select(!c(threshold, score_type))
+      dplyr::select(!c(threshold, score_type))
     plot_df$true <- NA
-    for(i in 1:nrow(plot_df)) {
-      plot_df$true[i] <- results %>%
+    for(j in 1:nrow(plot_df)) {
+      plot_df$true[j] <- results %>%
         filter(dataset == this_dataset) %>%
         filter(threshold == thresholds[[this_dataset]]) %>%
         filter(result_type == "true") %>%
         filter(score_type == use_result_type) %>%
-        filter(DE_method == plot_df$DE_method[i]) %>%
+        filter(DE_method == plot_df$DE_method[j]) %>%
         pull(point)
+      
+      p <- ggplot() +
+        geom_boxplot(data = plot_df,
+                     mapping = aes(x = DE_method,
+                                   ymin = lower90,
+                                   lower = lower50,
+                                   middle = point,
+                                   upper = upper50,
+                                   ymax = upper90,
+                                   fill = DE_method),
+                     stat = "identity", color = "#666666", width = 0.5, alpha = 0.4) +
+        geom_point(data = plot_df,
+                   mapping = aes(x = DE_method, y = true, fill = DE_method),
+                   size = 4, shape = 21, stroke = 1) +
+        ylim(c(0,1)) +
+        # scale_fill_manual(values = palette) +
+        scale_fill_brewer(palette = "Set2") +
+        theme_bw() +
+        theme(legend.position = "none") +
+        labs(x = "",
+             y = ifelse(use_result_type == "TPR", "sensitivity", "specificity"))
+      
+      if(use_result_type == "TPR") {
+        p2 <- p
+      } else {
+        p3 <- p
+      }
     }
-    rsquared_df <- rbind(rsquared_df,
-                         plot_df %>% select(dataset, DE_method, point, true))
-
-    pl <- ggplot(plot_df, aes(x = true, y = point)) +
-      geom_segment(data = data.frame(x = 0, xend = 1, y = 0, yend = 1),
-                   mapping = aes(x = x, xend = xend, y = y, yend = yend)) +
-      geom_linerange(data = plot_df,
-                     aes(ymin = lower90, ymax = upper90, color = factor(DE_method)),
-                     size = 0.75) +
-      geom_linerange(data = plot_df,
-                     aes(ymin = lower50, ymax = upper50, color = factor(DE_method)),
-                     size = 2) +
-      geom_point(data = plot_df,
-                 aes(x = true, y = point, color = factor(DE_method)),
-                 size = 4) +
-      scale_color_manual(values = palette) +
-      theme_bw() +
-      ylim(c(0,1)) +
-      labs(x = paste0("observed ", plot_labels[[use_result_type]], "\n", this_dataset, " et al."),
-           y = paste0("predicted ", plot_labels[[use_result_type]]),
-           color = "Data type") +
-      theme(axis.title.x = element_text(margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
-            axis.title.y = element_text(margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0)))
-    legend <- get_legend(pl + theme(legend.position = "bottom"))
-    pl <- pl +
-      theme(legend.position = "none")
-    
-    plots[[this_dataset]] <- pl
   }
   
-  # Report R^2
-  cat(paste0("Overall ", use_result_type, " R^2: ", round(cor(rsquared_df$point, rsquared_df$true)**2, 3), "\n"))
-  for(DE_method in sort(unique(rsquared_df$DE_method))) {
-    idx <- which(rsquared_df$DE_method == DE_method)
-    cat(paste0("for ", DE_method, ": ", round(cor(rsquared_df$point[idx], rsquared_df$true[idx])**2, 3), "\n"))
-  }
-
-  # Plot
-  prow1 <- plot_grid(plotlist = plots[1:4], ncol = 4, labels = c("a", "b", "c", "d"),
-                     #hjust = -1.35,
-                     vjust = -0.25, label_size = 24)
-  prow2 <- plot_grid(plotlist = plots[5:8], ncol = 4, labels = c("e", "f", "g", "h"),
-                     #hjust = -1.35,
-                     vjust = -0.2, label_size = 24)
-  pl <- plot_grid(prow1, prow2, legend, ncol = 1, rel_heights = c(1, 1, .1), scale = 0.9)
-  pl <- pl +
-    theme(plot.margin = ggplot2::margin(t = 25, r = 0, b = 0, l = 0, "pt"))
-  # show(pl)
-  ggsave(file.path("output",
-                   "images",
-                   paste0("validations_",
-                          model_dir,
-                          "_",
-                          use_result_type,
-                          ".png")),
-         plot = pl,
-         dpi = 100,
-         units = "in",
-         height = 7.35,
-         width = 13)
+  p2_padded <- plot_grid(p2, p3, ncol = 2, scale = 0.95)
+  p <- plot_grid(p1, p2_padded, ncol = 2, rel_widths = c(1, 1.5))
+  plotlist[[this_dataset]] <- p
 }
+
+common_scale <- 0.98
+
+prow1 <- plot_grid(plotlist = plotlist[1:6],
+                   ncol = 1,
+                   labels = c("a", "b", "c", "d", "e", "f"),
+                   scale = common_scale,
+                   label_y = 1.04,
+                   label_size = 18)
+
+ggsave(file.path("output", "images", "results_summary_1.png"),
+       plot = prow1,
+       units = "in",
+       height = 14,
+       width = 9,
+       bg = "white")
+
+prow2 <- plot_grid(plotlist = plotlist[7:12],
+                   ncol = 1,
+                   labels = c("g", "h", "i", "j", "k", "m"),
+                   scale = common_scale,
+                   label_y = 1.04,
+                   label_size = 18)
+
+ggsave(file.path("output", "images", "results_summary_2.png"),
+       plot = prow2,
+       units = "in",
+       height = 14,
+       width = 9,
+       bg = "white")

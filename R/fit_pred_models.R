@@ -254,6 +254,7 @@ characterize_dataset <- function(counts_A, counts_B) {
 #' @param use_totals pull fold change in total estimate from absolute counts
 #' @param use_renorm_counts pull features generated from method-renormalized
 #' data
+#' @param use_cpm use counts per million for relative abundances
 #' @return data.frame with predictive model training features
 #' @import dplyr
 #' @import RSQLite
@@ -261,7 +262,8 @@ characterize_dataset <- function(counts_A, counts_B) {
 pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                           use_baseline = "oracle",
                           use_totals = FALSE,
-                          use_renorm_counts = FALSE) {
+                          use_renorm_counts = FALSE,
+                          use_cpm = FALSE) {
 
   conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
   
@@ -280,7 +282,11 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
   if(use_renorm_counts) {
     characteristics <- dbGetQuery(conn, paste0("SELECT * FROM characteristics WHERE PARTIAL=0"))
   } else {
-    characteristics <- dbGetQuery(conn, paste0("SELECT * FROM characteristics WHERE PARTIAL=0 AND TYPE='relative_abundances'"))
+    if(use_cpm) {
+      characteristics <- dbGetQuery(conn, paste0("SELECT * FROM characteristics WHERE PARTIAL=0 AND TYPE='cpm'"))
+    } else {
+      characteristics <- dbGetQuery(conn, paste0("SELECT * FROM characteristics WHERE PARTIAL=0 AND TYPE='relative_abundances'"))
+    }
   }
   results <- dbGetQuery(conn, paste0("SELECT UUID, METHOD, TPR, FPR FROM results WHERE PARTIAL_INFO=0 AND BASELINE_TYPE='", use_baseline, "'"))
     
@@ -319,6 +325,7 @@ pull_features <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
 #' @param output_weights flag indicating whether or not to plot some visualization
 #' of feature weights
 #' @param train_percent percent of simulated datasets to train on
+#' @param use_cpm use counts per million for relative abundances
 #' @return NULL (fitted models are saved in output directory)
 #' @import randomForest
 #' @import dplyr
@@ -329,7 +336,8 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
                                  use_totals = FALSE,
                                  use_renorm_counts = FALSE,
                                  output_weights = TRUE,
-                                 train_percent = 0.8) {
+                                 train_percent = 0.8,
+                                 use_cpm = FALSE) {
   
   if(!(use_baseline %in% c("self", "oracle"))) {
     stop(paste0("Invalid baseline: ", use_baseline, "!\n"))
@@ -350,7 +358,8 @@ fit_predictive_model <- function(DE_methods = c("ALDEx2", "DESeq2", "scran"),
   features <- pull_features(DE_methods = DE_methods,
                             use_baseline = use_baseline,
                             use_totals = use_totals,
-                            use_renorm_counts = use_renorm_counts)
+                            use_renorm_counts = use_renorm_counts,
+                            use_cpm = use_cpm)
 
   if(use_renorm_counts) {
     # Combine features from relative abundances and renormalized counts for the 

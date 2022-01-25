@@ -28,19 +28,23 @@ for(u in 1:length(all_uuids)) {
   res <- dbGetQuery(conn, paste0("SELECT * FROM results ",
                                  "WHERE UUID = '",uuid,"' AND ",
                                  "CALLS IS NOT NULL;"))
-  # There are 16 combos of fit we want for each dataset
-  #   1) 'self' or 'oracle' as differential abundance reference
-  #   2) partial info = 0 or 1
-  #   3) method = ALDEx2, DESeq2, MAST, scran
-  #
+
   # Look for any missing combos and add them to the wishlist
-  for(ref in c("self")) {
+  # This is pretty run-specific!
+  for(ref in c("oracle")) {
     for(par in c(0)) {
-      for(method in c("NBGLM")) {
-        if(res %>% filter(BASELINE_TYPE == ref & PARTIAL_INFO == par & METHOD == method) %>% count() %>% pull(n) == 0) {
-          wishlist <- rbind(wishlist,
-                            data.frame(ID = counter, uuid = uuid, baseline = ref, partial_info = par, method = method))
-          counter <- counter + 1
+      for(method in c("ALDEx2", "DESeq2", "scran")) {
+        for(obs in c("cpm")) {
+          if(res %>% filter(BASELINE_TYPE == ref & PARTIAL_INFO == par & METHOD == method & OBSERVED_TYPE == obs) %>% count() %>% pull(n) == 0) {
+            wishlist <- rbind(wishlist,
+                              data.frame(ID = counter,
+                                         uuid = uuid,
+                                         baseline = ref,
+                                         partial_info = par,
+                                         method = method,
+                                         observed_type = obs))
+            counter <- counter + 1
+          }
         }
       }
     }

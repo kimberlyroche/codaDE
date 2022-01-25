@@ -75,6 +75,15 @@ if(threshold < 0) {
 abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE))
 rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE))
 
+# Convert to proportions
+# temp <- apply(rel_data$counts, 2, function(x) x/sum(x))
+# cpm <- round(temp*1e06)
+# rel_data$counts <- cpm
+
+# Downsample
+abs_data$counts <- abs_data$counts/10
+rel_data$counts <- rel_data$counts/10
+
 if(testing & nrow(abs_data$counts) > 500) {
   k <- 500
   sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
@@ -215,6 +224,30 @@ if(dataset_name == "Yu") {
   counts_A_abs <- ref_data[groups == "Brn",]
   counts_B_abs <- ref_data[groups == "Lvr",]
 }
+if(dataset_name == "Muraro") {
+  counts_A <- data[groups == "alpha",]
+  counts_B <- data[groups == "beta",]
+  counts_A_abs <- ref_data[groups == "alpha",]
+  counts_B_abs <- ref_data[groups == "beta",]
+}
+if(dataset_name == "Hashimshony") {
+  counts_A <- data[groups == "0",]
+  counts_B <- data[groups == "1",]
+  counts_A_abs <- ref_data[groups == "0",]
+  counts_B_abs <- ref_data[groups == "1",]
+}
+if(dataset_name == "Kimmerling") {
+  counts_A <- data[groups == "low_mass",]
+  counts_B <- data[groups == "high_mass",]
+  counts_A_abs <- ref_data[groups == "low_mass",]
+  counts_B_abs <- ref_data[groups == "high_mass",]
+}
+if(dataset_name == "Gruen") {
+  counts_A <- data[groups == "A",]
+  counts_B <- data[groups == "B",]
+  counts_A_abs <- ref_data[groups == "A",]
+  counts_B_abs <- ref_data[groups == "B",]
+}
 
 save_fn <- file.path("output",
                      paste0("filtered_data_",dataset_name,"_threshold",threshold,".rds"))
@@ -223,18 +256,6 @@ if(!file.exists(save_fn)) {
                relative = data,
                groups = groups), save_fn)
 }
-
-# Report stats on this data set
-cat(paste0("Number of features (after filtering): ", ncol(counts_A), "\n"))
-cat(paste0("Number of samples: ", length(groups), "\n"))
-cat(paste0("Samples per condition (A, B): ", sum(groups == levels(groups)[1]), ", ",
-           sum(groups == levels(groups)[2]), "\n"))
-cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
-sA <- mean(rowSums(counts_A_abs))
-sB <- mean(rowSums(counts_B_abs))
-fc <- max(sA, sB) / min(sA, sB)
-cat(paste0("Approx. fold change between conditions: ", round(fc, 1), "\n"))
-cat(paste0("Approx. percent differential features: ", round(percent_DE, 2)*100, "%\n"))
 
 # This takes 2-3 min. to run on 15K features
 features <- as.data.frame(characterize_dataset(counts_A, counts_B))

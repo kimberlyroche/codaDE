@@ -964,6 +964,10 @@ parse_Muraro <- function(absolute = TRUE) {
 #' @import edgeR
 #' @export
 parse_Hashimshony <- function(absolute = TRUE) {
+  # Note that 0 = GFP negative cells (quiescent)
+  #           1 = GFP positive cells (cycling)
+  #           0.3 = GFP "weak"
+  #           0.5 = GFP "mixed"
   file_dir <- file.path("data", "Hashimshony_2016")
   
   # Parse data and assignments

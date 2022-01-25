@@ -99,6 +99,11 @@ for(i in 1:nrow(wishlist)) {
     counts <- data$simulation$observed_counts1
   }
   
+  if(job$type == "cpm") {
+    counts <- t(apply(counts, 1, function(x) x/sum(x)))
+    counts <- counts*1e06
+  }
+
   med_abs <- mean(rowSums(abundances))
   med_rel <- mean(rowSums(counts))
 
