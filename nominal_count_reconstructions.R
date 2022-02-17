@@ -2,11 +2,13 @@ library(codaDE)
 library(tidyverse)
 library(cowplot)
 
-# datasets <- c("VieiraSilva", "Barlow", "Song", "Monaco", "Hagai", "Owens", "Klein", "Yu")
-# thresholds <- c(1, 1, 1, 1, 1, 1, 1, 1)
+# datasets <- c("VieiraSilva", "Muraro", "Hagai", "Hashimshony", "Gruen", "Kimmerling",
+#               "Song", "Barlow", "Monaco", "Yu",
+#               "Klein", "Owens")
+# thresholds <- rep(1, length(datasets))
 
-datasets <- c("Owens", "Klein", "Yu")
-thresholds <- c(1, 1, 1)
+datasets <- c("Kimmerling")
+thresholds <- c(1)
 
 plots <- list()
 legends <- list()
@@ -16,15 +18,10 @@ for(i in 1:length(datasets)) {
   scaled_counts_D <- scaled_counts_DESeq2(all_data$relative, all_data$groups, pseudocount = 0.5)
   scaled_counts_S <- scaled_counts_scran(all_data$relative, all_data$groups, pseudocount = 0.5)
   
-  plot_df <- data.frame(sample = 1:nrow(all_data$relative),
-                        total = rowSums(all_data$relative),
+  plot_df <- data.frame(sample = 1:nrow(scaled_counts_A),
+                        total = rowSums(scaled_counts_A),
                         group = all_data$groups,
-                        type = "relative")
-  plot_df <- rbind(plot_df,
-                   data.frame(sample = 1:nrow(scaled_counts_A),
-                              total = rowSums(scaled_counts_A),
-                              group = all_data$groups,
-                              type = "ALDEx2"))
+                        type = "ALDEx2")
   plot_df <- rbind(plot_df,
                    data.frame(sample = 1:nrow(scaled_counts_D),
                               total = rowSums(scaled_counts_D),
@@ -74,19 +71,21 @@ for(i in 1:length(datasets)) {
   legends[[i]] <- legend
 }
 
-l1 <- plot_grid(legends[[1]], NULL, ncol = 2, rel_widths = c(1, 0.4))
-l2 <- plot_grid(legends[[2]], NULL, ncol = 2, rel_widths = c(1, 0.05))
-l3 <- plot_grid(legends[[3]], NULL, ncol = 2, rel_widths = c(1, 0.8))
-p1 <- plot_grid(plots[[1]], l1, ncol = 2, rel_widths = c(1, 0.17))
-p2 <- plot_grid(plots[[2]], l2, ncol = 2, rel_widths = c(1, 0.17))
-p3 <- plot_grid(plots[[3]], l3, ncol = 2, rel_widths = c(1, 0.17))
-p <- plot_grid(p1, p2, p3, ncol = 1)
+plots[[1]]
 
-ggsave(file.path("output",
-                 "images",
-                 "nominal_rescaled.png"),
-       p,
-       dpi = 100,
-       units = "in",
-       height = 6,
-       width = 12)
+# l1 <- plot_grid(legends[[1]], NULL, ncol = 2, rel_widths = c(1, 0.4))
+# l2 <- plot_grid(legends[[2]], NULL, ncol = 2, rel_widths = c(1, 0.05))
+# l3 <- plot_grid(legends[[3]], NULL, ncol = 2, rel_widths = c(1, 0.8))
+# p1 <- plot_grid(plots[[1]], l1, ncol = 2, rel_widths = c(1, 0.17))
+# p2 <- plot_grid(plots[[2]], l2, ncol = 2, rel_widths = c(1, 0.17))
+# p3 <- plot_grid(plots[[3]], l3, ncol = 2, rel_widths = c(1, 0.17))
+# p <- plot_grid(p1, p2, p3, ncol = 1)
+# 
+# ggsave(file.path("output",
+#                  "images",
+#                  "nominal_rescaled.png"),
+#        p,
+#        dpi = 100,
+#        units = "in",
+#        height = 6,
+#        width = 12)
