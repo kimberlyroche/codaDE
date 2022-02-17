@@ -34,40 +34,33 @@ pull_top_features <- function(method) {
   sort(unique(c(top_features_tpr, top_features_fpr)))
 }
 
-# save_fn <- file.path("output", "MDS_features.rds")
-# if(!file.exists(save_fn)) {
-  top_features <- unique(c(pull_top_features("ALDEx2"), pull_top_features("DESeq2"), pull_top_features("scran")))
-  mds_features <- all_features %>%
+top_features <- unique(c(pull_top_features("ALDEx2"), pull_top_features("DESeq2"), pull_top_features("scran")))
+mds_features <- all_features %>%
+  select(top_features) %>%
+  mutate(type = "simulation")
+# Subsample for testing
+mds_features <- mds_features[sample(1:nrow(mds_features), size = 2000),]
+
+datasets <- c("Hagai", "Monaco", "Song", "Hashimshony", "Barlow", "Gruen",
+              "Muraro", "Owens", "VieiraSilva", "Kimmerling", "Yu", "Klein")
+thresholds <- rep(1, length(datasets))
+
+for(i in 1:length(datasets)) {
+  this_dataset <- datasets[i]
+  this_threshold <- thresholds[i]
+  temp <- readRDS(file.path("output",
+                            paste0("filtered_features_",this_dataset,"_threshold",this_threshold,".rds"))) %>%
     select(top_features) %>%
-    mutate(type = "simulation")
-  # Subsample for testing
-  mds_features <- mds_features[sample(1:nrow(mds_features), size = 2000),]
-  
-  datasets <- c("Hagai", "Monaco", "Song", "Hashimshony", "Barlow", "Gruen",
-                "Muraro", "Owens", "VieiraSilva", "Kimmerling", "Yu", "Klein")
-  thresholds <- rep(1, length(datasets))
-  
-  for(i in 1:length(datasets)) {
-    this_dataset <- datasets[i]
-    this_threshold <- thresholds[i]
-    temp <- readRDS(file.path("output",
-                              paste0("filtered_features_",this_dataset,"_threshold",this_threshold,".rds"))) %>%
-      select(top_features) %>%
-      mutate(type = this_dataset)
-    mds_features <- rbind(mds_features, temp)
-  }
-  
-  feature_dist <- dist(mds_features[,1:(ncol(mds_features)-1)])
-  coords <- cmdscale(feature_dist, k = 4) # Takes about 10-20 sec.
-  
-  # 1) Plot simulations in space of top 5-ish features
-  plot_df <- data.frame(x = coords[,1], y = coords[,2], z1 = coords[,3], z2 = coords[,4], type = mds_features$type)
-  plot_df$type <- factor(plot_df$type, levels = c(datasets, "simulation"))
-  
-#   saveRDS(plot_df, save_fn)
-# } else {
-#   plot_df <- readRDS(save_fn)
-# }
+    mutate(type = this_dataset)
+  mds_features <- rbind(mds_features, temp)
+}
+
+feature_dist <- dist(mds_features[,1:(ncol(mds_features)-1)])
+coords <- cmdscale(feature_dist, k = 4) # Takes about 10-20 sec.
+
+# 1) Plot simulations in space of top 5-ish features
+plot_df <- data.frame(x = coords[,1], y = coords[,2], z1 = coords[,3], z2 = coords[,4], type = mds_features$type)
+plot_df$type <- factor(plot_df$type, levels = c(datasets, "simulation"))
 
 palette <- generate_highcontrast_palette(length(datasets))
 
@@ -80,11 +73,11 @@ p1 <- ggplot() +
   scale_fill_manual(values = palette) +
   theme_bw()
 
-p1
+show(p1)
 
-# ggsave(file.path("output", "images", paste0("features_PC1-2.png")),
-#        p1,
-#        dpi = 100,
-#        units = "in",
-#        height = 5,
-#        width = 6.5)
+ggsave(file.path("output", "images", paste0("MDS_axes_1-2.png")),
+       p1,
+       dpi = 100,
+       units = "in",
+       height = 5,
+       width = 6.5)
