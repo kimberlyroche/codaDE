@@ -8,17 +8,6 @@ library(RColorBrewer)
 library(cowplot)
 library(ggridges)
 
-# Create directories manually
-
-dir.create("output", showWarnings = FALSE)
-dir.create(file.path("output", "images"), showWarnings = FALSE)
-
-# ------------------------------------------------------------------------------
-#
-#   Supplemental figure 1: distributional characteristics of simulations
-#
-# ------------------------------------------------------------------------------
-
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 qq_res <- dbGetQuery(conn, paste0("SELECT FC_ABSOLUTE FROM datasets ",
@@ -48,24 +37,12 @@ levels(temp$CORRP) <- c("Independent features", "Strongly correlated features")
 
 lr_margin <- 0.45
 
-
 # ------------------------------------------------------------------------------
 #  Percent differential features
 # ------------------------------------------------------------------------------
 
 n_bins <- 30
 bottom_offset <- 0.15
-
-# p1 <- ggplot(temp, aes(x = PERCENT_DIFF_REALIZ, fill = factor(P))) +
-#   geom_density(alpha = 0.6) +
-#   scale_fill_brewer(palette = "RdYlGn") +
-#   # facet_wrap(. ~ CORRP) +
-#   xlim(c(0, 1)) +
-#   theme_bw() +
-#   labs(x = "percent differentially abundant features",
-#        fill = "Feature number") +
-#   theme(legend.position = "none",
-#         plot.margin = margin(t = 0.4, l = lr_margin, r = lr_margin, b = 0.5, "cm"))
 
 p1 <- ggplot(temp, aes(x = PERCENT_DIFF_REALIZ, y = factor(P), fill = factor(P))) +
   geom_density_ridges(stat = "binline", bins = n_bins, scale = 0.9) +
@@ -79,22 +56,11 @@ p1 <- ggplot(temp, aes(x = PERCENT_DIFF_REALIZ, y = factor(P), fill = factor(P))
   labs(x = "percent differentially abundant features",
        fill = "Feature number") +
   theme(legend.position = "none",
-        plot.margin = margin(t = 0.4, l = lr_margin, r = lr_margin, b = 0.5, "cm"))
+        plot.margin = ggplot2::margin(t = 0.4, l = lr_margin, r = lr_margin, b = 0.5, "cm"))
 
 # ------------------------------------------------------------------------------
 #   Absolute fold change in totals
 # ------------------------------------------------------------------------------
-
-# p2 <- ggplot(temp, aes(x = FC_ABSOLUTE, fill = factor(P))) +
-#   geom_density(alpha = 0.6) +
-#   scale_fill_brewer(palette = "RdYlGn") +
-#   # facet_wrap(. ~ CORRP) +
-#   xlim(c(0, 10)) +
-#   theme_bw() +
-#   labs(x = "fold change in abundance",
-#        fill = "Feature number") +
-#   theme(legend.position = "none",
-#         plot.margin = margin(t = 0.4, l = lr_margin, r = lr_margin, b = 0.5, "cm"))
 
 p2 <- ggplot(temp, aes(x = FC_ABSOLUTE, y = factor(P), fill = factor(P))) +
   geom_density_ridges(stat = "binline", bins = n_bins, scale = 0.9) +
@@ -108,7 +74,7 @@ p2 <- ggplot(temp, aes(x = FC_ABSOLUTE, y = factor(P), fill = factor(P))) +
   labs(x = "fold change in abundance",
        fill = "Feature number") +
   theme(legend.position = "none",
-        plot.margin = margin(t = 0.4, l = lr_margin, r = lr_margin, b = 0.5, "cm"))
+        plot.margin = ggplot2::margin(t = 0.4, l = lr_margin, r = lr_margin, b = 0.5, "cm"))
 
 # ------------------------------------------------------------------------------
 #   Percent zeros
@@ -123,17 +89,6 @@ dbDisconnect(conn)
 
 temp2 <- data.frame(sparsity = c(res$COMP_C_P0_A, res$COMP_C_P0_B),
                     P = c(res$P, res$P))
-# p3 <- ggplot(temp2, aes(x = sparsity, fill = factor(P))) +
-#   geom_density(alpha = 0.6) +
-#   scale_fill_brewer(palette = "RdYlGn") +
-#   xlim(c(0,1)) +
-#   theme_bw() +
-#   labs(x = "percent zeros",
-#        fill = "Feature number")
-# legend <- get_legend(p3 + theme(legend.position = "bottom"))
-# p3 <- p3  +
-#   theme(legend.position = "none",
-#         plot.margin = margin(t = 0.4, l = lr_margin, r = lr_margin, b = 0.5, "cm"))
 
 p3 <- ggplot(temp2, aes(x = sparsity, y = factor(P), fill = factor(P))) +
   geom_density_ridges(stat = "binline", bins = n_bins, scale = 0.9) +
@@ -149,7 +104,7 @@ p3 <- ggplot(temp2, aes(x = sparsity, y = factor(P), fill = factor(P))) +
 legend <- get_legend(p3 + theme(legend.position = "bottom"))
 p3 <- p3  +
   theme(legend.position = "none",
-        plot.margin = margin(t = 0.4, l = lr_margin, r = lr_margin, b = 0.5, "cm"))
+        plot.margin = ggplot2::margin(t = 0.4, l = lr_margin, r = lr_margin, b = 0.5, "cm"))
 
 prow <- plot_grid(p1,
                   p2,
@@ -157,21 +112,22 @@ prow <- plot_grid(p1,
                   align = 'vh',
                   hjust = -1,
                   nrow = 1)
-# labels = c("a", "b", "c"),
-# label_size = 18,
-# label_x = -0.03,
-# label_y = 1.03)
 
 pl <- plot_grid(prow,
                 legend,
                 ncol = 1,
                 rel_heights = c(1, 0.1))
 
-ggsave(file.path("output",
-                 "images",
-                 paste0("simulation_characteristics.svg")),
-       plot = pl,
-       dpi = 100,
-       units = "px",
-       height = 600,
-       width = 1000)
+dev.off()
+tiff(file.path("output", "images", "S1.tif"), units = "in", width = 10, height = 5, res = 300)
+pl
+dev.off()
+
+# ggsave(file.path("output",
+#                  "images",
+#                  paste0("simulation_characteristics.svg")),
+#        plot = pl,
+#        dpi = 100,
+#        units = "px",
+#        height = 600,
+#        width = 1000)
