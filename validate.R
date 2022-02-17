@@ -62,7 +62,6 @@ use_renorm_counts <- opt$userenormcounts
 use_cpm <- opt$usecpm
 
 testing <- FALSE
-alpha <- 0.05
 methods_list <- c("ALDEx2", "DESeq2", "scran")
 
 if(threshold < 0) {
@@ -73,14 +72,14 @@ if(threshold < 0) {
 #   Parse and wrangle validation data
 # ------------------------------------------------------------------------------
 
-abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE))
-rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE))
+abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE, use_cpm = use_cpm))
+rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE, use_cpm = use_cpm))
 
-if(use_cpm) {
-  # Convert to CPM
-  rel_data$counts <- apply(rel_data$counts, 2, function(x) x/sum(x))
-  rel_data$counts <- round(rel_data$counts*1e06)
-}
+#if(use_cpm) {
+#  # Convert to CPM
+#  rel_data$counts <- apply(rel_data$counts, 2, function(x) x/sum(x))
+#  rel_data$counts <- round(rel_data$counts*1e06)
+#}
 
 if(testing & nrow(abs_data$counts) > 500) {
   k <- 500
@@ -135,7 +134,7 @@ if(!is.null(tax)) {
 # ------------------------------------------------------------------------------
 
 # Save this estimate for later; we'll print it out with other statistics
-percent_DE <- NULL
+# percent_DE <- NULL
 for(DE_method in methods_list) {
   # Pull saved calls on this data set x method if these exist
   save_fn <- file.path("output",
@@ -163,10 +162,10 @@ for(DE_method in methods_list) {
     save_obj <- list(all_calls = all_calls, rates = rates)
     saveRDS(save_obj, save_fn)
   }
-  if(is.null(percent_DE)) {
-    oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < 0.05
-    percent_DE <- sum(oracle_calls) / length(oracle_calls)
-  }
+  # if(is.null(percent_DE)) {
+  #   oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < 0.05
+  #   percent_DE <- sum(oracle_calls) / length(oracle_calls)
+  # }
 }
 
 # ------------------------------------------------------------------------------
@@ -255,17 +254,17 @@ if(!file.exists(save_fn)) {
                groups = groups), save_fn)
 }
 
-# Report stats on this data set
-cat(paste0("Number of features (after filtering): ", ncol(counts_A), "\n"))
-cat(paste0("Number of samples: ", length(groups), "\n"))
-cat(paste0("Samples per condition (A, B): ", sum(groups == levels(groups)[1]), ", ",
-           sum(groups == levels(groups)[2]), "\n"))
-cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
-sA <- mean(rowSums(counts_A_abs))
-sB <- mean(rowSums(counts_B_abs))
-fc <- max(sA, sB) / min(sA, sB)
-cat(paste0("Approx. fold change between conditions: ", round(fc, 1), "\n"))
-cat(paste0("Approx. percent differential features: ", round(percent_DE, 2)*100, "%\n"))
+# # Report stats on this data set
+# cat(paste0("Number of features (after filtering): ", ncol(counts_A), "\n"))
+# cat(paste0("Number of samples: ", length(groups), "\n"))
+# cat(paste0("Samples per condition (A, B): ", sum(groups == levels(groups)[1]), ", ",
+#            sum(groups == levels(groups)[2]), "\n"))
+# cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
+# sA <- mean(rowSums(counts_A_abs))
+# sB <- mean(rowSums(counts_B_abs))
+# fc <- max(sA, sB) / min(sA, sB)
+# cat(paste0("Approx. fold change between conditions: ", round(fc, 1), "\n"))
+# cat(paste0("Approx. percent differential features: ", round(percent_DE, 2)*100, "%\n"))
 
 # This takes 2-3 min. to run on 15K features
 features <- as.data.frame(characterize_dataset(counts_A, counts_B))

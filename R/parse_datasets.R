@@ -31,7 +31,7 @@ compute_sf <- function(ref_data) {
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_VieiraSilva <- function(absolute = TRUE) {
+parse_VieiraSilva <- function(absolute = TRUE, use_cpm = FALSE) {
   file_dir <- file.path("data", "Vieira-Silva_2019")
   
   data <- read.table(file.path(file_dir, "QMP.matrix.tsv"))
@@ -55,21 +55,7 @@ parse_VieiraSilva <- function(absolute = TRUE) {
               by = "sample_id")
   data <- data[mapping$idx_in_data,]
   data <- t(data)
-  
   counts <- data
-  if(!absolute) {
-    # Shuffle observed abundances
-    set.seed(1001)
-    new_totals <- sample(round(colSums(counts)))
-    for(i in 1:ncol(counts)) {
-      counts[,i] <- rmultinom(1,
-                              size = new_totals[i],
-                              prob = counts[,i] / sum(counts[,i]))
-    }
-  }
-  counts <- data.matrix(counts)
-  colnames(counts) <- NULL
-  rownames(counts) <- NULL
   
   groups <- factor(meta$cohort)
   
@@ -78,6 +64,38 @@ parse_VieiraSilva <- function(absolute = TRUE) {
   B_idx <- which(groups == "CD")
   counts <- counts[,c(A_idx, B_idx)]
   groups <- groups[c(A_idx, B_idx)]
+  
+  # Filter out ultra-low read counts
+  retain_idx <- colSums(counts) > 1000
+  counts <- counts[,retain_idx]
+  groups <- groups[retain_idx]
+  
+  if(absolute) {
+    if(use_cpm) {
+      # Scale up these low counts
+      counts <- counts * 1e06 / mean(colSums(counts))
+    }
+  } else {
+    if(use_cpm) {
+      counts <- apply(counts, 2, function(x) x/sum(x))
+      counts <- round(counts*1e06)
+    } else {
+      # Shuffle observed abundances
+      set.seed(1001)
+      new_totals <- sample(round(colSums(counts)))
+      for(i in 1:ncol(counts)) {
+        counts[,i] <- rmultinom(1,
+                                size = new_totals[i],
+                                prob = counts[,i] / sum(counts[,i]))
+      }
+    }
+  }
+  
+  plot(colSums(counts))
+  
+  counts <- data.matrix(counts)
+  colnames(counts) <- NULL
+  rownames(counts) <- NULL
   
   parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
   return(parsed_obj)
@@ -97,7 +115,7 @@ parse_VieiraSilva <- function(absolute = TRUE) {
 #' data
 #' @return named list of counts and group labels
 #' @export
-parse_Barlow <- function(absolute = TRUE) {
+parse_Barlow <- function(absolute = TRUE, use_cpm = FALSE) {
   file_dir <- file.path("data", "Barlow_2020")
   
   if(absolute) {
@@ -119,11 +137,6 @@ parse_Barlow <- function(absolute = TRUE) {
   rownames(counts) <- NULL
   counts <- data.matrix(counts)
   
-  if(!absolute) {
-    # Note relative_counts are scaled to 100; scale to CPM
-    counts <- counts * (1e6 / sum(counts[1,]))
-  }
-  
   # `counts` is initially 103 samples x 142 taxa
   
   # Pull stool samples from days 4, 7, 10
@@ -136,21 +149,32 @@ parse_Barlow <- function(absolute = TRUE) {
   labels <- c(rep("control", length(ctrl_idx)), rep("keto", length(keto_idx)))
   
   counts <- apply(counts, c(1,2), as.numeric)
+  counts <- t(counts) # now features x samples
   
   # Eliminate all-zero taxa
-  absent_tax_idx <- which(colSums(counts) == 0)
-  counts <- counts[,-absent_tax_idx]
+  absent_tax_idx <- which(rowSums(counts) == 0)
+  counts <- counts[-absent_tax_idx,]
   tax <- tax[-absent_tax_idx]
   
   groups <- factor(labels, levels = c("control", "keto"))
+  
+  if(use_cpm) {
+    if(absolute) {
+      # Rescale these to bring them into the same universe of scale as the 
+      # relative counts
+      counts <- counts * (1e6 / sum(counts[,1]))
+    } else {
+      # Note relative_counts are scaled to 100; scale to CPM
+      counts <- counts * (1e6 / sum(counts[,1]))
+    }
+  }
   
   # The scaling does weird things to this data set. The minimum *observed* 
   # (non-zero) abundance is huge giving a gap between observed and unobserved 
   # features that is enormous. I'm scaling down all the counts by this minimum 
   # observed abundance for now.
-  min_observed <- min(counts[which(counts > 0, arr.ind = TRUE)])
-  counts <- counts / min_observed
-  counts <- t(counts)
+  # min_observed <- min(counts[which(counts > 0, arr.ind = TRUE)])
+  # counts <- counts / min_observed
   
   parsed_obj <- list(counts = counts, groups = groups, tax = tax)
   return(parsed_obj)
@@ -171,7 +195,7 @@ parse_Barlow <- function(absolute = TRUE) {
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Song <- function(absolute = TRUE) {
+parse_Song <- function(absolute = TRUE, use_cpm = FALSE) {
   file_dir <- file.path("data", "Song_2021")
   # Had to first remove a pound sign in the Accession No field name
   headers <- read.table(file.path(file_dir, "GSE161116_series_matrix.txt"),
@@ -197,7 +221,14 @@ parse_Song <- function(absolute = TRUE) {
   
   # Observed abundances correlate very well to spike-in abundances already;
   # forego renormalization
-  counts <- data.matrix(mrna[-ref_idx,])
+
+  counts <- data.matrix(mrna)
+  if(use_cpm) {
+    counts <- apply(counts, 2, function(x) x/sum(x))
+    counts <- round(counts*1e06)
+  }
+
+  counts <- counts[-ref_idx,]
   if(!absolute) {
     # Shuffle observed abundances
     set.seed(1000)
@@ -230,7 +261,7 @@ parse_Song <- function(absolute = TRUE) {
 #' @import stringr
 #' @import edgeR
 #' @export
-parse_Monaco <- function(absolute = TRUE) {
+parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE) {
   file_dir <- file.path("data", "Monaco_2019")
   
   # Parse data and assignments
@@ -245,6 +276,12 @@ parse_Monaco <- function(absolute = TRUE) {
   spike_sums <- colSums(spike_counts)
   retain_idx <- which(spike_sums >= quantile(spike_sums, probs = c(0.05)))
   data <- data[,retain_idx]
+
+  if(use_cpm) {
+    data <- apply(data, 2, function(x) x/sum(x))
+    data <- round(data*1e06)
+  }
+
   spike_counts <- data[spike_idx,]
 
   # Plot spike-in relative abundance by type
@@ -326,7 +363,7 @@ parse_Monaco <- function(absolute = TRUE) {
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Hagai <- function(absolute = TRUE) {
+parse_Hagai <- function(absolute = TRUE, use_cpm = FALSE) {
   counts_A <- read.table(file.path("data",
                                    "Hagai_2018",
                                    "counts_mouse_unst.txt"),
@@ -343,11 +380,16 @@ parse_Hagai <- function(absolute = TRUE) {
   counts_B <- counts_B[,2:ncol(counts_B)]
   
   # Eliminate lowly sequenced samples
-  counts_A <- counts_A[,colSums(counts_A) > 5000]
-  counts_B <- counts_B[,colSums(counts_B) > 5000]
+  # counts_A <- counts_A[,colSums(counts_A) > 5000]
+  # counts_B <- counts_B[,colSums(counts_B) > 5000]
   
   counts <- round(cbind(counts_A, counts_B))
-  
+
+  if(use_cpm) {
+    counts <- apply(counts, 2, function(x) x/sum(x))
+    counts <- round(counts*1e06)
+  }
+
   batch <- unname(sapply(colnames(counts), function(x) {
     str_split(x, "_")[[1]][1]
   }))
@@ -377,6 +419,18 @@ parse_Hagai <- function(absolute = TRUE) {
   counts <- data.matrix(counts)
   groups <- condition
   
+  # totals1 <- colSums(counts)[groups == unique(groups)[1]]
+  # sd1 <- sd(totals1)
+  # outliers1 <- which((totals1 > mean(totals1) + sd1*2) | (totals1 < mean(totals1) - sd1*2))
+  # totals2 <- colSums(counts)[groups == unique(groups)[2]]
+  # sd2 <- sd(totals2)
+  # outliers2 <- which((totals2 > mean(totals2) + sd2*2) | (totals2 < mean(totals2) - sd2*2))
+  # outliers <- c(outliers1, outliers2)
+  
+  # if(length(outliers) > 0) {
+  #   # TBD
+  # }
+  
   parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
   return(parsed_obj)
 }
@@ -396,7 +450,7 @@ parse_Hagai <- function(absolute = TRUE) {
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Owens <- function(absolute = TRUE) {
+parse_Owens <- function(absolute = TRUE, use_cpm = FALSE) {
   counts <- read.table(file.path("data",
                                  "Owens_2016",
                                  "clutchA_polya_relative_TPM_gene_isoform.txt"),
@@ -411,6 +465,12 @@ parse_Owens <- function(absolute = TRUE) {
   
   # Pull spike-in sequences
   ref_idx <- which(sapply(gene_IDs, function(x) str_detect(x, "^ERCC-")))
+  
+  if(use_cpm) {
+    counts <- apply(counts, 2, function(x) x/sum(x))
+    counts <- round(counts*1e06)
+  }
+  
   spike_counts <- counts[ref_idx,]
   counts <- counts[-ref_idx,]
   sf <- compute_sf(spike_counts)
@@ -457,7 +517,7 @@ parse_Owens <- function(absolute = TRUE) {
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Klein <- function(absolute = TRUE) {
+parse_Klein <- function(absolute = TRUE, use_cpm = FALSE) {
   counts_A <- read.table(file.path("data",
                                    "Klein_2015",
                                    "GSM1599494_ES_d0_main.csv",
@@ -485,33 +545,14 @@ parse_Klein <- function(absolute = TRUE) {
   
   gapdh_expr <- unlist(counts[gapdh_idx,])
   sf <- compute_sf(gapdh_expr)
+
+  if(use_cpm) {
+    counts <- apply(counts, 2, function(x) x/sum(x))
+    counts <- round(counts*1e06)
+  }
+
   counts <- counts[-gapdh_idx,]
-  
-  # # Plot observed abundance vs. our reference for each group
-  # plot_df <- data.frame(total = colSums(counts),
-  #                       group = groups,
-  #                       reference = sf)
-  # # plot_df <- plot_df %>%
-  # #   filter(total > quantile(plot_df$total, probs = c(0.05)) & total < quantile(plot_df$total, probs = c(0.95))) %>%
-  # #   filter(reference > quantile(plot_df$reference, probs = c(0.05)) & reference < quantile(plot_df$reference, probs = c(0.95)))
-  # ggplot(plot_df, aes(x = reference, y = total)) +
-  #   geom_smooth(aes(color = group), formula = y ~ x, method = "lm", alpha = 0.5) +
-  #   geom_point(aes(fill = group), size = 2, shape = 21) +
-  #   scale_fill_manual(values = c("#58D68D", "#9B59B6")) +
-  #   scale_color_manual(values = c("#58D68D", "#9B59B6"), guide = FALSE) +
-  #   theme_bw() +
-  #   labs(x = "Reference (Gadph)", y = "Total abundance", fill = "Group")
-  # ggsave(file.path("output", "images", "Klein_totals.png"),
-  #        units = "in",
-  #        dpi = 100,
-  #        height = 5,
-  #        width = 7)
-  # for(grp in unique(groups)) {
-  #   r2 <- cor(plot_df[plot_df$group == grp,]$reference,
-  #             plot_df[plot_df$group == grp,]$total)**2
-  #   cat(paste0("R^2 (", grp, "): ", round(r2, 3), "\n"))
-  # }
-  
+
   if(absolute) {
     for(j in 1:ncol(counts)) {
       counts[,j] <- counts[,j]/sf[j]
@@ -550,7 +591,7 @@ parse_Klein <- function(absolute = TRUE) {
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Yu <- function(absolute = TRUE) {
+parse_Yu <- function(absolute = TRUE, use_cpm = FALSE) {
   # type <- c("Adr", "Brn", "Hrt", "Kdn", "Lng", "Lvr", "Msc", "Spl", "Thm", "Tst", "Utr")
   # Brain and liver are the most differential in terms of sample abundance
   type <- c("Brn", "Lvr")
@@ -582,13 +623,23 @@ parse_Yu <- function(absolute = TRUE) {
   # accurate total abundances.
   # See: https://www.nature.com/articles/ncomms4230#accession-codes
   
-  if(!absolute) {
-    # Shuffle observed abundances
-    set.seed(1000)
-    new_totals <- sample(round(colSums(counts)))
-    for(i in 1:ncol(counts)) {
-      counts[,i] <- rmultinom(1, size = new_totals[i],
-                              prob = counts[,i] / sum(counts[,i]))
+  if(absolute) {
+    if(use_cpm) {
+      counts <- counts * 1e06 / mean(colSums(counts))
+    }
+  } else {
+    if(use_cpm) {
+      if(use_cpm) {
+        counts <- apply(counts, 2, function(x) x/sum(x))
+        counts <- round(counts*1e06)
+      }
+      # Shuffle observed abundances
+      set.seed(1000)
+      new_totals <- sample(round(colSums(counts)))
+      for(i in 1:ncol(counts)) {
+        counts[,i] <- rmultinom(1, size = new_totals[i],
+                                prob = counts[,i] / sum(counts[,i]))
+      }
     }
   }
   counts <- data.matrix(counts)
@@ -837,7 +888,7 @@ parse_Athanasiadou <- function(absolute = TRUE, which_data = "ciona") {
 #' @import stringr
 #' @import dplyr
 #' @export
-parse_Muraro <- function(absolute = TRUE) {
+parse_Muraro <- function(absolute = TRUE, use_cpm = FALSE) {
   file_dir <- file.path("data", "Muraro_2016")
   
   # Parse data and assignments
@@ -896,6 +947,12 @@ parse_Muraro <- function(absolute = TRUE) {
   # Use edgeR (for now) to compute the size factor
   # sf <- calcNormFactors(spikein_counts) # columns assumed to be samples
   sf <- compute_sf(spikein_counts)
+  
+  if(use_cpm) {
+    counts <- apply(counts, 2, function(x) x/sum(x))
+    counts <- round(counts*1e06)
+  }
+  
   counts <- counts[-spikein_seqs,]
   
   # Not strong
@@ -963,7 +1020,7 @@ parse_Muraro <- function(absolute = TRUE) {
 #' @import stringr
 #' @import edgeR
 #' @export
-parse_Hashimshony <- function(absolute = TRUE) {
+parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
   # Note that 0 = GFP negative cells (quiescent)
   #           1 = GFP positive cells (cycling)
   #           0.3 = GFP "weak"
@@ -987,6 +1044,11 @@ parse_Hashimshony <- function(absolute = TRUE) {
   
   spike_idx <- which(sapply(data$Sample, function(x) str_detect(x, "^ERCC-")))
   data <- data[,2:ncol(data)]
+
+  if(use_cpm) {
+    data <- apply(data, 2, function(x) x/sum(x))
+    data <- round(data*1e06)
+  }
   
   # Here total abundances look pretty informative. Use:
   #   gapdh_idx <- which(data$Sample == "ENSMUSG00000057666")
@@ -994,24 +1056,6 @@ parse_Hashimshony <- function(absolute = TRUE) {
   sf <- compute_sf(data[spike_idx,])
   counts <- data[-spike_idx,]
 
-  # # Plot observed abundance vs. our reference
-  # plot_df <- data.frame(total = colSums(counts),
-  #                       stage = as.numeric(as.character(groups)),
-  #                       reference = sf)
-  # ggplot(plot_df, aes(x = reference, y = total, fill = stage)) +
-  #   geom_smooth(formula = y ~ x, method = "lm", alpha = 0.5, color = "#666666") +
-  #   geom_point(size = 2, shape = 21) +
-  #   scale_fill_gradient2(low = "#58D68D", mid = "white", high = "#9B59B6", midpoint = 0.5) +
-  #   theme_bw() +
-  #   labs(x = "Reference (spike-ins)", y = "Total abundance", fill = "Cell cycle stage")
-  # ggsave(file.path("output", "images", "Hashimshony_totals.png"),
-  #        units = "in",
-  #        dpi = 100,
-  #        height = 5,
-  #        width = 7)
-  # r2 <- cor(plot_df$reference, plot_df$total)**2
-  # cat(paste0("R^2 (", grp, "): ", round(r2, 3), "\n"))
-  
   if(absolute) {
     for(i in 1:ncol(counts)) {
       counts[,i] <- counts[,i] / sf[i]
@@ -1056,7 +1100,7 @@ parse_Hashimshony <- function(absolute = TRUE) {
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE) {
+parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE, use_cpm = FALSE) {
   file_dir <- file.path("data", "Kimmerling_2018")
   
   data <- read.table(file.path(file_dir, "fl5_serial_rsem3.txt"),
@@ -1087,6 +1131,11 @@ parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE) {
   # sf <- scale(meta$mass/(sd(meta$mass)*10), scale = F) + 1
   sf <- compute_sf(meta$mass)
   counts <- data
+  
+  if(use_cpm) {
+    counts <- apply(counts, 2, function(x) x/sum(x))
+    counts <- round(counts*1e06)
+  }
   
   if(absolute) {
     for(i in 1:ncol(counts)) {
@@ -1221,7 +1270,7 @@ parse_ESCA <- function(absolute = TRUE) {
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Gruen <- function(absolute = TRUE) {
+parse_Gruen <- function(absolute = TRUE, use_cpm = FALSE) {
   counts <- read.table(file.path("data",
                                  "Gruen_2014",
                                  "GSE54695_data_transcript_counts.txt"),
@@ -1243,24 +1292,13 @@ parse_Gruen <- function(absolute = TRUE) {
   ref_idx <- which(sapply(gene_IDs, function(x) str_detect(x, "^ERCC-")))
   spike_counts <- counts[ref_idx,]
   sf <- unname(compute_sf(spike_counts))
-  counts <- counts[-ref_idx,]
   
-  # # Plot observed abundance vs. our reference
-  # plot_df <- data.frame(total = colSums(counts),
-  #                       # stage = as.numeric(as.character(groups)),
-  #                       reference = sf)
-  # ggplot(plot_df, aes(x = reference, y = total)) +
-  #   geom_smooth(formula = y ~ x, method = "lm", alpha = 0.5, color = "#666666") +
-  #   geom_point(size = 2, shape = 21, fill = "#888888") +
-  #   theme_bw() +
-  #   labs(x = "Reference (spike-ins)", y = "Total abundance", fill = "Cell cycle stage")
-  # ggsave(file.path("output", "images", "Gruen_totals.png"),
-  #        units = "in",
-  #        dpi = 100,
-  #        height = 5,
-  #        width = 6)
-  # r2 <- cor(plot_df$reference, plot_df$total)**2
-  # cat(paste0("R^2 (", grp, "): ", round(r2, 3), "\n"))
+  if(use_cpm) {
+    counts <- apply(counts, 2, function(x) x/sum(x))
+    counts <- round(counts*1e06)
+  }
+  
+  counts <- counts[-ref_idx,]
   
   if(absolute) {
     for(j in 1:ncol(counts)) {

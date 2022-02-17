@@ -9,8 +9,8 @@ library(RColorBrewer)
 dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
 
-datasets <- c("Hagai", "Monaco", "Song", "Hashimshony", "Barlow", "Gruen",
-              "Muraro", "Owens", "VieiraSilva", "Kimmerling", "Yu", "Klein")
+datasets <- c("VieiraSilva", "Muraro", "Hagai", "Hashimshony", "Gruen", "Kimmerling",
+              "Song", "Barlow", "Monaco", "Yu", "Klein", "Owens")
 thresholds <- rep(1, length(datasets))
 
 names(thresholds) <- datasets

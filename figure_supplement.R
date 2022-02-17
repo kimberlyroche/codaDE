@@ -411,32 +411,34 @@ visualize_totals <- function(dataset, group_labels = NULL, min_relab = 0.01) {
 plots <- list()
 plots[[1]] <- visualize_totals(dataset = "Barlow",
                                group_labels = list(control = "Control diet", keto = "Ketogenic diet"))
-plots[[2]] <- visualize_totals(dataset = "VieiraSilva",
-                               group_labels = list(mHC = "Control", CD = "Crohn's disease"))
-plots[[3]] <- visualize_totals(dataset = "Song",
-                               group_labels = list(brain = "Brain metastasis", lung = "Lung primary tumor"))
-plots[[4]] <- visualize_totals(dataset = "Hagai",
-                               group_labels = list(unstimulated = "Unstimulated fibroblasts", pIC4 = "pIC4"))
-plots[[5]] <- visualize_totals(dataset = "Monaco",
-                               group_labels = list(CD4_naive = "Naive CD4 cells", PBMC = "PBMC cells"))
-plots[[6]] <- visualize_totals(dataset = "Owens",
-                               group_labels = list(early_series = "Early time series", late_series = "Late time series"))
-plots[[7]] <- visualize_totals(dataset = "Klein",
-                               group_labels = list(unstimulated = "Untreated", "LIF-2hr" = "LIF-treated"))
-plots[[8]] <- visualize_totals(dataset = "Yu",
-                               group_labels = list(Brn = "Brain", Lvr = "Liver"))
-plots[[9]] <- visualize_totals(dataset = "Muraro",
-                               group_labels = list(alpha = "Alpha", beta = "Beta"))
-plots[[10]] <- visualize_totals(dataset = "Hashimshony",
-                                group_labels = list("0" = "Quiescent", "1" = "Cycling"))
-plots[[11]] <- visualize_totals(dataset = "Gruen",
+plots[[2]] <- visualize_totals(dataset = "Gruen",
                                 group_labels = list(A = "Two-inhibitor medium", B = "Serum"))
-plots[[12]] <- visualize_totals(dataset = "Kimmerling",
+plots[[3]] <- visualize_totals(dataset = "Hagai",
+                               group_labels = list(unstimulated = "Unstimulated fibroblasts", pIC4 = "pIC4"))
+plots[[4]] <- visualize_totals(dataset = "Hashimshony",
+                                group_labels = list("0" = "Quiescent", "1" = "Cycling"))
+plots[[5]] <- visualize_totals(dataset = "Kimmerling",
                                 group_labels = list(low_mass = "Low mass", high_mass = "High mass"))
+plots[[6]] <- visualize_totals(dataset = "Klein",
+                               group_labels = list(unstimulated = "Untreated", "LIF-2hr" = "LIF-treated"))
+plots[[7]] <- visualize_totals(dataset = "Monaco",
+                               group_labels = list(CD4_naive = "Naive CD4 cells", PBMC = "PBMC cells"))
+plots[[8]] <- visualize_totals(dataset = "Muraro",
+                               group_labels = list(alpha = "Alpha", beta = "Beta"))
+plots[[9]] <- visualize_totals(dataset = "Owens",
+                               group_labels = list(early_series = "Early time series", late_series = "Late time series"))
+plots[[10]] <- visualize_totals(dataset = "Song",
+                               group_labels = list(brain = "Brain metastasis", lung = "Lung primary tumor"))
+plots[[11]] <- visualize_totals(dataset = "Yu",
+                               group_labels = list(Brn = "Brain", Lvr = "Liver"))
+plots[[12]] <- visualize_totals(dataset = "VieiraSilva",
+                               group_labels = list(mHC = "Control", CD = "Crohn's disease"))
 
 # Put these together
-prow1 <- plot_grid(plotlist = plots[c(4,5,3,10,1,11)], ncol = 1, labels = c("a", "b", "c", "d", "e", "f"))
-prow2 <- plot_grid(plotlist = plots[c(9,6,2,12,8,7)], ncol = 1, labels = c("g", "h", "i", "j", "k", "m"))
+# Canonical order: VieiraSilva, Muraro, Hagai, Hashimshony, Gruen, Kimmerling
+#                  Song, Barlow, Monaco, Yu, Klein, Owens
+prow1 <- plot_grid(plotlist = plots[c(12,8,3,4,2,5)], ncol = 1, labels = c("a", "b", "c", "d", "e", "f"))
+prow2 <- plot_grid(plotlist = plots[c(10,1,7,11,6,9)], ncol = 1, labels = c("g", "h", "i", "j", "k", "m"))
 
 # p <- plot_grid(prow1, prow2, ncol = 2)
 # ggsave(file.path("output", "images", "realdata_summary.png"),

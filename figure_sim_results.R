@@ -244,7 +244,8 @@ data %>%
   mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2))
 
 # Exceeding k% FPR by setting
-threshold <- 0.05
+threshold <- 0.5
+# BY SETTING
 data %>%
   select(METHOD, P, PERTURBATION, FPR) %>%
   mutate(setting = ifelse(P <= 1000 & PERTURBATION >= 1.2,
@@ -263,6 +264,18 @@ data %>%
   mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2)) %>%
   arrange(setting, METHOD)
 
+# BY FEATURE NUMBER
+data %>%
+  select(METHOD, P, FPR) %>%
+  mutate(high_FPR = ifelse(FPR > threshold, 1, 0)) %>%
+  mutate(low_FPR = ifelse(FPR <= threshold, 1, 0)) %>%
+  group_by(METHOD, P) %>%
+  summarize(median_specificity = 1 - median(FPR),
+            n_high_FPR = sum(high_FPR),
+            n_low_FPR = sum(low_FPR)) %>%
+  mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2)) %>%
+  arrange(P, METHOD)
+
 # Turn FPR into specificity!
 data$FPR <- 1 - data$FPR
 
@@ -271,8 +284,8 @@ data$FPR <- 1 - data$FPR
 # ------------------------------------------------------------------------------
 
 DE_methods <- c("ALDEx2", "DESeq2", "scran")
-datasets <- c("Hagai", "Monaco", "Song", "Hashimshony", "Barlow", "Gruen",
-              "Muraro", "Owens", "VieiraSilva", "Kimmerling", "Yu", "Klein")
+datasets <- sort(c("Hagai", "Monaco", "Song", "Hashimshony", "Barlow", "Gruen",
+              "Muraro", "Owens", "VieiraSilva", "Kimmerling", "Yu", "Klein"))
 thresholds <- rep(1, length(datasets))
 realdata <- NULL
 for(i in 1:length(datasets)) {
@@ -298,6 +311,7 @@ for(i in 1:length(DE_methods)) {
                shape = 21,
                size = 3,
                color = "black") +
+    scale_fill_brewer(palette = "Paired") +
     xlim(c(-0.025,1.025)) +
     ylim(c(-0.025,1.025)) +
     labs(x = paste0(DE_methods[i], " specificity (1 - FPR)"),
