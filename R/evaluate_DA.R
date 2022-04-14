@@ -1,41 +1,28 @@
-#' #' Evaluate differential abundance with edgeR
-#' #' This evaluates expression on all features of the count matrix together
-#' #'
-#' #' @param data simulated data set
-#' #' @param groups group (cohort) labels
-#' #' @param normalization_method if NULL, uses library size normalization; 
-#' other options include "TMM" and "scran"
-#' #' @return p-value for DA for all features
-#' #' @import edgeR
-#' #' @export
-#' call_DA_edgeR <- function(data, groups, normalization_method = NULL) {
-#'   # DGEList expects samples as columns
-#'   if(!is.null(normalization_method)) {
-#'     if(normalization_method == "TMM") {
-#'       dge_obj <- DGEList(counts = t(data), group = factor(groups))
-#'       dge_obj <- calcNormFactors(dge_obj, method = "TMM")
-#'     } else {
-#'       stop("Unknown normalization method!")
-#'     }
-#'   } else {
-#'     dge_obj <- DGEList(counts = t(data), group = factor(groups))
-#'     dge_obj <- calcNormFactors(dge_obj, method = "none") # library size 
-#'     normalization-only
-#'   }
-#'   design <- model.matrix(~ groups)
-#'   dge_obj <- estimateDisp(dge_obj, design)
-#'   # LRT recommended for single-cell data
-#'   fit <- glmFit(dge_obj, design)
-#'   lrt <- glmLRT(fit, coef = 2)
-#'   # alternatively: is.de <- decideTestsDGE(lrt)
-#'   pval <- lrt@.Data[[14]]$PValue
-#'   # quasi-likelihood recommended for bulk RNA-seq (different dispersion 
-#'   estimation procedure)
-#'   # fit <- glmQLFit(dge_obj, design)
-#'   # lrt <- glmQLFTest(fit, coef=2)
-#'   # pval <- lrt@.Data[[17]]$PValue
-#'   return(pval)
-#' }
+#' Evaluate differential abundance with edgeR
+#' This evaluates expression on all features of the count matrix together
+#'
+#' @param data simulated data set
+#' @param groups group (cohort) labels
+#' @param use_TMM if TRUE, uses the trimmed mean of M-values normalization
+#' @return p-value for DA for all features
+#' @import edgeR
+#' @export
+call_DA_edgeR <- function(data, groups, use_TMM = FALSE) {
+  # DGEList expects a features x samples orientation; accommodate this
+  data <- t(data)
+  n_genes <- nrow(data)
+  # Estimate DE from relative abundances with edgeR and TMM
+  dge_obj <- DGEList(counts = data, group = groups, lib.size = colSums(data))
+  if(use_TMM) {
+    dge_obj <- calcNormFactors(dge_obj) # optional bit
+  }
+  design <- model.matrix(~ groups)
+  dge_obj <- estimateGLMCommonDisp(dge_obj, design)
+  dge_obj <- estimateGLMTagwiseDisp(dge_obj, design)
+  fit <- glmFit(dge_obj, design)
+  lrt <- glmLRT(fit, coef = 2)
+  lrt$table$PValue
+}
 
 #' Evaluate differential abundance with a negative binomial GLM (via MASS)
 #'

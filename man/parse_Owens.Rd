@@ -4,7 +4,7 @@
 \alias{parse_Owens}
 \title{Parse the Owens et al. (2016) zebrafish developmental series}
 \usage{
-parse_Owens(absolute = TRUE)
+parse_Owens(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

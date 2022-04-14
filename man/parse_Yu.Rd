@@ -4,7 +4,7 @@
 \alias{parse_Yu}
 \title{Parse the Yu et al. (2014) rat tissue bulk RNA-seq}
 \usage{
-parse_Yu(absolute = TRUE)
+parse_Yu(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

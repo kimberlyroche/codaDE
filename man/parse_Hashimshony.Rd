@@ -4,7 +4,7 @@
 \alias{parse_Hashimshony}
 \title{Parse the Hashimshony et al. (2016) mouse fibroblast data set}
 \usage{
-parse_Hashimshony(absolute = TRUE)
+parse_Hashimshony(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

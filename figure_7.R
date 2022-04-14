@@ -1,5 +1,6 @@
 source("path_fix.R")
 
+library(codaDE)
 library(ggplot2)
 library(MASS)
 library(cowplot)

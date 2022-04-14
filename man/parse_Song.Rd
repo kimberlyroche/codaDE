@@ -4,7 +4,7 @@
 \alias{parse_Song}
 \title{Parse the Song et al. (2021) nCounter data}
 \usage{
-parse_Song(absolute = TRUE)
+parse_Song(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

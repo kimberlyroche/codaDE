@@ -1,23 +1,45 @@
+library(codaDE)
 library(edgeR)
+library(caret)
+library(cowplot)
+library(RSQLite)
 
-source("exploratory_analyses/other_DE/run_first.R")
+data <- readRDS("output/datasets/122f7064-bf7a-422e-ab4f-fbc0564684a0.rds")
 
-rownames(cell_metadata) <- colnames(count_table)
-rownames(count_table) <- paste0("gene", 1:n_genes)
-colnames(count_table) <- paste0("cell", 1:(n_samples_condition*2))
-head(count_table)
+# Estimate true percent DE
+oracle_calls <- call_DA_NB(data$simulation$abundances, data$simulation$groups)
+qvals <- p.adjust(oracle_calls$pval, method = "BH")
+oracle_calls <- factor(qvals < 0.05)
+levels(oracle_calls) <- c("not DE", "DE")
+table(oracle_calls)
 
-sce <- SingleCellExperiment(assays = list(counts = count_table),
-                            colData = cell_metadata)
+nb_calls <- call_DA_NB(data$simulation$observed_counts1, data$simulation$groups)
+qvals <- p.adjust(nb_calls$pval, method = "BH")
+nb_calls <- factor(qvals < 0.05)
+levels(nb_calls) <- c("not DE", "DE")
+table(nb_calls)
 
-# Confirm the false positive effect of just using library size
-sce <- suppressWarnings(computeSumFactors(sce)) # warnings are about assuming UMI counts (ok)
-dge_obj <- convertTo(sce, type = "edgeR")
-sig_genes <- quick_dirty_edgeR_call(dge_obj)
-quick_dirty_rate_calcs(sig_genes, rownames(count_table)[sim$da_genes])
+noTMM_calls <- call_DA_edgeR(data = data$simulation$observed_counts1,
+                             groups = data$simulation$groups,
+                             use_TMM = FALSE)
+qvals <- p.adjust(noTMM_calls, method = "BH")
+noTMM_calls <- factor(qvals < 0.05)
+levels(noTMM_calls) <- c("not DE", "DE")
+table(noTMM_calls)
 
-# Confirm TMM normalization sucks too
-dge_obj <- DGEList(counts = count_table, group = factor(labels))
-dge_obj <- calcNormFactors(dge_obj, method = "TMM")
-sig_genes <- quick_dirty_edgeR_call(dge_obj)
-quick_dirty_rate_calcs(sig_genes, rownames(count_table)[sim$da_genes])
+TMM_calls <- call_DA_edgeR(data = data$simulation$observed_counts1,
+                           groups = data$simulation$groups,
+                           use_TMM = TRUE)
+qvals <- p.adjust(TMM_calls, method = "BH")
+TMM_calls <- factor(qvals < 0.05)
+levels(TMM_calls) <- c("not DE", "DE")
+table(TMM_calls)
+
+caret::confusionMatrix(nb_calls, oracle_calls, positive = "DE")
+
+caret::confusionMatrix(noTMM_calls, oracle_calls, positive = "DE")
+
+caret::confusionMatrix(TMM_calls, oracle_calls, positive = "DE")
+
+
+

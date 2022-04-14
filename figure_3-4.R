@@ -172,5 +172,5 @@ dev.off()
 
 dev.off()
 tiff(file.path("output", "images", "F4.tif"), units = "in", width = 8, height = 10, res = 300)
-prow1
+prow2
 dev.off()

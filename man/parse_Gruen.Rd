@@ -4,7 +4,7 @@
 \alias{parse_Gruen}
 \title{Parse the Gruen et al. (2014) single-cell cell line data set}
 \usage{
-parse_Gruen(absolute = TRUE)
+parse_Gruen(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

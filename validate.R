@@ -311,8 +311,6 @@ save_df <- NULL
 
 for(use_result_type in c("TPR", "FPR")) {
 
-  print("K")
-
   # Load predictive model
   model_list <- c("all")
   if(per_model) {
@@ -416,7 +414,9 @@ for(use_result_type in c("TPR", "FPR")) {
                                   lower50 = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
                                   upper50 = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
                                   upper90 = unname(quantile(pred_real$individual[1,], probs = c(0.95))),
-                                  point = pred_real$aggregate))
+                                  point = pred_real$aggregate)) # this should really be replaced or augmented
+                                                                # by the median to guarantee it's within the
+                                                                # IQR
     }
   }
 }

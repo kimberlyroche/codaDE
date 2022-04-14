@@ -4,7 +4,7 @@
 \alias{parse_Monaco}
 \title{Parse the Monaco et al. (2019) immune cell data set}
 \usage{
-parse_Monaco(absolute = TRUE)
+parse_Monaco(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

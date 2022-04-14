@@ -24,6 +24,9 @@ resample_counts <- function(proportions, library_sizes) {
 #' @export
 spike_in_ones <- function(counts, groups = NULL) {
   if(!is.null(groups)) {
+    if(!is.factor(groups)) {
+      groups <- as.factor(groups)
+    }
     all_zeros_A <- which(colSums(counts[groups == levels(groups)[1],,drop=FALSE]) == 0)
     all_zeros_B <- which(colSums(counts[groups == levels(groups)[2],,drop=FALSE]) == 0)
     for(idx in all_zeros_A) {
