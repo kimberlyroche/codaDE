@@ -4,7 +4,7 @@
 \alias{parse_VieiraSilva}
 \title{Parse the Vieira-Silva et al. (2019) QMP data set}
 \usage{
-parse_VieiraSilva(absolute = TRUE)
+parse_VieiraSilva(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

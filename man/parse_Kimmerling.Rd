@@ -4,7 +4,7 @@
 \alias{parse_Kimmerling}
 \title{Parse the Kimmerling et al. (2018) fibroblast data set}
 \usage{
-parse_Kimmerling(absolute = TRUE, use_spike_ins = FALSE)
+parse_Kimmerling(absolute = TRUE, use_spike_ins = FALSE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

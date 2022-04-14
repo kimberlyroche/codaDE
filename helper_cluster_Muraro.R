@@ -7,7 +7,7 @@ library(codaDE)
 # ------------------------------------------------------------------------------
 
 # Reproduce the clustering in Muraro et al.
-source("RaceID2_StemID_class.R")
+source("helper_RaceID2_StemID_class.R")
 
 data_orig <- read.table("GSE85241_cellsystems_dataset_4donors_updated.csv")
 

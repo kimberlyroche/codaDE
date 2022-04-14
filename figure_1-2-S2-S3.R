@@ -227,10 +227,17 @@ data <- pull_data(qq, use_baseline = "oracle", use_cpm = TRUE)
 #   Calculate some overall statistics
 # ------------------------------------------------------------------------------
 
+# 80% of data sets with modest change had FPR of 10% or less
+quantile(data %>%
+           filter(PERCENT_DIFF_REALIZ < 1/3) %>%
+           filter(FC_plot == "low (< 1.5)") %>%
+           pull(FPR), probs = c(0.8))
+
 # Median specificity per method
 data %>%
   group_by(METHOD) %>%
-  summarize("Median specificity" = 1 - median(FPR))
+  summarize("Median sensitivity" = median(TPR),
+            "Median specificity" = 1 - median(FPR))
 
 # Exceeding k% FPR overall
 threshold <- 0.50
@@ -244,7 +251,8 @@ data %>%
   mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2))
 
 # Exceeding k% FPR by setting
-threshold <- 0.05
+threshold <- 0.5
+# BY SETTING
 data %>%
   select(METHOD, P, PERTURBATION, FPR) %>%
   mutate(setting = ifelse(P <= 1000 & PERTURBATION >= 1.2,
@@ -261,18 +269,30 @@ data %>%
             n_high_FPR = sum(high_FPR),
             n_low_FPR = sum(low_FPR)) %>%
   mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2)) %>%
-  arrange(setting, METHOD)
+  arrange(METHOD, setting)
+
+# BY FEATURE NUMBER
+data %>%
+  select(METHOD, P, FPR) %>%
+  mutate(high_FPR = ifelse(FPR > threshold, 1, 0)) %>%
+  mutate(low_FPR = ifelse(FPR <= threshold, 1, 0)) %>%
+  group_by(METHOD, P) %>%
+  summarize(median_specificity = 1 - median(FPR),
+            n_high_FPR = sum(high_FPR),
+            n_low_FPR = sum(low_FPR)) %>%
+  mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2)) %>%
+  arrange(P, METHOD)
 
 # Turn FPR into specificity!
 data$FPR <- 1 - data$FPR
 
 # ------------------------------------------------------------------------------
-#   Render real data outcomes on top of
+#   Render real data outcomes on top of simulated data
 # ------------------------------------------------------------------------------
 
 DE_methods <- c("ALDEx2", "DESeq2", "scran")
-datasets <- c("Hagai", "Monaco", "Song", "Hashimshony", "Barlow", "Gruen",
-              "Muraro", "Owens", "VieiraSilva", "Kimmerling", "Yu", "Klein")
+datasets <- sort(c("Hagai", "Monaco", "Song", "Hashimshony", "Barlow", "Gruen",
+              "Muraro", "Owens", "VieiraSilva", "Kimmerling", "Yu", "Klein"))
 thresholds <- rep(1, length(datasets))
 realdata <- NULL
 for(i in 1:length(datasets)) {
@@ -298,6 +318,7 @@ for(i in 1:length(DE_methods)) {
                shape = 21,
                size = 3,
                color = "black") +
+    scale_fill_brewer(palette = "Paired") +
     xlim(c(-0.025,1.025)) +
     ylim(c(-0.025,1.025)) +
     labs(x = paste0(DE_methods[i], " specificity (1 - FPR)"),
@@ -315,54 +336,12 @@ for(i in 1:length(DE_methods)) {
 }
 
 pl <- plot_grid(plotlist = plots, ncol = 3, rel_widths = c(1, 1, 1.3))
-ggsave("output/images/temp.png",
+ggsave(file.path("output", "images", "real_results_over_simulated.png"),
        pl,
        dpi = 100,
        units = "in",
        height = 4,
        width = 14)
-
-# ------------------------------------------------------------------------------
-#
-#   OUTCOMES AND FACTORS AFFECTING THEM
-#
-# ------------------------------------------------------------------------------
-
-p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
-p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
-p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
-legend <- NULL
-for(i in 1:length(method_list)) {
-  method <- method_list[i]
-  for(j in c(100, 1000, 5000)) {
-    plot_pieces <- plot_ROC_fc(data, method, j)
-    pl <- plot_pieces$pl
-    if(is.null(legend)) {
-      legend <- plot_pieces$legend
-    }
-    if(i == 1 & j == 100) p1_100 <<- pl
-    if(i == 1 & j == 1000) p1_1000 <<- pl
-    if(i == 1 & j == 5000) p1_5000 <<- pl
-    if(i == 2 & j == 100) p2_100 <<- pl
-    if(i == 2 & j == 1000) p2_1000 <<- pl
-    if(i == 2 & j == 5000) p2_5000 <<- pl
-    if(i == 3 & j == 100) p3_100 <<- pl
-    if(i == 3 & j == 1000) p3_1000 <<- pl
-    if(i == 3 & j == 5000) p3_5000 <<- pl
-  }
-}
-prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
-prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
-prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
-pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
-pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
-ggsave(file.path("output", "images", "ROC_by_FC_cpm.png"),
-       plot = pl,
-       units = "in",
-       height = 10.5,
-       width = 10,
-       bg = "white")
-show(pl)
 
 # ------------------------------------------------------------------------------
 #   Sensitivity x specificity plot labeled by percent of features differentially
@@ -397,17 +376,67 @@ prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
 prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
 pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
 pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
-ggsave(file.path("output", "images", "ROC_by_percentDE_cpm.png"),
-       plot = pl,
-       units = "in",
-       height = 10.5,
-       width = 10,
-       bg = "white")
-show(pl)
+# ggsave(file.path("output", "images", "F1.png"),
+#        plot = pl,
+#        units = "in",
+#        height = 10.5,
+#        width = 10,
+#        bg = "white")
+
+dev.off()
+tiff(file.path("output", "images", "S2.tif"), units = "in", width = 10, height = 10.5, res = 300)
+pl
+dev.off()
 
 # ------------------------------------------------------------------------------
+#  Sensitivity x specificity plot labeled by mean fold change
+# ------------------------------------------------------------------------------
+
+p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
+p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
+p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
+legend <- NULL
+for(i in 1:length(method_list)) {
+  method <- method_list[i]
+  for(j in c(100, 1000, 5000)) {
+    plot_pieces <- plot_ROC_fc(data, method, j)
+    pl <- plot_pieces$pl
+    if(is.null(legend)) {
+      legend <- plot_pieces$legend
+    }
+    if(i == 1 & j == 100) p1_100 <<- pl
+    if(i == 1 & j == 1000) p1_1000 <<- pl
+    if(i == 1 & j == 5000) p1_5000 <<- pl
+    if(i == 2 & j == 100) p2_100 <<- pl
+    if(i == 2 & j == 1000) p2_1000 <<- pl
+    if(i == 2 & j == 5000) p2_5000 <<- pl
+    if(i == 3 & j == 100) p3_100 <<- pl
+    if(i == 3 & j == 1000) p3_1000 <<- pl
+    if(i == 3 & j == 5000) p3_5000 <<- pl
+  }
+}
+prow1 <- plot_grid(p1_100, p2_100, p3_100, ncol = 3)
+prow2 <- plot_grid(p1_1000, p2_1000, p3_1000, ncol = 3)
+prow3 <- plot_grid(p1_5000, p2_5000, p3_5000, ncol = 3)
+pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
+# ggsave(file.path("output", "images", "F2.png"),
+#        plot = pl,
+#        units = "in",
+#        height = 10.5,
+#        width = 10,
+#        bg = "white")
+
+dev.off()
+tiff(file.path("output", "images", "S3.tif"), units = "in", width = 10, height = 10.5, res = 300)
+pl
+dev.off()
+
+# ------------------------------------------------------------------------------
+#   Settings
+#
 #   Sensitivity x specificity plot labeled by percent of features differentially
-#   abundant; here ROWS ARE SETTINGS
+#   abundant
 # ------------------------------------------------------------------------------
 
 p1_1 <- NULL; p1_2 <- NULL; p1_3 <- NULL
@@ -442,7 +471,6 @@ for(i in 1:length(method_list)) {
       pull(prop)
     cat(paste0("Method: ", method, ", setting: ", setting_label, ", high FPR prop: ", round(prop_high_fpr, 3), "\n"))
     plot_pieces <- plot_ROC_percentDE(subdata, method)
-    # plot_pieces <- plot_ROC_fc(subdata, method)
     pl <- plot_pieces$pl
     if(is.null(legend)) {
       legend <- plot_pieces$legend
@@ -463,14 +491,87 @@ prow2 <- plot_grid(p1_2, p2_2, p3_2, ncol = 3)
 prow3 <- plot_grid(p1_3, p2_3, p3_3, ncol = 3)
 pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
 pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
-ggsave(file.path("output", "images", "ROC_by_percentDE-settings_cpm.png"),
-# ggsave(file.path("output", "images", "ROC_by_FC-settings_cpm.png"),
-       plot = pl,
-       units = "in",
-       height = 10.5,
-       width = 10,
-       bg = "white")
-show(pl)
+# ggsave(file.path("output", "images", "F1.png"),
+#        plot = pl,
+#        units = "in",
+#        height = 10.5,
+#        width = 10,
+#        bg = "white")
+
+dev.off()
+tiff(file.path("output", "images", "F1.tif"), units = "in", width = 10, height = 10.5, res = 300)
+pl
+dev.off()
+
+# ------------------------------------------------------------------------------
+#   Settings
+#
+#   Sensitivity x specificity plot labeled by mean fold change
+# ------------------------------------------------------------------------------
+
+p1_1 <- NULL; p1_2 <- NULL; p1_3 <- NULL
+p2_1 <- NULL; p2_2 <- NULL; p2_3 <- NULL
+p3_1 <- NULL; p3_2 <- NULL; p3_3 <- NULL
+legend <- NULL
+for(i in 1:length(method_list)) {
+  method <- method_list[i]
+  setting_label <- "n/a"
+  for(j in 1:3) { # iterate settings
+    subdata <- data
+    if(j == 1) {
+      subdata <- subdata %>%
+        filter(P <= 1000 & PERTURBATION >= 1.2)
+      setting_label <- "Microbial"
+    } else if(j == 2) {
+      subdata <- subdata %>%
+        filter(P >= 1000 & PERTURBATION >= 0.8 & PERTURBATION <= 1.2)
+      setting_label <- "Transcriptomic"
+    } else if(j == 3) {
+      subdata <- subdata %>%
+        filter(P == 5000 & PERTURBATION <= 0.8)
+      setting_label <- "Bulk transcriptomic"
+    }
+    prop_high_fpr <- subdata %>%
+      filter(METHOD == method) %>%
+      mutate(high_FPR = ifelse(FPR < 0.95, "high", "low")) %>%
+      group_by(high_FPR) %>%
+      tally() %>%
+      mutate(prop = n/sum(n)) %>%
+      filter(high_FPR == "high") %>%
+      pull(prop)
+    cat(paste0("Method: ", method, ", setting: ", setting_label, ", high FPR prop: ", round(prop_high_fpr, 3), "\n"))
+    plot_pieces <- plot_ROC_fc(subdata, method)
+    pl <- plot_pieces$pl
+    if(is.null(legend)) {
+      legend <- plot_pieces$legend
+    }
+    if(i == 1 & j == 1) p1_1 <<- pl
+    if(i == 1 & j == 2) p1_2 <<- pl
+    if(i == 1 & j == 3) p1_3 <<- pl
+    if(i == 2 & j == 1) p2_1 <<- pl
+    if(i == 2 & j == 2) p2_2 <<- pl
+    if(i == 2 & j == 3) p2_3 <<- pl
+    if(i == 3 & j == 1) p3_1 <<- pl
+    if(i == 3 & j == 2) p3_2 <<- pl
+    if(i == 3 & j == 3) p3_3 <<- pl
+  }
+}
+prow1 <- plot_grid(p1_1, p2_1, p3_1, ncol = 3)
+prow2 <- plot_grid(p1_2, p2_2, p3_2, ncol = 3)
+prow3 <- plot_grid(p1_3, p2_3, p3_3, ncol = 3)
+pgrid <- plot_grid(prow1, prow2, prow3, nrow = 3, labels = c("a", "b", "c"), label_size = 18, label_y = 1.02)
+pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
+# ggsave(file.path("output", "images", "F2.png"),
+#        plot = pl,
+#        units = "in",
+#        height = 10.5,
+#        width = 10,
+#        bg = "white")
+
+dev.off()
+tiff(file.path("output", "images", "F2.tif"), units = "in", width = 10, height = 10.5, res = 300)
+pl
+dev.off()
 
 # ------------------------------------------------------------------------------
 #   Sensitivity x specificity plot labeled for majority differential features

@@ -4,7 +4,7 @@
 \alias{parse_Barlow}
 \title{Parse the Barlow et al. (2020) 16S data}
 \usage{
-parse_Barlow(absolute = TRUE)
+parse_Barlow(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

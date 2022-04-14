@@ -5,7 +5,7 @@
 \title{Parse the Hagai et al. (2018) cross-species, cross-cell, multiple condition
 experiment for mouse unstimulated vs. pIC4 time point}
 \usage{
-parse_Hagai(absolute = TRUE)
+parse_Hagai(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

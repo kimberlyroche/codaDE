@@ -4,7 +4,7 @@
 \alias{parse_Klein}
 \title{Parse the Klein et al. (2015) mouse +/- LIF data set}
 \usage{
-parse_Klein(absolute = TRUE)
+parse_Klein(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance

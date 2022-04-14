@@ -2,45 +2,7 @@
 % Please edit documentation in R/evaluate_DA.R
 \name{call_DA_NB}
 \alias{call_DA_NB}
-\title{#' Evaluate differential abundance with edgeR
-#' This evaluates expression on all features of the count matrix together
-#'
-#' @param data simulated data set
-#' @param groups group (cohort) labels
-#' @param normalization_method if NULL, uses library size normalization; 
-other options include "TMM" and "scran"
-#' @return p-value for DA for all features
-#' @import edgeR
-#' @export
-call_DA_edgeR <- function(data, groups, normalization_method = NULL) {
-  # DGEList expects samples as columns
-  if(!is.null(normalization_method)) {
-    if(normalization_method == "TMM") {
-      dge_obj <- DGEList(counts = t(data), group = factor(groups))
-      dge_obj <- calcNormFactors(dge_obj, method = "TMM")
-    } else {
-      stop("Unknown normalization method!")
-    }
-  } else {
-    dge_obj <- DGEList(counts = t(data), group = factor(groups))
-    dge_obj <- calcNormFactors(dge_obj, method = "none") # library size 
-    normalization-only
-  }
-  design <- model.matrix(~ groups)
-  dge_obj <- estimateDisp(dge_obj, design)
-  # LRT recommended for single-cell data
-  fit <- glmFit(dge_obj, design)
-  lrt <- glmLRT(fit, coef = 2)
-  # alternatively: is.de <- decideTestsDGE(lrt)
-  pval <- lrt@.Data[[14]]$PValue
-  # quasi-likelihood recommended for bulk RNA-seq (different dispersion 
-  estimation procedure)
-  # fit <- glmQLFit(dge_obj, design)
-  # lrt <- glmQLFTest(fit, coef=2)
-  # pval <- lrt@.Data[[17]]$PValue
-  return(pval)
-}
-Evaluate differential abundance with a negative binomial GLM (via MASS)}
+\title{Evaluate differential abundance with a negative binomial GLM (via MASS)}
 \usage{
 call_DA_NB(data, groups)
 }
@@ -53,43 +15,5 @@ call_DA_NB(data, groups)
 unadjusted p-values for all features
 }
 \description{
-#' Evaluate differential abundance with edgeR
-#' This evaluates expression on all features of the count matrix together
-#'
-#' @param data simulated data set
-#' @param groups group (cohort) labels
-#' @param normalization_method if NULL, uses library size normalization; 
-other options include "TMM" and "scran"
-#' @return p-value for DA for all features
-#' @import edgeR
-#' @export
-call_DA_edgeR <- function(data, groups, normalization_method = NULL) {
-  # DGEList expects samples as columns
-  if(!is.null(normalization_method)) {
-    if(normalization_method == "TMM") {
-      dge_obj <- DGEList(counts = t(data), group = factor(groups))
-      dge_obj <- calcNormFactors(dge_obj, method = "TMM")
-    } else {
-      stop("Unknown normalization method!")
-    }
-  } else {
-    dge_obj <- DGEList(counts = t(data), group = factor(groups))
-    dge_obj <- calcNormFactors(dge_obj, method = "none") # library size 
-    normalization-only
-  }
-  design <- model.matrix(~ groups)
-  dge_obj <- estimateDisp(dge_obj, design)
-  # LRT recommended for single-cell data
-  fit <- glmFit(dge_obj, design)
-  lrt <- glmLRT(fit, coef = 2)
-  # alternatively: is.de <- decideTestsDGE(lrt)
-  pval <- lrt@.Data[[14]]$PValue
-  # quasi-likelihood recommended for bulk RNA-seq (different dispersion 
-  estimation procedure)
-  # fit <- glmQLFit(dge_obj, design)
-  # lrt <- glmQLFTest(fit, coef=2)
-  # pval <- lrt@.Data[[17]]$PValue
-  return(pval)
-}
 Evaluate differential abundance with a negative binomial GLM (via MASS)
 }

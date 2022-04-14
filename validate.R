@@ -62,7 +62,6 @@ use_renorm_counts <- opt$userenormcounts
 use_cpm <- opt$usecpm
 
 testing <- FALSE
-alpha <- 0.05
 methods_list <- c("ALDEx2", "DESeq2", "scran")
 
 if(threshold < 0) {
@@ -135,7 +134,7 @@ if(!is.null(tax)) {
 # ------------------------------------------------------------------------------
 
 # Save this estimate for later; we'll print it out with other statistics
-percent_DE <- NULL
+# percent_DE <- NULL
 for(DE_method in methods_list) {
   # Pull saved calls on this data set x method if these exist
   save_fn <- file.path("output",
@@ -164,7 +163,7 @@ for(DE_method in methods_list) {
     saveRDS(save_obj, save_fn)
   }
   if(is.null(percent_DE)) {
-    oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < alpha
+    oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < 0.05
     percent_DE <- sum(oracle_calls) / length(oracle_calls)
   }
 }
@@ -255,17 +254,17 @@ save_fn <- file.path("output",
                groups = groups), save_fn)
 #}
 
-# Report stats on this data set
-cat(paste0("Number of features (after filtering): ", ncol(counts_A), "\n"))
-cat(paste0("Number of samples: ", length(groups), "\n"))
-cat(paste0("Samples per condition (A, B): ", sum(groups == levels(groups)[1]), ", ",
-           sum(groups == levels(groups)[2]), "\n"))
-cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
-sA <- mean(rowSums(counts_A_abs))
-sB <- mean(rowSums(counts_B_abs))
-fc <- max(sA, sB) / min(sA, sB)
-cat(paste0("Approx. fold change between conditions: ", round(fc, 1), "\n"))
-cat(paste0("Approx. percent differential features: ", round(percent_DE, 2)*100, "%\n"))
+# # Report stats on this data set
+# cat(paste0("Number of features (after filtering): ", ncol(counts_A), "\n"))
+# cat(paste0("Number of samples: ", length(groups), "\n"))
+# cat(paste0("Samples per condition (A, B): ", sum(groups == levels(groups)[1]), ", ",
+#            sum(groups == levels(groups)[2]), "\n"))
+# cat(paste0("Percent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data)), 3)*100, "%\n"))
+# sA <- mean(rowSums(counts_A_abs))
+# sB <- mean(rowSums(counts_B_abs))
+# fc <- max(sA, sB) / min(sA, sB)
+# cat(paste0("Approx. fold change between conditions: ", round(fc, 1), "\n"))
+# cat(paste0("Approx. percent differential features: ", round(percent_DE, 2)*100, "%\n"))
 
 # This takes 2-3 min. to run on 15K features
 features <- as.data.frame(characterize_dataset(counts_A, counts_B))
@@ -311,8 +310,6 @@ if(use_renorm_counts) {
 save_df <- NULL
 
 for(use_result_type in c("TPR", "FPR")) {
-
-  print("K")
 
   # Load predictive model
   model_list <- c("all")
@@ -417,7 +414,9 @@ for(use_result_type in c("TPR", "FPR")) {
                                   lower50 = unname(quantile(pred_real$individual[1,], probs = c(0.25))),
                                   upper50 = unname(quantile(pred_real$individual[1,], probs = c(0.75))),
                                   upper90 = unname(quantile(pred_real$individual[1,], probs = c(0.95))),
-                                  point = pred_real$aggregate))
+                                  point = pred_real$aggregate)) # this should really be replaced or augmented
+                                                                # by the median to guarantee it's within the
+                                                                # IQR
     }
   }
 }

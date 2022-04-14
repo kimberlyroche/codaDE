@@ -79,15 +79,3 @@ FEATURE-WISE CHANGES (B vs. A)
 	FW_CLR_PFC05_D: percent features with < 0.5 FC in CLR
 	FW_CLR_PFC1_D: percent features with < 1 FC in CLR
 	FW_CLR_PFC2_D: percent features with < 2 FC in CLR
-
-TARGETED FEATURES
-
-	ALDEx2: changes in the mean
-		absolute change in mean relative abundance from A to B
-		absolute change in mean log abundance from A to B
-
-	DESeq2: proportion of features changing
-		these are already present: FW_LOG_PFC05_D (percent features with < 0.5 FC in log + PC counts) and similar
-
-	scran: proportion of features changing within a condition
-		these are already present: COMP_RA_SD_A (SD relative abundance in A) and similar

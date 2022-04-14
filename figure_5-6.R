@@ -44,6 +44,40 @@ for(file in result_files) {
 results <- results %>%
   filter(!(dataset == "Monaco" & DE_method == "scran"))
 
+# R^2 for prediction
+temp <- results %>% filter(score_type == "TPR")
+cat(paste0("R^2 sensitivity: ", round(cor(temp %>% filter(result_type == "true") %>% pull(point),
+                                          temp %>% filter(result_type == "predicted") %>% pull(point))**2, 3), "\n"))
+temp <- results %>% filter(score_type == "FPR")
+cat(paste0("R^2 specificity: ", round(cor(temp %>% filter(result_type == "true") %>% pull(point),
+                                          temp %>% filter(result_type == "predicted") %>% pull(point))**2, 3), "\n"))
+
+# Statistics related to upper bound on sensitivity
+temp <- results %>% filter(score_type == "TPR")
+temp_true <- temp %>%
+  filter(result_type == "true") %>%
+  select(dataset, DE_method, point)
+temp_pred <- temp %>%
+  filter(result_type == "predicted") %>%
+  select(dataset, DE_method, lower90)
+temp2 <- temp_pred %>%
+  left_join(temp_true, by = c("dataset", "DE_method")) %>%
+  mutate(bounded = (point > lower90))
+sum(temp2$bounded)/nrow(temp2)
+
+# Statistics related to lower bound on specificity
+temp <- results %>% filter(score_type == "FPR")
+temp_true <- temp %>%
+  filter(result_type == "true") %>%
+  select(dataset, DE_method, point)
+temp_pred <- temp %>%
+  filter(result_type == "predicted") %>%
+  select(dataset, DE_method, lower90)
+temp2 <- temp_pred %>%
+  left_join(temp_true, by = c("dataset", "DE_method")) %>%
+  mutate(bounded = (point > lower90))
+sum(temp2$bounded)/nrow(temp2)
+
 plotlist <- list()
 for(i in 1:length(datasets)) {
   this_dataset <- datasets[i]
@@ -155,12 +189,16 @@ prow1 <- plot_grid(plotlist = plotlist[1:6],
                    label_y = 1.04,
                    label_size = 18)
 
-ggsave(file.path("output", "images", "results_summary_1.png"),
-       plot = prow1,
-       units = "in",
-       height = 14,
-       width = 9,
-       bg = "white")
+# ggsave(file.path("output", "images", "F5.png"),
+#        plot = prow1,
+#        units = "in",
+#        height = 14,
+#        width = 9,
+#        bg = "white")
+
+tiff(file.path("output", "images", "F5.tif"), units = "in", width = 9, height = 14, res = 300)
+prow1
+dev.off()
 
 prow2 <- plot_grid(plotlist = plotlist[7:12],
                    ncol = 1,
@@ -169,9 +207,14 @@ prow2 <- plot_grid(plotlist = plotlist[7:12],
                    label_y = 1.04,
                    label_size = 18)
 
-ggsave(file.path("output", "images", "results_summary_2.png"),
-       plot = prow2,
-       units = "in",
-       height = 14,
-       width = 9,
-       bg = "white")
+# ggsave(file.path("output", "images", "F6.eps"),
+#        plot = prow2,
+#        units = "in",
+#        height = 14,
+#        width = 9,
+#        bg = "white")
+
+tiff(file.path("output", "images", "F6.tif"), units = "in", width = 9, height = 14, res = 300)
+prow2
+dev.off()
+

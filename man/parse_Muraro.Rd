@@ -4,7 +4,7 @@
 \alias{parse_Muraro}
 \title{Parse the Muraro et al. (2016) single-cell pancreas data set}
 \usage{
-parse_Muraro(absolute = TRUE)
+parse_Muraro(absolute = TRUE, use_cpm = FALSE)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance
