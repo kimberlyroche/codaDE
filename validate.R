@@ -73,14 +73,14 @@ if(threshold < 0) {
 #   Parse and wrangle validation data
 # ------------------------------------------------------------------------------
 
-abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE))
-rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE))
+abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE, use_cpm = use_cpm))
+rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE, use_cpm = use_cpm))
 
-if(use_cpm) {
-  # Convert to CPM
-  rel_data$counts <- apply(rel_data$counts, 2, function(x) x/sum(x))
-  rel_data$counts <- round(rel_data$counts*1e06)
-}
+#if(use_cpm) {
+#  # Convert to CPM
+#  rel_data$counts <- apply(rel_data$counts, 2, function(x) x/sum(x))
+#  rel_data$counts <- round(rel_data$counts*1e06)
+#}
 
 if(testing & nrow(abs_data$counts) > 500) {
   k <- 500
@@ -164,7 +164,7 @@ for(DE_method in methods_list) {
     saveRDS(save_obj, save_fn)
   }
   if(is.null(percent_DE)) {
-    oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < 0.05
+    oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < alpha
     percent_DE <- sum(oracle_calls) / length(oracle_calls)
   }
 }
@@ -249,11 +249,11 @@ if(dataset_name == "Gruen") {
 
 save_fn <- file.path("output",
                      paste0("filtered_data_",dataset_name,"_threshold",threshold,".rds"))
-if(!file.exists(save_fn)) {
+#if(!file.exists(save_fn)) {
   saveRDS(list(absolute = ref_data,
                relative = data,
                groups = groups), save_fn)
-}
+#}
 
 # Report stats on this data set
 cat(paste0("Number of features (after filtering): ", ncol(counts_A), "\n"))
