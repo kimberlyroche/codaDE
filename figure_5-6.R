@@ -9,17 +9,21 @@ library(RColorBrewer)
 dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
 
-datasets <- c("Hagai", "Monaco", "Song", "Hashimshony", "Barlow", "Gruen",
-              "Muraro", "Owens", "VieiraSilva", "Kimmerling", "Yu", "Klein")
-thresholds <- rep(1, length(datasets))
+# "Canonical" ordering
+datasets <- c("VieiraSilva", "Hagai", "Hashimshony", "Song", "Monaco", "Barlow",
+              "Gruen", "Muraro", "Kimmerling", "Yu", "Owens", "Klein")
+thresholds <- c(1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1)
 
 names(thresholds) <- datasets
 model_dir <- "oracle"
-submodel_dir <- "regression_cpm"
+# submodel_dir <- "regression_cpm"
+submodel_dir <- "regression_plain"
 
-# palette <- list(ALDEx2 = "#46A06B",
-#                 DESeq2 = "#FF5733",
-#                 scran = "#E3C012")
+palette <- list(ALDEx2 = "#46A06B",
+                DESeq2 = "#FF5733",
+                edgeR_TMM = "#7E54DE",
+                'edgeR (TMM)' = "#7E54DE",
+                scran = "#E3C012")
 
 plot_labels <- list(FPR = "specificity (1 - FPR)", TPR = "sensitivity (TPR)")
 
@@ -43,6 +47,9 @@ for(file in result_files) {
 # scran seems to work best with an absolute MINIMUM of 5 samples.
 results <- results %>%
   filter(!(dataset == "Monaco" & DE_method == "scran"))
+
+# results$DE_method <- factor(results$DE_method)
+# levels(results$DE_method)[3] <- "edgeR (TMM)"
 
 # R^2 for prediction
 temp <- results %>% filter(score_type == "TPR")
@@ -87,7 +94,7 @@ for(i in 1:length(datasets)) {
   # ----------------------------------------------------------------------------
   
   bar_components <- NULL
-  for(method in c("ALDEx2", "DESeq2", "scran")) {
+  for(method in c("ALDEx2", "DESeq2", "edgeR_TMM", "scran")) {
     if(this_dataset == "Monaco" & method == "scran") next;
     calls <- readRDS(file.path("output",
                                "real_data_calls",
@@ -114,10 +121,14 @@ for(i in 1:length(datasets)) {
   bar_components$type <- factor(bar_components$type, levels = c("TP", "TN", "FN", "FP"))
   # levels(bar_components$type) <- c("True positive", "True negative", "False negative", "False positive")
   
+  bar_components$method <- factor(bar_components$method)
+  levels(bar_components$method)[3] <- "edgeR (TMM)"
+  
   p1 <- ggplot(bar_components, aes(x = method, y = count, fill = type, label = count)) +
     geom_bar(stat = "identity") +
     geom_text(size = 3, position = position_stack(vjust = 0.5), colour = "black", fontface = "bold") +
     theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
     # scale_fill_brewer(palette = "GnBu") +
     scale_fill_manual(values = c("#ec561d", "#ffaf60", "#217db4", "#9bd4e4")) +
     labs(fill = "",
@@ -145,33 +156,37 @@ for(i in 1:length(datasets)) {
         filter(score_type == use_result_type) %>%
         filter(DE_method == plot_df$DE_method[j]) %>%
         pull(point)
+    }
       
-      p <- ggplot() +
-        geom_boxplot(data = plot_df,
-                     mapping = aes(x = DE_method,
-                                   ymin = lower90,
-                                   lower = lower50,
-                                   middle = point,
-                                   upper = upper50,
-                                   ymax = upper90,
-                                   fill = DE_method),
-                     stat = "identity", color = "#666666", width = 0.5, alpha = 0.4) +
-        geom_point(data = plot_df,
-                   mapping = aes(x = DE_method, y = true, fill = DE_method),
-                   size = 4, shape = 21, stroke = 1) +
-        ylim(c(0,1)) +
-        # scale_fill_manual(values = palette) +
-        scale_fill_brewer(palette = "Set2") +
-        theme_bw() +
-        theme(legend.position = "none") +
-        labs(x = "",
-             y = ifelse(use_result_type == "TPR", "sensitivity", "specificity"))
-      
-      if(use_result_type == "TPR") {
-        p2 <- p
-      } else {
-        p3 <- p
-      }
+    plot_df$DE_method <- factor(plot_df$DE_method)
+    levels(plot_df$DE_method)[3] <- "edgeR (TMM)"
+    
+    p <- ggplot() +
+      geom_boxplot(data = plot_df,
+                   mapping = aes(x = DE_method,
+                                 ymin = lower90,
+                                 lower = lower50,
+                                 middle = point,
+                                 upper = upper50,
+                                 ymax = upper90,
+                                 fill = DE_method),
+                   stat = "identity", color = "#666666", width = 0.5, alpha = 0.4) +
+      geom_point(data = plot_df,
+                 mapping = aes(x = DE_method, y = true, fill = DE_method),
+                 size = 3, shape = 21, stroke = 1) +
+      ylim(c(0,1)) +
+      scale_fill_manual(values = palette) +
+      # scale_fill_brewer(palette = "Set2") +
+      theme_bw() +
+      theme(legend.position = "none",
+            axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+      labs(x = "",
+           y = ifelse(use_result_type == "TPR", "sensitivity", "specificity"))
+    
+    if(use_result_type == "TPR") {
+      p2 <- p
+    } else {
+      p3 <- p
     }
   }
   
@@ -182,39 +197,42 @@ for(i in 1:length(datasets)) {
 
 common_scale <- 0.98
 
-prow1 <- plot_grid(plotlist = plotlist[1:6],
+neg_pad <- -0.12
+
+prow1 <- plot_grid(plotlist[[1]], NULL,
+                   plotlist[[2]], NULL,
+                   plotlist[[3]], NULL,
+                   plotlist[[4]], NULL,
+                   plotlist[[5]], NULL,
+                   plotlist[[6]],
                    ncol = 1,
-                   labels = c("a", "b", "c", "d", "e", "f"),
+                   rel_heights = c(1, neg_pad, 1, neg_pad, 1, neg_pad,
+                                   1, neg_pad, 1, neg_pad, 1),
+                   labels = c("a", "", "b", "", "c", "", "d", "", "e", "", "f"),
                    scale = common_scale,
                    label_y = 1.04,
                    label_size = 18)
 
-# ggsave(file.path("output", "images", "F5.png"),
-#        plot = prow1,
-#        units = "in",
-#        height = 14,
-#        width = 9,
-#        bg = "white")
-
-tiff(file.path("output", "images", "F5.tif"), units = "in", width = 9, height = 14, res = 300)
+tiff(file.path("output", "images", "F6.tif"), units = "in", width = 9, height = 14, res = 300)
 prow1
 dev.off()
 
-prow2 <- plot_grid(plotlist = plotlist[7:12],
+prow2 <- plot_grid(plotlist[[7]], NULL,
+                   plotlist[[8]], NULL,
+                   plotlist[[9]], NULL,
+                   plotlist[[10]], NULL,
+                   plotlist[[11]], NULL,
+                   plotlist[[12]],
                    ncol = 1,
-                   labels = c("g", "h", "i", "j", "k", "m"),
+                   rel_heights = c(1, neg_pad, 1, neg_pad, 1, neg_pad,
+                                   1, neg_pad, 1, neg_pad, 1),
+                   labels = c("g", "", "h", "", "i", "", "j", "", "k", "", "l"),
                    scale = common_scale,
                    label_y = 1.04,
                    label_size = 18)
 
-# ggsave(file.path("output", "images", "F6.eps"),
-#        plot = prow2,
-#        units = "in",
-#        height = 14,
-#        width = 9,
-#        bg = "white")
 
-tiff(file.path("output", "images", "F6.tif"), units = "in", width = 9, height = 14, res = 300)
+tiff(file.path("output", "images", "F7.tif"), units = "in", width = 9, height = 14, res = 300)
 prow2
 dev.off()
 

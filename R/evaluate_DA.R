@@ -33,7 +33,7 @@ call_DA_edgeR <- function(data, groups, use_TMM = FALSE) {
 #' @import dplyr
 #' @export
 call_DA_NB <- function(data, groups) {
-  pval_df <- data.frame(feature = paste0("feature", 1:ncol(data)),
+  pval_df <- data.frame(feature = paste0("gene", 1:ncol(data)),
                         pval = 1)
   data <- spike_in_ones(data, groups)
   for(feature_idx in 1:ncol(data)) {
@@ -66,45 +66,77 @@ call_DA_NB <- function(data, groups) {
 #'
 #' @param data simulated data set (samples x features)
 #' @param groups group (cohort) labels
+#' @param reference simulated true abundances; if included we will use 
+#' a random set of stable features from the true abundances to rescale the 
+#' observed abundances (data) to renormalize
+#' @param control_indices if specified, these features are used as the stable 
+#' features against which to normalize observed abundances (DESeq2-only)
 #' @return unadjusted p-values for all features
-#' @import Seurat
+#' @import DESeq2
 #' @import dplyr
 #' @export
-call_DA_DESeq2 <- function(data, groups) {
-  count_table <- t(data)
-  n_genes <- nrow(count_table)
-  n_samples <- ncol(count_table)
+call_DA_DESeq2 <- function(data, groups,
+                           reference = NULL,
+                           control_n = 10,
+                           control_indices = NULL) {
+  sampleData <- data.frame(group = factor(groups))
+  dds <- suppressMessages(DESeqDataSetFromMatrix(countData = t(data), colData = sampleData, design = ~ group))
+  if(!is.null(reference) & !is.null(control_indices)) {
+    # # Find "housekeeping" gene analogs
+    # log_ab <- log(t(reference) + 0.5)
+    # covar <- apply(log_ab, 1, function(x) sd(x)/mean(x))
+    # bottom5 <- quantile(abs(covar), probs = c(0.05))
+    # idx <- sample(which(covar < bottom5), size = control_n)
+    dds <- suppressMessages(DESeq2::estimateSizeFactors(object = dds, controlGenes = control_indices))
+  } else {
+    dds <- suppressMessages(DESeq2::estimateSizeFactors(object = dds))
+  }
+  dds <- suppressMessages(DESeq2::estimateDispersions(object = dds, fitType = "local"))
+  dds <- suppressMessages(DESeq2::nbinomWaldTest(object = dds))
+  res <- DESeq2::results(object = dds, alpha = 0.05)
   
-  # Create count table and metadata objects  
-  cell_metadata <- data.frame(active.ident = as.factor(groups))
-  rownames(cell_metadata) <- colnames(count_table)
-  rownames(count_table) <- paste0("gene", 1:n_genes)
-  colnames(count_table) <- paste0("cell", 1:n_samples)
-  levels(cell_metadata$active.ident) <- c("untreated", "treated")
-  rownames(cell_metadata) <- colnames(count_table)
-  
-  # Create Seurat object manually:
-  # https://learn.gencore.bio.nyu.edu/single-cell-rnaseq/loading-your-own-data-in-seurat-reanalyze-a-different-dataset/
-  seurat_data <- CreateSeuratObject(counts = count_table,
-                                    project = "simulation",
-                                    min.cells = 1,
-                                    min.features = 10,
-                                    meta.data = cell_metadata)
-  DefaultAssay(seurat_data) <- "RNA"
-  # Assign labels manually
-  seurat_data <- SetIdent(seurat_data, value = seurat_data@meta.data$active.ident)
-  results <- suppressMessages(FindMarkers(seurat_data,
-                                          ident.1 = "untreated",
-                                          ident.2 = "treated",
-                                          test.use = "DESeq2"))
-  pval_df <- left_join(data.frame(feature = rownames(count_table)),
-                       data.frame(feature = rownames(results),
-                                  pval = results$p_val),
-                       by = "feature")
-  # It's likely some features will have been excluded from consideration if they
-  # are near-zero. Plug p-values of 1 in for these.
-  pval_df$pval[is.na(pval_df$pval)] <- 1
+  pval_df <- data.frame(feature = paste0("gene", 1:nrow(data)),
+                        pval = res$pvalue)
   pval_df
+  
+  # Previously
+  # I had been using a Seurat wrapper when many more differential abundance
+  # testing methods - including MAST - were in use. FindMarkers() was a 
+  # conventient general purpose function for calling these.
+  # count_table <- t(data)
+  # n_genes <- nrow(count_table)
+  # n_samples <- ncol(count_table)
+  # 
+  # # Create count table and metadata objects  
+  # cell_metadata <- data.frame(active.ident = as.factor(groups))
+  # rownames(cell_metadata) <- colnames(count_table)
+  # rownames(count_table) <- paste0("gene", 1:n_genes)
+  # colnames(count_table) <- paste0("cell", 1:n_samples)
+  # levels(cell_metadata$active.ident) <- c("untreated", "treated")
+  # rownames(cell_metadata) <- colnames(count_table)
+  # 
+  # # Create Seurat object manually:
+  # # https://learn.gencore.bio.nyu.edu/single-cell-rnaseq/loading-your-own-data-in-seurat-reanalyze-a-different-dataset/
+  # seurat_data <- CreateSeuratObject(counts = count_table,
+  #                                   project = "simulation",
+  #                                   min.cells = 1,
+  #                                   min.features = 10,
+  #                                   meta.data = cell_metadata)
+  # DefaultAssay(seurat_data) <- "RNA"
+  # # Assign labels manually
+  # seurat_data <- SetIdent(seurat_data, value = seurat_data@meta.data$active.ident)
+  # results <- suppressMessages(FindMarkers(seurat_data,
+  #                                         ident.1 = "untreated",
+  #                                         ident.2 = "treated",
+  #                                         test.use = "DESeq2"))
+  # pval_df <- left_join(data.frame(feature = rownames(count_table)),
+  #                      data.frame(feature = rownames(results),
+  #                                 pval = results$p_val),
+  #                      by = "feature")
+  # # It's likely some features will have been excluded from consideration if they
+  # # are near-zero. Plug p-values of 1 in for these.
+  # pval_df$pval[is.na(pval_df$pval)] <- 1
+  # pval_df
 }
 
 #' Evaluate differential abundance with MAST (via Seurat)
@@ -283,14 +315,23 @@ DA_by_NB <- function(ref_data, data, groups, oracle_calls = NULL) {
 #' @param data relative abundance data set (samples x features)
 #' @param groups group (cohort) labels
 #' @param oracle_calls optional baseline (true) differential abundance calls
+#' @param control_indices if specified, these features are used as the stable 
+#' features against which to normalize observed abundances (DESeq2-only)
 #' @return baseline (true) differential abundance calls and calls made on 
 #' relative abundances
 #' @export
-DA_by_DESeq2 <- function(ref_data, data, groups, oracle_calls = NULL) {
+DA_by_DESeq2 <- function(ref_data, data, groups, oracle_calls = NULL,
+                         control_indices = NULL) {
   if(is.null(oracle_calls)) {
     oracle_calls <- call_DA_DESeq2(ref_data, groups)
   }
-  calls <- call_DA_DESeq2(data, groups)
+  if(!is.null(control_indices)) {
+    calls <- call_DA_DESeq2(data, groups,
+                            reference = ref_data,
+                            control_indices = control_indices)
+  } else {
+    calls <- call_DA_DESeq2(data, groups)
+  }
   return(list(oracle_calls = oracle_calls, calls = calls))
 }
 
@@ -352,11 +393,14 @@ DA_by_scran <- function(ref_data, data, groups, oracle_calls = NULL) {
 #' @param groups group (cohort) labels
 #' @param method differential abundance calling method (e.g. "DESeq2")
 #' @param oracle_calls optional baseline (true) differential abundance calls
+#' @param control_indices if specified, these features are used as the stable 
+#' features against which to normalize observed abundances (DESeq2-only)
 #' @return named list of baseline (true) differential abundance calls and
 #' calls made on relative abundances (the observed data)
 #' @export
 DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
-                                oracle_calls = NULL) {
+                       oracle_calls = NULL,
+                       control_indices = NULL) {
   if(method == "NBGLM") {
     DE_calls <- DA_by_NB(ref_data, data, groups, oracle_calls = oracle_calls)
     if(is.null(oracle_calls)) {
@@ -365,7 +409,8 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
     calls <- DE_calls$calls$pval
   }
   if(method == "DESeq2") {
-    DE_calls <- DA_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls)
+    DE_calls <- DA_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls,
+                             control_indices = control_indices)
     if(is.null(oracle_calls)) {
       oracle_calls <- DE_calls$oracle_calls$pval
     }

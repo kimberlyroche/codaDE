@@ -93,7 +93,7 @@ p <- plot_grid(panel_Kimmerling, panel_Klein, ncol = 1,
                label_y = 1.03)
 
 dev.off()
-tiff(file.path("output", "images", "F7.tif"), units = "in", width = 9, height = 6, res = 300)
+tiff(file.path("output", "images", "F9.tif"), units = "in", width = 9, height = 6, res = 300)
 p
 dev.off()
 

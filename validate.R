@@ -62,7 +62,8 @@ use_renorm_counts <- opt$userenormcounts
 use_cpm <- opt$usecpm
 
 testing <- FALSE
-methods_list <- c("ALDEx2", "DESeq2", "scran")
+#methods_list <- c("ALDEx2", "DESeq2", "scran")
+methods_list <- c("edgeR_TMM")
 
 if(threshold < 0) {
   stop(paste0("Invalid threshold: ", threshold, "!\n"))
@@ -114,6 +115,14 @@ ref_data <- t(ref_data)
 data <- t(data)
 groups <- factor(groups)
 tax <- abs_data$tax
+
+if(dataset_name == "Barlow") {
+  # The qPCR Barlow data has enormous rescaled abundances (> MAX INT) and the minimum
+  # observed (non-zero) abundance after rescaling is over 7 million. Scale down these
+  # counts such that the minmum observed (non-zero) abundance is 1.
+  rescale <- min(ref_data[ref_data != 0])
+  ref_data <- ref_data/rescale
+}
 
 # Convert to integers, just for DESeq2
 ref_data <- apply(ref_data, c(1,2), as.integer)
