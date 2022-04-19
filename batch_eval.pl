@@ -24,9 +24,9 @@ while($i <= $end) {
   open(my $fh, '>', $filename);
   print $fh '#!/bin/bash'."\n";
   print $fh '#SBATCH -J eval_'.$i.'-'.$j."\n";
-  print $fh '#SBATCH --mem=32GB'."\n";
+  print $fh '#SBATCH --mem=16GB'."\n";
   print $fh '#SBATCH --get-user-env'."\n";
-  print $fh '#SBATCH --time=16:00:00'."\n";
+  print $fh '#SBATCH --time=4:00:00'."\n";
   print $fh '#'."\n\n";
 
   print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";

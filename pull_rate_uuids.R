@@ -45,16 +45,19 @@ for(u in 1:length(all_uuids)) {
   if(nrow(res) > 0) {
     for(i in 1:nrow(res)) {
       job <- res[i,]
-      wishlist <- rbind(wishlist,
-                        data.frame(ID = counter,
-                                   uuid = job$UUID,
-                                   baseline = job$BASELINE_TYPE,
-                                   partial_info = job$PARTIAL_INFO,
-                                   method = job$METHOD,
-                                   type = job$OBSERVED_TYPE,
-                                   baseline_calls = ifelse(job$BASELINE_TYPE == "oracle", job$ORACLE_CALLS, job$BASELINE_CALLS),
-                                   calls = job$CALLS))
-      counter <- counter + 1
+      #if(job$METHOD %in% c("ALDEx2", "DESeq2", "scran", "edgeR", "edgeR_TMM")) {
+      if(job$METHOD %in% c("edgeR", "edgeR_TMM")) {
+        wishlist <- rbind(wishlist,
+                          data.frame(ID = counter,
+                                     uuid = job$UUID,
+                                     baseline = job$BASELINE_TYPE,
+                                     partial_info = job$PARTIAL_INFO,
+                                     method = job$METHOD,
+                                     type = job$OBSERVED_TYPE,
+                                     baseline_calls = ifelse(job$BASELINE_TYPE == "oracle", job$ORACLE_CALLS, job$BASELINE_CALLS),
+                                     calls = job$CALLS))
+        counter <- counter + 1
+      }
     }
   }
 }

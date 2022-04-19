@@ -131,13 +131,13 @@ for(i in 1:nrow(wishlist)) {
       # to refer back to the datasets table to find the oracle calls.
       results_row <- cbind(job,
                            baseline_calls = NA,
-                           calls = paste0(round(all_calls$calls, 10), collapse = ";"),
-                           observed_type = job$observed_type)
+                           calls = paste0(round(all_calls$calls, 10), collapse = ";")) #,
+#                           observed_type = job$observed_type)
     } else {
       results_row <- cbind(job,
                            baseline_calls = paste0(round(all_calls$oracle_calls, 10), collapse = ";"),
-                           calls = paste0(round(all_calls$calls, 10), collapse = ";"),
-                           observed_type = job$observed_type)
+                           calls = paste0(round(all_calls$calls, 10), collapse = ";")) #,
+#                           observed_type = job$observed_type)
     }
 
     # Add to output file

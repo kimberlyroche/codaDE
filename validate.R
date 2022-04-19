@@ -62,8 +62,7 @@ use_renorm_counts <- opt$userenormcounts
 use_cpm <- opt$usecpm
 
 testing <- FALSE
-#methods_list <- c("ALDEx2", "DESeq2", "scran")
-methods_list <- c("edgeR_TMM")
+methods_list <- c("ALDEx2", "DESeq2", "edgeR_TMM", "scran")
 
 if(threshold < 0) {
   stop(paste0("Invalid threshold: ", threshold, "!\n"))
@@ -143,7 +142,7 @@ if(!is.null(tax)) {
 # ------------------------------------------------------------------------------
 
 # Save this estimate for later; we'll print it out with other statistics
-# percent_DE <- NULL
+percent_DE <- NULL
 for(DE_method in methods_list) {
   # Pull saved calls on this data set x method if these exist
   save_fn <- file.path("output",

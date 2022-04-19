@@ -1,9 +1,8 @@
 source("path_fix.R")
 
 datasets <- c("VieiraSilva", "Muraro", "Hagai", "Hashimshony", "Gruen", "Kimmerling",
-              "Song", "Barlow", "Monaco", "Yu",
-              "Klein", "Owens")
-thresholds <- rep(1, length(datasets))
+              "Song", "Monaco", "Yu", "Klein", "Owens", "Barlow")
+thresholds <- c(rep(1, length(datasets)-1), 0)
 
 for(i in 1:length(datasets)) {
   dataset_name <- datasets[i]

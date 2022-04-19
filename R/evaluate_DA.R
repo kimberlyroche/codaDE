@@ -21,7 +21,8 @@ call_DA_edgeR <- function(data, groups, use_TMM = FALSE) {
   dge_obj <- estimateGLMTagwiseDisp(dge_obj, design)
   fit <- glmFit(dge_obj, design)
   lrt <- glmLRT(fit, coef = 2)
-  lrt$table$PValue
+  data.frame(feature = paste0("feature", 1:nrow(data)),
+             pval = lrt$table$PValue)
 }
 
 #' Evaluate differential abundance with a negative binomial GLM (via MASS)
@@ -292,6 +293,25 @@ call_DA_scran <- function(data, groups) {
   pval_df
 }
 
+#' Wrapper for call_DA_edgeR generating reference and target calls
+#'
+#' @param ref_data absolute abundance data set (samples x features)
+#' @param data relative abundance data set (samples x features)
+#' @param groups group (cohort) labels
+#' @param oracle_calls optional baseline (true) differential abundance calls
+#' @param use_TMM if TRUE, uses the trimmed mean of M-values normalization
+#' @return baseline (true) differential abundance calls and calls made on 
+#' relative abundances
+#' @export
+DA_by_edgeR <- function(ref_data, data, groups, oracle_calls = NULL,
+                        use_TMM = FALSE) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_NB(ref_data, groups)
+  }
+  calls <- call_DA_edgeR(data, groups, use_TMM = use_TMM)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
 #' Wrapper for call_DA_NB generating reference and target calls
 #'
 #' @param ref_data absolute abundance data set (samples x features)
@@ -402,11 +422,7 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
                        oracle_calls = NULL,
                        control_indices = NULL) {
   if(method == "NBGLM") {
-    DE_calls <- DA_by_NB(ref_data, data, groups, oracle_calls = oracle_calls)
-    if(is.null(oracle_calls)) {
-      oracle_calls <- DE_calls$oracle_calls$pval
-    }
-    calls <- DE_calls$calls$pval
+    DA_calls <- DA_by_NB(ref_data, data, groups, oracle_calls = oracle_calls)
   }
   if(method == "DESeq2") {
     DE_calls <- DA_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls,
@@ -417,27 +433,27 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
     calls <- DE_calls$calls$pval
   }
   if(method == "MAST") {
-    DE_calls <- DA_by_MAST(ref_data, data, groups, oracle_calls = oracle_calls)
-    if(is.null(oracle_calls)) {
-      oracle_calls <- DE_calls$oracle_calls$pval
-    }
-    calls <- DE_calls$calls$pval
+    DA_calls <- DA_by_MAST(ref_data, data, groups, oracle_calls = oracle_calls)
   }
   if(method == "ALDEx2") {
-    DE_calls <- DA_by_ALDEx2(ref_data, data, groups,
+    DA_calls <- DA_by_ALDEx2(ref_data, data, groups,
                              oracle_calls = oracle_calls)
-    if(is.null(oracle_calls)) {
-      oracle_calls <- DE_calls$oracle_calls$pval
-    }
-    calls <- DE_calls$calls$pval
   }
   if(method == "scran") {
-    DE_calls <- DA_by_scran(ref_data, data, groups, oracle_calls = oracle_calls)
-    if(is.null(oracle_calls)) {
-      oracle_calls <- DE_calls$oracle_calls$pval
-    }
-    calls <- DE_calls$calls$pval
+    DA_calls <- DA_by_scran(ref_data, data, groups, oracle_calls = oracle_calls)
   }
+  if(method == "edgeR") {
+    DA_calls <- DA_by_edgeR(ref_data, data, groups,
+                            oracle_calls = oracle_calls, use_TMM = FALSE)
+  }
+  if(method == "edgeR_TMM") {
+    DA_calls <- DA_by_edgeR(ref_data, data, groups,
+                            oracle_calls = oracle_calls, use_TMM = TRUE)
+  }
+  if(is.null(oracle_calls)) {
+    oracle_calls <- DA_calls$oracle_calls$pval
+  }
+  calls <- DA_calls$calls$pval
     
   return(list(calls = calls, oracle_calls = oracle_calls))
 }
@@ -453,7 +469,7 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
 #' correction
 #' @return named list of all calls, TPR, and FPR
 #' @export
-calc_DA_discrepancy <- function(calls, oracle_calls, adjusted = TRUE) {
+calc_DA_discrepancy <- function(calls, oracle_calls, adjusted = TRUE, alpha = 0.05) {
   if(typeof(calls) == "character") {
     calls <- as.numeric(strsplit(calls, ";")[[1]])
   }
@@ -463,12 +479,12 @@ calc_DA_discrepancy <- function(calls, oracle_calls, adjusted = TRUE) {
   
   if(adjusted) {
     # Calls on observed
-    de <- p.adjust(calls, method = "BH") < 0.05
+    de <- p.adjust(calls, method = "BH") < alpha
     # Calls on original abundances
-    sim_de <- p.adjust(oracle_calls, method = "BH") < 0.05
+    sim_de <- p.adjust(oracle_calls, method = "BH") < alpha
   } else {
-    de <- calls < 0.05
-    sim_de <- oracle_calls < 0.05
+    de <- calls < alpha
+    sim_de <- oracle_calls < alpha
   }
 
   TP_calls <- de & sim_de
