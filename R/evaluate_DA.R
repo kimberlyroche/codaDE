@@ -1,5 +1,28 @@
+#' Evaluate differential abundance with ANCOM-BC
+#'
+#' @param data simulated data set
+#' @param groups group (cohort) labels
+#' @param use_TMM if TRUE, uses the trimmed mean of M-values normalization
+#' @return p-value for DA for all features
+#' @import phyloseq
+#' @import ANCOMBC
+#' @export
+call_DA_ANCOMBC <- function(data, groups) {
+  physeq <- phyloseq(otu_table(data, taxa_are_rows = FALSE),
+                     sample_data(data.frame(group = groups)))
+  out <- ancombc(phyloseq = physeq, formula = "group", p_adj_method = "BH")
+
+  # ANCOM will omit some very low abundance features from consideration
+  # Re-incorporate these with p-values of 1
+  pval_df <- data.frame(feature = colnames(otu_table(physeq))) %>%
+    left_join(data.frame(feature = rownames(out$res$p_val),
+                         pval = unname(out$res$p_val)), by = "feature")
+  pval_df$pval[is.na(pval_df$pval)] <- 1
+  pval_df$feature <- str_replace(pval_df$feature, "sp", "gene")
+  pval_df
+}
+
 #' Evaluate differential abundance with edgeR
-#' This evaluates expression on all features of the count matrix together
 #'
 #' @param data simulated data set
 #' @param groups group (cohort) labels
@@ -21,7 +44,7 @@ call_DA_edgeR <- function(data, groups, use_TMM = FALSE) {
   dge_obj <- estimateGLMTagwiseDisp(dge_obj, design)
   fit <- glmFit(dge_obj, design)
   lrt <- glmLRT(fit, coef = 2)
-  data.frame(feature = paste0("feature", 1:nrow(data)),
+  data.frame(feature = paste0("gene", 1:nrow(data)),
              pval = lrt$table$PValue)
 }
 
@@ -293,6 +316,23 @@ call_DA_scran <- function(data, groups) {
   pval_df
 }
 
+#' Wrapper for call_DA_ANCOMBC generating reference and target calls
+#'
+#' @param ref_data absolute abundance data set (samples x features)
+#' @param data relative abundance data set (samples x features)
+#' @param groups group (cohort) labels
+#' @param oracle_calls optional baseline (true) differential abundance calls
+#' @return baseline (true) differential abundance calls and calls made on 
+#' relative abundances
+#' @export
+DA_by_ANCOMBC <- function(ref_data, data, groups, oracle_calls = NULL) {
+  if(is.null(oracle_calls)) {
+    oracle_calls <- call_DA_NB(ref_data, groups)
+  }
+  calls <- call_DA_ANCOMBC(data, groups)
+  return(list(oracle_calls = oracle_calls, calls = calls))
+}
+
 #' Wrapper for call_DA_edgeR generating reference and target calls
 #'
 #' @param ref_data absolute abundance data set (samples x features)
@@ -424,6 +464,9 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
   if(method == "NBGLM") {
     DA_calls <- DA_by_NB(ref_data, data, groups, oracle_calls = oracle_calls)
   }
+  if(method == "ANCOMBC") {
+    DA_calls <- DA_by_ANCOMBC(ref_data, data, groups, oracle_calls = oracle_calls)
+  }
   if(method == "DESeq2") {
     DE_calls <- DA_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls,
                              control_indices = control_indices)
@@ -454,7 +497,7 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
     oracle_calls <- DA_calls$oracle_calls$pval
   }
   calls <- DA_calls$calls$pval
-    
+  
   return(list(calls = calls, oracle_calls = oracle_calls))
 }
 
