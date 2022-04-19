@@ -3,12 +3,12 @@ use warnings;
 use POSIX;
 use List::Util qw(min);
 
-my $p = 5000;
+my $p = 100;
 my $input = "input_rate_".$p.".txt";
 my $output = "output_rate_".$p;
 my $start = 1;
-my $end = 5779;
-my $chunks = 20;
+my $end = 17;
+my $chunks = 1;
 
 my $filename = "job.slurm";
 my $n = $end - $start + 1;

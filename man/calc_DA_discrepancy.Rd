@@ -5,7 +5,7 @@
 \title{Calculates the discrepancy between differential abundance calls made on
 absolute and relative abundances}
 \usage{
-calc_DA_discrepancy(calls, oracle_calls, adjusted = TRUE)
+calc_DA_discrepancy(calls, oracle_calls, adjusted = TRUE, alpha = 0.05)
 }
 \arguments{
 \item{calls}{calls (as a numeric vector of p-values or a character string 

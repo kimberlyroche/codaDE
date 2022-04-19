@@ -22,10 +22,10 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
 insertions <- 0
 file_list <- list.files(dir, pattern = "output_eval")
-for(file in file_list[2:length(file_list)]) {
+for(file in file_list) {
   results <- read.table(file.path(dir, file), sep = "\t", header = TRUE)
   # Fix messed up headers
-  colnames(results) <- c("uuid", "baseline", "partial_info", "method", "observed_type", "baseline_calls", "calls", "discard")
+  colnames(results) <- c("id", "uuid", "baseline", "partial_info", "method", "observed_type", "baseline_calls", "calls")
   for(i in 1:nrow(results)) {
     job <- results[i,]
     if(!any(is.na(job %>% select(-baseline_calls)))) {
