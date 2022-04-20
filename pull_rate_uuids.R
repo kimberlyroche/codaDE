@@ -46,7 +46,7 @@ for(u in 1:length(all_uuids)) {
     for(i in 1:nrow(res)) {
       job <- res[i,]
       #if(job$METHOD %in% c("ALDEx2", "DESeq2", "scran", "edgeR", "edgeR_TMM")) {
-      if(job$METHOD %in% c("edgeR", "edgeR_TMM")) {
+      if(job$METHOD %in% c("ANCOMBC")) {
         wishlist <- rbind(wishlist,
                           data.frame(ID = counter,
                                      uuid = job$UUID,
