@@ -118,11 +118,9 @@ call_DA_DESeq2 <- function(data, groups,
   dds <- suppressMessages(DESeq2::estimateDispersions(object = dds, fitType = "local"))
   dds <- suppressMessages(DESeq2::nbinomWaldTest(object = dds))
   res <- DESeq2::results(object = dds, alpha = 0.05)
-  
   pval_df <- data.frame(feature = paste0("gene", 1:nrow(data)),
                         pval = res$pvalue)
   pval_df
-  
   # Previously
   # I had been using a Seurat wrapper when many more differential abundance
   # testing methods - including MAST - were in use. FindMarkers() was a 
