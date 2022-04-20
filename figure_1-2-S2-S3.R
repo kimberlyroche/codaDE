@@ -195,7 +195,7 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#7E54DE", "#E3C012", "#B95D6E")
 dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
 
-method_list <- c("ALDEx2", "DESeq2", "scran", "edgeR", "edgeR_TMM")
+method_list <- c("ALDEx2", "DESeq2", "scran", "edgeR", "edgeR_TMM", "ANCOMBC")
 
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
@@ -218,7 +218,7 @@ data$sensitivity <- data$TPR
 data$specificity <- 1 - data$FPR
 
 data$METHOD <- factor(data$METHOD)
-levels(data$METHOD)[4] <- "edgeR (TMM)"
+levels(data$METHOD)[5] <- "edgeR (TMM)"
 
 # ------------------------------------------------------------------------------
 #   Calculate some overall statistics
@@ -308,7 +308,7 @@ ggsave(file.path(output_dir, "roc_edgeR-only.svg"),
        height = 6,
        width = 6)
 
-method_list <- c("ALDEx2", "DESeq2", "edgeR (TMM)", "scran")
+method_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "edgeR (TMM)", "scran")
 
 # ------------------------------------------------------------------------------
 #   ROC plot: all normalization-based methods together
@@ -388,12 +388,13 @@ p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
 p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
 p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
 p4_100 <- NULL; p4_1000 <- NULL; p4_5000 <- NULL
+p5_100 <- NULL; p5_1000 <- NULL; p5_5000 <- NULL
 legend <- NULL
 for(i in 1:length(method_list)) {
   method <- method_list[i]
   for(j in c(100, 1000, 5000)) {
-    # plot_pieces <- plot_ROC_percentDE(data, method, j)
-    plot_pieces <- plot_ROC_fc(data, method, j) # fold change version
+    plot_pieces <- plot_ROC_percentDE(data, method, j)
+    # plot_pieces <- plot_ROC_fc(data, method, j) # fold change version
     pl <- plot_pieces$pl
     if(is.null(legend)) {
       legend <- plot_pieces$legend
@@ -410,19 +411,25 @@ for(i in 1:length(method_list)) {
     if(i == 4 & j == 100) p4_100 <<- pl
     if(i == 4 & j == 1000) p4_1000 <<- pl
     if(i == 4 & j == 5000) p4_5000 <<- pl
+    if(i == 5 & j == 100) p5_100 <<- pl
+    if(i == 5 & j == 1000) p5_1000 <<- pl
+    if(i == 5 & j == 5000) p5_5000 <<- pl
   }
 }
 prow1 <- plot_grid(p1_100, p1_1000, p1_5000, ncol = 3)
 prow2 <- plot_grid(p2_100, p2_1000, p2_5000, ncol = 3)
 prow3 <- plot_grid(p3_100, p3_1000, p3_5000, ncol = 3)
 prow4 <- plot_grid(p4_100, p4_1000, p4_5000, ncol = 3)
-pgrid <- plot_grid(prow1, prow2, prow3, prow4, nrow = 4, labels = c("a", "b", "c", "d"), label_size = 18, label_y = 1.02)
+prow5 <- plot_grid(p5_100, p5_1000, p5_5000, ncol = 3)
+pgrid <- plot_grid(prow1, prow2, prow3, prow4, prow5,
+                   nrow = 5, labels = c("a", "b", "c", "d"),
+                   label_size = 18, label_y = 1.02)
 pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
 
-ggsave(file.path("output", "images", "F2_alt.svg"),
+ggsave(file.path("output", "images", "F2_alt_ANCOM.svg"),
        plot = pl,
        units = "in",
-       height = 11,
+       height = 12,
        width = 8.5,
        bg = "white")
 
