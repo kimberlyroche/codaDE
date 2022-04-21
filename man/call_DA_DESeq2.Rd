@@ -4,22 +4,12 @@
 \alias{call_DA_DESeq2}
 \title{Evaluate differential abundance with DESeq2 (via Seurat)}
 \usage{
-call_DA_DESeq2(
-  data,
-  groups,
-  reference = NULL,
-  control_n = 10,
-  control_indices = NULL
-)
+call_DA_DESeq2(data, groups, control_indices = NULL)
 }
 \arguments{
 \item{data}{simulated data set (samples x features)}
 
 \item{groups}{group (cohort) labels}
-
-\item{reference}{simulated true abundances; if included we will use 
-a random set of stable features from the true abundances to rescale the 
-observed abundances (data) to renormalize}
 
 \item{control_indices}{if specified, these features are used as the stable 
 features against which to normalize observed abundances (DESeq2-only)}

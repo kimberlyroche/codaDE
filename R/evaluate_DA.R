@@ -90,9 +90,6 @@ call_DA_NB <- function(data, groups) {
 #'
 #' @param data simulated data set (samples x features)
 #' @param groups group (cohort) labels
-#' @param reference simulated true abundances; if included we will use 
-#' a random set of stable features from the true abundances to rescale the 
-#' observed abundances (data) to renormalize
 #' @param control_indices if specified, these features are used as the stable 
 #' features against which to normalize observed abundances (DESeq2-only)
 #' @return unadjusted p-values for all features
@@ -100,17 +97,10 @@ call_DA_NB <- function(data, groups) {
 #' @import dplyr
 #' @export
 call_DA_DESeq2 <- function(data, groups,
-                           reference = NULL,
-                           control_n = 10,
                            control_indices = NULL) {
   sampleData <- data.frame(group = factor(groups))
   dds <- suppressMessages(DESeqDataSetFromMatrix(countData = t(data), colData = sampleData, design = ~ group))
-  if(!is.null(reference) & !is.null(control_indices)) {
-    # # Find "housekeeping" gene analogs
-    # log_ab <- log(t(reference) + 0.5)
-    # covar <- apply(log_ab, 1, function(x) sd(x)/mean(x))
-    # bottom5 <- quantile(abs(covar), probs = c(0.05))
-    # idx <- sample(which(covar < bottom5), size = control_n)
+  if(!is.null(control_indices)) {
     dds <- suppressMessages(DESeq2::estimateSizeFactors(object = dds, controlGenes = control_indices))
   } else {
     dds <- suppressMessages(DESeq2::estimateSizeFactors(object = dds))
@@ -118,8 +108,9 @@ call_DA_DESeq2 <- function(data, groups,
   dds <- suppressMessages(DESeq2::estimateDispersions(object = dds, fitType = "local"))
   dds <- suppressMessages(DESeq2::nbinomWaldTest(object = dds))
   res <- DESeq2::results(object = dds, alpha = 0.05)
-  pval_df <- data.frame(feature = paste0("gene", 1:nrow(data)),
+  pval_df <- data.frame(feature = paste0("gene", 1:ncol(data)),
                         pval = res$pvalue)
+  pval_df$pval[is.na(pval_df$pval)] <- 1
   pval_df
   # Previously
   # I had been using a Seurat wrapper when many more differential abundance
@@ -385,7 +376,6 @@ DA_by_DESeq2 <- function(ref_data, data, groups, oracle_calls = NULL,
   }
   if(!is.null(control_indices)) {
     calls <- call_DA_DESeq2(data, groups,
-                            reference = ref_data,
                             control_indices = control_indices)
   } else {
     calls <- call_DA_DESeq2(data, groups)
@@ -466,12 +456,12 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
     DA_calls <- DA_by_ANCOMBC(ref_data, data, groups, oracle_calls = oracle_calls)
   }
   if(method == "DESeq2") {
-    DE_calls <- DA_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls,
+    DA_calls <- DA_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls,
                              control_indices = control_indices)
     if(is.null(oracle_calls)) {
-      oracle_calls <- DE_calls$oracle_calls$pval
+      oracle_calls <- DA_calls$oracle_calls$pval
     }
-    calls <- DE_calls$calls$pval
+    calls <- DA_calls$calls$pval
   }
   if(method == "MAST") {
     DA_calls <- DA_by_MAST(ref_data, data, groups, oracle_calls = oracle_calls)

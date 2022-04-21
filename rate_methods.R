@@ -49,7 +49,8 @@ writeLines(paste0(c("ID",
                     "partial_info",
                     "method",
                     "tpr",
-                    "fpr"), collapse = "\t"),
+                    "fpr",
+                    "fdr"), collapse = "\t"),
            output_file)
 close(output_file)
 
@@ -61,7 +62,7 @@ wishlist <- wishlist[start:end,]
 counter <- 1
 for(i in 1:nrow(wishlist)) {
   job <- wishlist[i,]
-  rates <- calc_DA_discrepancy(job$calls, job$baseline_calls)
+  rates <- calc_DA_discrepancy(job$calls, job$baseline_calls, alpha = job$fdr)
   results_row <- data.frame(ID = counter,
                             uuid = job$uuid,
                             baseline = job$baseline,
@@ -69,7 +70,8 @@ for(i in 1:nrow(wishlist)) {
                             partial_info = job$partial_info,
                             method = job$method,
                             tpr = rates$TPR,
-                            fpr = rates$FPR)
+                            fpr = rates$FPR,
+                            fdr = job$fdr)
   write_delim(results_row, output_fn, delim = "\t", append = TRUE)
   counter <- counter + 1
 }

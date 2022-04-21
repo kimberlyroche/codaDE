@@ -100,13 +100,25 @@ for(i in 1:nrow(wishlist)) {
     oracle_calls <- NULL
   }
 
+  if(job$method == "DESeq2_control") {
+    # Find "housekeeping" gene analogs
+    log_ab <- log(t(data$simulation$abundances) + 0.5)
+    covar <- apply(log_ab, 1, function(x) sd(x)/mean(x))
+    bottom10 <- quantile(abs(covar), probs = c(0.1))
+    control_indices <- sample(which(abs(covar) < bottom10), size = min(sum(abs(covar) < bottom10), 10))
+    job$method <- "DESeq2"
+  } else {
+    control_indices <- NULL
+  }
+
   if(job$partial_info == 0) {
     all_calls <- tryCatch({
       DA_wrapper(data$simulation$abundances,
                  data$simulation$observed_counts1,
                  data$simulation$groups,
                  method = job$method,
-                 oracle_calls = oracle_calls)
+                 oracle_calls = oracle_calls,
+                 control_indices = control_indices)
     },
     error = function(cond) { NULL },
     warning = function(cond) { NULL },
@@ -117,7 +129,8 @@ for(i in 1:nrow(wishlist)) {
                  data$simulation$observed_counts2,
                  data$simulation$groups,
                  method = job$method,
-                 oracle_calls = oracle_calls)
+                 oracle_calls = oracle_calls,
+                 control_indices = control_indices)
     },
     error = function(cond) { NULL },
     warning = function(cond) { NULL },

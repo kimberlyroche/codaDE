@@ -27,16 +27,33 @@ for(file in file_list) {
   results <- results[complete.cases(results),]
   for(i in 1:nrow(results)) {
     job <- results[i,]
-    updates <- updates + dbExecute(conn,
-                                   paste0("UPDATE RESULTS SET ",
-                                          "TPR = ",job$tpr, ", ",
-                                          "FPR = ", job$fpr, " ",
-                                          "WHERE ",
-                                          "UUID = '", job$uuid, "' AND ",
-                                          "METHOD = '", job$method, "' AND ",
-                                          "PARTIAL_INFO = ", job$partial_info, " AND ",
-                                          "BASELINE_TYPE = '", job$baseline, "' AND ",
-                                          "OBSERVED_TYPE = '", job$type, "'"))
+    this_round <- dbExecute(conn,
+                            paste0("UPDATE RESULTS SET ",
+                                   "TPR = ",job$tpr, ", ",
+                                   "FPR = ", job$fpr, " ",
+                                   "WHERE ",
+                                   "UUID = '", job$uuid, "' AND ",
+                                   "METHOD = '", job$method, "' AND ",
+                                   "PARTIAL_INFO = ", job$partial_info, " AND ",
+                                   "BASELINE_TYPE = '", job$baseline, "' AND ",
+                                   "OBSERVED_TYPE = '", job$type, "' AND ",
+                                   "FDR = ", job$fdr))
+    if(this_round == 0) {
+      # Attempt to insert new row
+      # First we'll need to pull some extra info from comparable results
+      res <- dbGetQuery(conn, paste0("SELECT BASELINE_CALLS, CALLS FROM results WHERE UUID='", job$uuid, "'",
+                                     " AND METHOD='", job$method, "' AND PARTIAL_INFO=", job$partial_info,
+                                     " AND BASELINE_TYPE='", job$baseline, "' AND OBSERVED_TYPE='", job$type, "' LIMIT 1"))
+      this_round <- dbExecute(conn, paste0("INSERT OR IGNORE INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, BASELINE_CALLS, CALLS, FDR) VALUES (",
+                                                        "'",job$uuid,"', ",
+                                                        "'",job$method,"', ",
+                                                        job$partial_info,", ",
+                                                        "'",job$baseline,"', ",
+                                                        "'",job$type,"', ",
+                                                        ifelse(is.na(res$BASELINE_CALLS), "NULL, ", paste0("'", res$BASELINE_CALLS,"', ")),
+                                                        "'",res$CALLS,"', ",job$fdr,")"))
+    }
+    updates <- updates + this_round
   }
   cat(paste0("Succeeded on ", updates, " rows\n"))
 }
