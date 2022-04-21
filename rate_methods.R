@@ -75,3 +75,4 @@ for(i in 1:nrow(wishlist)) {
   write_delim(results_row, output_fn, delim = "\t", append = TRUE)
   counter <- counter + 1
 }
+

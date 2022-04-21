@@ -241,7 +241,7 @@ parse_Song <- function(absolute = TRUE, use_cpm = FALSE) {
   colnames(counts) <- NULL
   rownames(counts) <- NULL
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  parsed_obj <- list(counts = counts, groups = groups, tax = gene_names)
   return(parsed_obj)
 }
 

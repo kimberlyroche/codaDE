@@ -62,7 +62,8 @@ use_renorm_counts <- opt$userenormcounts
 use_cpm <- opt$usecpm
 
 testing <- FALSE
-methods_list <- c("ALDEx2", "DESeq2", "edgeR_TMM", "scran")
+# methods_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "edgeR_TMM", "scran")
+methods_list <- c("DESeq2_CG")
 
 if(threshold < 0) {
   stop(paste0("Invalid threshold: ", threshold, "!\n"))
@@ -165,7 +166,29 @@ for(DE_method in methods_list) {
     } else {
       oracle_calls <- call_DA_NB(ref_data, groups)$pval
     }
-    all_calls <- DA_wrapper(ref_data, data, groups, DE_method, oracle_calls)
+    if(DE_method == "DESeq2_CG") {
+      hkg <- c("GAPDH",
+               "EEF2",
+               "LMNA",
+               "TBCB", # Padovan-Merhar et al.
+               "ATP5PB", # Panina et al.
+               "EEF1A1",
+               "TBP",
+               "PPIB", # Nazet et al.
+               "CYCS",
+               "PRKG1",
+               "B2M",
+               "HPRT1",
+               "HMBS") # de Kok
+      control_indices <- which(tax %in% hkg)
+      if(length(control_indices) < 2) {
+        stop("No housekeeping genes found for DESeq2 control_genes run!")
+      }
+      all_calls <- DA_wrapper(ref_data, data, groups, "DESeq2", oracle_calls,
+                              control_indices = control_indices)
+    } else {
+      all_calls <- DA_wrapper(ref_data, data, groups, DE_method, oracle_calls)
+    }
     rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls)
     save_obj <- list(all_calls = all_calls, rates = rates)
     saveRDS(save_obj, save_fn)
@@ -309,6 +332,10 @@ if(use_renorm_counts) {
   colnames(features_DESeq2)[rename_flag] <- paste0(colnames(features_DESeq2)[rename_flag], "_scaled")
   
   features <- cbind(features, features_DESeq2)
+}
+
+if(length(setdiff("DESeq2_CG", methods_list)) == 0) {
+  quit()
 }
 
 # ------------------------------------------------------------------------------

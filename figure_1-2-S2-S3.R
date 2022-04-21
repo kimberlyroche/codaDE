@@ -40,7 +40,8 @@ pull_data <- function(qq, use_baseline = "self", use_cpm = TRUE) {
                                  "MED_REL_TOTAL, ",
                                  "PERCENT_DIFF_REALIZ, ",
                                  "TPR, ",
-                                 "FPR ",
+                                 "FPR, ",
+                                 "FDR ",
                                  "FROM results LEFT JOIN datasets ON ",
                                  "results.UUID=datasets.UUID ",
                                  "WHERE PARTIAL_INFO=0 ",
@@ -117,25 +118,25 @@ plot_ROC_fc <- function(data, method, p = NULL) {
   if(is.null(p)) {
     pl <- pl +
       geom_point(data %>% filter(METHOD == method),
-                 mapping = aes(x = FPR, y = TPR, fill = FC_plot),
+                 mapping = aes(x = specificity, y = sensitivity, fill = FC_plot),
                  size = 1.5,
                  shape = 21)
   } else {
     pl <- pl +
       geom_point(data %>% filter(METHOD == method & P == p),
-                 mapping = aes(x = FPR, y = TPR, fill = FC_plot),
+                 mapping = aes(x = specificity, y = sensitivity, fill = FC_plot),
                  size = 1.5,
                  shape = 21)
   }
   pl <- pl +
     xlim(c(-0.025,1.025)) +
     ylim(c(-0.025,1.025)) +
-    labs(x = paste0(method, " FPR"),
-         y = paste0(method, " TPR"),
+    labs(x = paste0(method, " specificity (1-FPR)"),
+         y = paste0(method, " sensitivity"),
          fill = "Fold change") +
     theme_bw() +
-    theme(axis.title.x = element_text(margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
-          axis.title.y = element_text(margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0))) +
+    theme(axis.title.x = element_text(size = 9, margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 9, margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0))) +
     scale_fill_brewer(palette = "RdYlBu")
   legend <- get_legend(pl + theme(legend.position = "bottom"))
   pl <- pl +
@@ -150,25 +151,25 @@ plot_ROC_percentDE <- function(data, method, p = NULL) {
   if(is.null(p)) {
     pl <- pl +
       geom_point(data %>% filter(METHOD == method),
-                 mapping = aes(x = FPR, y = TPR, fill = PERCENT_DIFF_REALIZ),
+                 mapping = aes(x = specificity, y = sensitivity, fill = PERCENT_DIFF_REALIZ),
                  size = 1.5,
                  shape = 21)
   } else {
     pl <- pl +
       geom_point(data %>% filter(METHOD == method & P == p),
-                 mapping = aes(x = FPR, y = TPR, fill = PERCENT_DIFF_REALIZ),
+                 mapping = aes(x = specificity, y = sensitivity, fill = PERCENT_DIFF_REALIZ),
                  size = 1.5,
                  shape = 21)
   }
   pl <- pl +
     xlim(c(-0.025,1.025)) +
     ylim(c(-0.025,1.025)) +
-    labs(x = paste0(method, " FPR"),
-         y = paste0(method, " TPR"),
+    labs(x = paste0(method, " specificitity (1-FPR)"),
+         y = paste0(method, " sensitivity"),
          fill = "Proportion differentially abundant features     ") +
     theme_bw() +
-    theme(axis.title.x = element_text(margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
-          axis.title.y = element_text(margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0)),
+    theme(axis.title.x = element_text(size = 9, margin = ggplot2::margin(t = 10, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 9, margin = ggplot2::margin(t = 0, r = 10, b = 0, l = 0)),
           legend.position = "bottom",
           legend.title = element_text(vjust = 0.75)) +
     scale_fill_distiller(palette = "RdYlBu",
@@ -184,7 +185,14 @@ plot_ROC_percentDE <- function(data, method, p = NULL) {
 }
 
 # Method-labeling palette
-palette <- c("#46A06B", "#FF5733", "#EF82BB", "#7E54DE", "#E3C012", "#B95D6E")
+palette <- c("#46A06B", "#FF5733", "#EF82BB", "#9B59B6", "#E3C012", "#C70039", "#467BBC")
+names(palette) <- c("ALDEx2", "ANCOM-BC", "DESeq2", "edgeR (TMM)", "scran", "DESeq2 (CG)", "edgeR")
+
+# Visualize this palette
+# ggplot(data.frame(x = 1:7, y = 1:7, method = names(palette)), aes(x = x, y = y, fill = method)) +
+#   geom_point(size = 5, shape = 21) +
+#   scale_fill_manual(values = palette) +
+#   theme_bw()
 
 # ------------------------------------------------------------------------------
 #   Initialize output directory and generate a color palette for levels of fold
@@ -195,7 +203,7 @@ palette <- c("#46A06B", "#FF5733", "#EF82BB", "#7E54DE", "#E3C012", "#B95D6E")
 dir.create("output", showWarnings = FALSE)
 dir.create(file.path("output", "images"), showWarnings = FALSE)
 
-method_list <- c("ALDEx2", "DESeq2", "scran", "edgeR", "edgeR_TMM", "ANCOMBC")
+method_list <- c("ALDEx2", "DESeq2", "scran", "edgeR", "edgeR_TMM", "ANCOMBC", "DESeq2_control")
 
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
@@ -218,7 +226,9 @@ data$sensitivity <- data$TPR
 data$specificity <- 1 - data$FPR
 
 data$METHOD <- factor(data$METHOD)
-levels(data$METHOD)[5] <- "edgeR (TMM)"
+levels(data$METHOD)[2] <- "ANCOM-BC"
+levels(data$METHOD)[4] <- "DESeq2 (CG)"
+levels(data$METHOD)[6] <- "edgeR (TMM)"
 
 # ------------------------------------------------------------------------------
 #   Calculate some overall statistics
@@ -289,7 +299,7 @@ if(FALSE) {
 #   ROC plot: edgeR without normalization is terrible
 # ------------------------------------------------------------------------------
 
-p <- ggplot(data %>% filter(METHOD == "edgeR"),
+p <- ggplot(data %>% filter(METHOD == "DESeq2"),
             aes(x = FPR, y = TPR, fill = factor(P))) +
   geom_point(size = 2, shape = 21) +
   theme_bw() +
@@ -307,8 +317,6 @@ ggsave(file.path(output_dir, "roc_edgeR-only.svg"),
        units = "in",
        height = 6,
        width = 6)
-
-method_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "edgeR (TMM)", "scran")
 
 # ------------------------------------------------------------------------------
 #   ROC plot: all normalization-based methods together
@@ -337,8 +345,17 @@ ggsave(file.path(output_dir, "roc_edgeR-absent.svg"),
 #   Ridges plot: all normalization-based methods x FPR
 # ------------------------------------------------------------------------------
 
-temp <- data %>% filter(METHOD %in% method_list)
-temp$METHOD <- factor(temp$METHOD, levels = c("scran", "edgeR (TMM)", "DESeq2", "ALDEx2"))
+# Main text version
+# use_fdr <- 0.05
+
+# Supplemental, higher-stringency version
+use_fdr <- 0.001
+
+method_list <- c("ALDEx2", "ANCOM-BC", "DESeq2", "edgeR (TMM)", "scran")
+temp <- data %>%
+  filter(METHOD %in% method_list) %>%
+  filter(FDR == use_fdr)
+temp$METHOD <- factor(temp$METHOD, levels = method_list[5:1])
 
 p <- ggplot(temp, aes(x = FPR, y = METHOD, fill = METHOD)) +
   geom_density_ridges(stat = "binline", bins = 40, scale = 1) +
@@ -361,8 +378,6 @@ ggsave(file.path(output_dir, "ridges_fpr_methods.svg"),
 #   Ridges plot: FPR x P
 # ------------------------------------------------------------------------------
 
-temp <- data %>% filter(METHOD %in% method_list)
-
 p <- ggplot(temp, aes(x = FPR, y = factor(P))) +
   geom_density_ridges(stat = "binline", bins = 40, scale = 1) +
   theme_bw() +
@@ -384,6 +399,8 @@ ggsave(file.path(output_dir, "ridges_fpr_P.svg"),
 #   abundant
 # ------------------------------------------------------------------------------
 
+by_pde <- TRUE
+
 p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
 p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
 p3_100 <- NULL; p3_1000 <- NULL; p3_5000 <- NULL
@@ -393,8 +410,11 @@ legend <- NULL
 for(i in 1:length(method_list)) {
   method <- method_list[i]
   for(j in c(100, 1000, 5000)) {
-    plot_pieces <- plot_ROC_percentDE(data, method, j)
-    # plot_pieces <- plot_ROC_fc(data, method, j) # fold change version
+    if(by_pde) {
+      plot_pieces <- plot_ROC_percentDE(temp, method, j)
+    } else {
+      plot_pieces <- plot_ROC_fc(temp, method, j) # fold change version
+    }
     pl <- plot_pieces$pl
     if(is.null(legend)) {
       legend <- plot_pieces$legend
@@ -421,32 +441,47 @@ prow2 <- plot_grid(p2_100, p2_1000, p2_5000, ncol = 3)
 prow3 <- plot_grid(p3_100, p3_1000, p3_5000, ncol = 3)
 prow4 <- plot_grid(p4_100, p4_1000, p4_5000, ncol = 3)
 prow5 <- plot_grid(p5_100, p5_1000, p5_5000, ncol = 3)
-pgrid <- plot_grid(prow1, prow2, prow3, prow4, prow5,
-                   nrow = 5, labels = c("a", "b", "c", "d"),
-                   label_size = 18, label_y = 1.02)
-pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
 
-ggsave(file.path("output", "images", "F2_alt_ANCOM.svg"),
+pgrid <- plot_grid(prow1, prow2, prow3, prow4, prow5,
+                   nrow = 5, labels = c("a", "b", "c", "d", "e"),
+                   label_size = 17, label_y = 1.02)
+pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, 0.08))
+
+fn <- ""
+if(by_pde & use_fdr == 0.05) {
+  fn <- "S3.svg"
+} else if(!by_pde & use_fdr == 0.05) {
+  fn <- "S4.svg"
+} else if(by_pde) {
+  fn <- "S3_alt-fdr.svg"
+} else {
+  fn <- "S4_alt-fdr.svg"
+}
+ggsave(file.path("output", "images", fn),
        plot = pl,
        units = "in",
        height = 12,
-       width = 8.5,
+       width = 7.75,
        bg = "white")
 
 # ------------------------------------------------------------------------------
 #   Same plot by "settings"
 # ------------------------------------------------------------------------------
 
+by_pde <- TRUE
+DESeq2_only <- TRUE
+
 p1_1 <- NULL; p1_2 <- NULL; p1_3 <- NULL
 p2_1 <- NULL; p2_2 <- NULL; p2_3 <- NULL
 p3_1 <- NULL; p3_2 <- NULL; p3_3 <- NULL
 p4_1 <- NULL; p4_2 <- NULL; p4_3 <- NULL
+p5_1 <- NULL; p5_2 <- NULL; p5_3 <- NULL
 legend <- NULL
-for(i in 1:length(method_list)) {
-  method <- method_list[i]
+for(i in 1:(length(method_list) + 1)) {
+  method <- c(method_list, "DESeq2 (CG)")[i]
   setting_label <- "n/a"
   for(j in 1:3) { # iterate settings
-    subdata <- data
+    subdata <- temp
     if(j == 1) {
       subdata <- subdata %>%
         filter(P <= 1000 & PERTURBATION >= 1.2)
@@ -468,9 +503,11 @@ for(i in 1:length(method_list)) {
       mutate(prop = n/sum(n)) %>%
       filter(high_FPR == "high") %>%
       pull(prop)
-    # cat(paste0("Method: ", method, ", setting: ", setting_label, ", high FPR prop: ", round(prop_high_fpr, 3), "\n"))
-    # plot_pieces <- plot_ROC_percentDE(subdata, method)
-    plot_pieces <- plot_ROC_fc(subdata, method) # fold change version
+    if(by_pde) {
+      plot_pieces <- plot_ROC_percentDE(subdata, method)
+    } else {
+      plot_pieces <- plot_ROC_fc(subdata, method)
+    }
     pl <- plot_pieces$pl
     if(is.null(legend)) {
       legend <- plot_pieces$legend
@@ -487,56 +524,162 @@ for(i in 1:length(method_list)) {
     if(i == 4 & j == 1) p4_1 <<- pl
     if(i == 4 & j == 2) p4_2 <<- pl
     if(i == 4 & j == 3) p4_3 <<- pl
+    if(i == 5 & j == 1) p5_1 <<- pl
+    if(i == 5 & j == 2) p5_2 <<- pl
+    if(i == 5 & j == 3) p5_3 <<- pl
   }
 }
+
 prow1 <- plot_grid(p1_1, p1_2, p1_3, ncol = 3)
 prow2 <- plot_grid(p2_1, p2_2, p2_3, ncol = 3)
 prow3 <- plot_grid(p3_1, p3_2, p3_3, ncol = 3)
 prow4 <- plot_grid(p4_1, p4_2, p4_3, ncol = 3)
-pgrid <- plot_grid(prow1, prow2, prow3, prow4, nrow = 4,
-                   labels = c("a", "b", "c", "d"),
-                   label_size = 18, label_y = 1.02)
-pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, .1))
-
-ggsave(file.path("output", "images", "F2.svg"),
+prow5 <- plot_grid(p5_1, p5_2, p5_3, ncol = 3)
+pgrid <- plot_grid(prow1, prow2, prow3, prow4, prow5,
+                   nrow = 5, labels = c("a", "b", "c", "d", "e"),
+                   label_size = 17, label_y = 1.02)
+pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, 0.08))
+ggsave(file.path("output", "images", ifelse(by_pde, "F1.svg", "F2.svg")),
        plot = pl,
        units = "in",
-       height = 11,
-       width = 8.5,
+       height = 12,
+       width = 7.75,
        bg = "white")
+
+# ------------------------------------------------------------------------------
+#   DESeq2 improvement with control_genes (simulated data)
+# ------------------------------------------------------------------------------
+
+p1_1 <- NULL; p1_2 <- NULL; p1_3 <- NULL
+p2_1 <- NULL; p2_2 <- NULL; p2_3 <- NULL
+legend <- NULL
+setting_label <- "n/a"
+for(i in 1:2) {
+  this_method <- c("DESeq2", "DESeq2 (CG)")[i]
+  for(j in 1:3) { # iterate settings
+    subdata <- data %>%
+      filter(METHOD == this_method) %>%
+      filter(FDR == 0.05)
+    if(j == 1) {
+      subdata <- subdata %>%
+        filter(P <= 1000 & PERTURBATION >= 1.2)
+      setting_label <- "Microbial"
+    } else if(j == 2) {
+      subdata <- subdata %>%
+        filter(P >= 1000 & PERTURBATION >= 0.8 & PERTURBATION <= 1.2)
+      setting_label <- "Transcriptomic"
+    } else if(j == 3) {
+      subdata <- subdata %>%
+        filter(P == 5000 & PERTURBATION <= 0.8)
+      setting_label <- "Bulk transcriptomic"
+    }
+    if(by_pde) {
+      plot_pieces <- plot_ROC_percentDE(subdata, this_method)
+    } else {
+      plot_pieces <- plot_ROC_fc(subdata, this_method)
+    }
+    pl <- plot_pieces$pl
+    if(is.null(legend)) {
+      legend <- plot_pieces$legend
+    }
+    if(i == 1 & j == 1) p1_1 <<- pl
+    if(i == 1 & j == 2) p1_2 <<- pl
+    if(i == 1 & j == 3) p1_3 <<- pl
+    if(i == 2 & j == 1) p2_1 <<- pl
+    if(i == 2 & j == 2) p2_2 <<- pl
+    if(i == 2 & j == 3) p2_3 <<- pl
+  }
+}
+
+prow1 <- plot_grid(p1_1, p1_2, p1_3, ncol = 3)
+prow2 <- plot_grid(p2_1, p2_2, p2_3, ncol = 3)
+
+ptop <- plot_grid(prow1, prow2,
+                  nrow = 2, labels = c("a", "b"),
+                  label_size = 18, label_y = 1.02)
+
+nocg_res <- data %>%
+  filter(METHOD == "DESeq2" & FDR == 0.05) %>%
+  dplyr::select(UUID, TPR, FPR)
+cg_res <- data %>%
+  filter(METHOD == "DESeq2 (CG)" & FDR == 0.05) %>%
+  dplyr::select(UUID, TPR, FPR)
+
+combined <- nocg_res %>%
+  left_join(cg_res, by = "UUID") %>%
+  mutate(spec_nocg = 1 - FPR.x,
+         spec_cg = 1 - FPR.y) %>%
+  mutate(delta_sens = TPR.y - TPR.x,
+         delta_spec = spec_cg - spec_nocg)
+
+pbottom_a <- ggplot(combined, aes(x = delta_sens)) +
+  geom_histogram(bins = 30, color = "white") +
+  theme_bw() +
+  xlim(c(-0.5, 1)) +
+  labs(x = "change in DESeq2 sensitivity\n(control genes vs. baseline)")
+
+pbottom_b <- ggplot(combined, aes(x = delta_spec)) +
+  geom_histogram(bins = 30, color = "white") +
+  theme_bw() +
+  xlim(c(-0.5, 1)) +
+  labs(x = "change in DESeq2 specificity\n(control genes vs. baseline)")
+
+pbottom <- plot_grid(pbottom_a, pbottom_b, ncol = 2,
+                     labels = c("c", "d"),
+                     scale = 0.95,
+                     label_size = 18, label_y = 1.02)
+
+p <- plot_grid(ptop, NULL, pbottom, ncol = 1,
+               rel_heights = c(1, 0.05, 0.75))
+
+ggsave(file.path(output_dir, "control_genes.svg"),
+       p,
+       dpi = 100,
+       units = "in",
+       height = 9,
+       width = 8)
 
 # ------------------------------------------------------------------------------
 #   Box plots: false positive count vs. % differential features
 # ------------------------------------------------------------------------------
 
-# Calculate the absolute counts of false positives
-fp <- numeric(nrow(data))
-for(i in 1:nrow(data)) {
-  if(i %% 1000 == 0) {
-    cat(paste0("Iteration ", i, "\n"))
-  }
-  x <- as.numeric(str_split(data[i,]$ORACLE_BASELINE, ";")[[1]])
-  y <- as.numeric(str_split(data[i,]$CALLS, ";")[[1]])
-  
-  x <- p.adjust(x, method = "BH")
-  y <- p.adjust(y, method = "BH")
-  
-  x_d <- factor(x < 0.001)
-  levels(x_d) <- c("not DE", "DE")
-  y_d <- factor(y < 0.001)
-  levels(y_d) <- c("not DE", "DE")
-  
-  fp[i] <- sum(y_d == "DE" & x_d == "not DE")
-}
-data$FP_n <- fp
+edgeR_only <- FALSE
 
-# temp <- data %>% filter(METHOD %in% method_list)
-temp <- data
-temp$P <- paste0(temp$P, " features")
-# temp$METHOD <- factor(temp$METHOD, levels = c("ALDEx2", "DESeq2", "edgeR_TMM", "scran"))
-# temp$METHOD <- factor(temp$METHOD, levels = c("ALDEx2", "DESeq2", "edgeR", "edgeR_TMM", "scran"))
-# levels(temp$METHOD)[4] <- "edgeR (TMM)"
-temp <- temp %>%
+# Calculate the absolute counts of false positives
+if(!exists("fp")) {
+  fp <- numeric(nrow(data))
+  for(i in 1:nrow(data)) {
+    if(i %% 10000 == 0) {
+      cat(paste0("Iteration ", i, "\n"))
+    }
+    x <- as.numeric(str_split(data[i,]$ORACLE_BASELINE, ";")[[1]])
+    y <- as.numeric(str_split(data[i,]$CALLS, ";")[[1]])
+    
+    x <- p.adjust(x, method = "BH")
+    y <- p.adjust(y, method = "BH")
+    
+    x_d <- factor(x < 0.001)
+    levels(x_d) <- c("not DE", "DE")
+    y_d <- factor(y < 0.001)
+    levels(y_d) <- c("not DE", "DE")
+    
+    fp[i] <- sum(y_d == "DE" & x_d == "not DE")
+  }
+  data$FP_n <- fp
+}
+
+if(edgeR_only) {
+  temp2 <- data %>%
+    filter(METHOD %in% c("edgeR", "edgeR (TMM)")) %>%
+    filter(FDR == 0.05)
+  temp2$METHOD <- factor(temp2$METHOD, levels = c("edgeR (TMM)", "edgeR"))
+} else {
+  temp2 <- data %>%
+    filter(METHOD %in% method_list) %>%
+    filter(FDR == 0.05)
+}
+temp2$P <- paste0(temp2$P, " features")
+temp2 <- temp2 %>%
   mutate(PDIFF_DISCRETE = case_when(
     PERCENT_DIFF_REALIZ < 0.2 ~ "0-20%",
     PERCENT_DIFF_REALIZ < 0.4 ~ "20-40%",
@@ -544,11 +687,11 @@ temp <- temp %>%
     PERCENT_DIFF_REALIZ < 0.8 ~ "60-80%",
     TRUE ~ "80-100%"
   ))
-temp$PDIFF_DISCRETE <- factor(temp$PDIFF_DISCRETE,
-                              levels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
+temp2$PDIFF_DISCRETE <- factor(temp2$PDIFF_DISCRETE,
+                               levels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
 
-temp$title <- paste0(temp$METHOD, " x ", temp$P)
-p1 <- ggplot(temp %>% filter(P == "100 features"), aes(x = PDIFF_DISCRETE, y = FP_n, fill = METHOD)) +
+temp2$title <- paste0(temp2$METHOD, " x ", temp2$P)
+p1 <- ggplot(temp2 %>% filter(P == "100 features"), aes(x = PDIFF_DISCRETE, y = FP_n, fill = METHOD)) +
   geom_boxplot(outlier.shape = NA) +
   facet_wrap(. ~ title, ncol = 1) + #, scales = "free_y") +
   theme_bw() +
@@ -558,7 +701,7 @@ p1 <- ggplot(temp %>% filter(P == "100 features"), aes(x = PDIFF_DISCRETE, y = F
   labs(x = "\npercent differentially abundant features",
        y = "false positive count\n") +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
-p2 <- ggplot(temp %>% filter(P == "1000 features"), aes(x = PDIFF_DISCRETE, y = FP_n, fill = METHOD)) +
+p2 <- ggplot(temp2 %>% filter(P == "1000 features"), aes(x = PDIFF_DISCRETE, y = FP_n, fill = METHOD)) +
   geom_boxplot(outlier.shape = NA) +
   facet_wrap(. ~ title, ncol = 1) + #, scales = "free_y") +
   theme_bw() +
@@ -568,7 +711,7 @@ p2 <- ggplot(temp %>% filter(P == "1000 features"), aes(x = PDIFF_DISCRETE, y = 
   labs(x = "\npercent differentially abundant features",
        y = "false positive count\n") +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
-p3 <- ggplot(temp %>% filter(P == "5000 features"), aes(x = PDIFF_DISCRETE, y = FP_n, fill = METHOD)) +
+p3 <- ggplot(temp2 %>% filter(P == "5000 features"), aes(x = PDIFF_DISCRETE, y = FP_n, fill = METHOD)) +
   geom_boxplot(outlier.shape = NA) +
   facet_wrap(. ~ title, ncol = 1) + #, scales = "free_y") +
   theme_bw() +
@@ -580,16 +723,15 @@ p3 <- ggplot(temp %>% filter(P == "5000 features"), aes(x = PDIFF_DISCRETE, y = 
        y = "false positive count\n") +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 
-p1_padded <- plot_grid(p1, NULL, ncol = 1, rel_heights = c(1, 0.05))
-p3_padded <- plot_grid(p3, NULL, ncol = 1, rel_heights = c(1, 0.05))
+p1_padded <- plot_grid(p1, NULL, ncol = 1, rel_heights = c(1, ifelse(edgeR_only, 0.1, 0.05)))
+p3_padded <- plot_grid(p3, NULL, ncol = 1, rel_heights = c(1, ifelse(edgeR_only, 0.1, 0.05)))
 p <- plot_grid(p1_padded, p2, p3_padded, ncol = 3, rel_widths = c(1, 0.85, 0.85))
 
-ggsave(file.path(output_dir, "fp_by_percentDE.svg"),
+ggsave(file.path(output_dir, ifelse(edgeR_only, "F3_edgeR.svg", "F3.svg")),
        p,
        dpi = 100,
        units = "in",
-       # height = 7,
-       height = 8,
+       height = ifelse(edgeR_only, 4, 8),
        width = 8)
 
 # ------------------------------------------------------------------------------

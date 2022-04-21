@@ -90,9 +90,6 @@ call_DA_NB <- function(data, groups) {
 #'
 #' @param data simulated data set (samples x features)
 #' @param groups group (cohort) labels
-#' @param reference simulated true abundances; if included we will use 
-#' a random set of stable features from the true abundances to rescale the 
-#' observed abundances (data) to renormalize
 #' @param control_indices if specified, these features are used as the stable 
 #' features against which to normalize observed abundances (DESeq2-only)
 #' @return unadjusted p-values for all features
@@ -100,16 +97,10 @@ call_DA_NB <- function(data, groups) {
 #' @import dplyr
 #' @export
 call_DA_DESeq2 <- function(data, groups,
-                           reference = NULL,
                            control_indices = NULL) {
   sampleData <- data.frame(group = factor(groups))
   dds <- suppressMessages(DESeqDataSetFromMatrix(countData = t(data), colData = sampleData, design = ~ group))
-  if(!is.null(reference) & !is.null(control_indices)) {
-    # # Find "housekeeping" gene analogs
-    # log_ab <- log(t(reference) + 0.5)
-    # covar <- apply(log_ab, 1, function(x) sd(x)/mean(x))
-    # bottom5 <- quantile(abs(covar), probs = c(0.05))
-    # idx <- sample(which(covar < bottom5), size = control_n)
+  if(!is.null(control_indices)) {
     dds <- suppressMessages(DESeq2::estimateSizeFactors(object = dds, controlGenes = control_indices))
   } else {
     dds <- suppressMessages(DESeq2::estimateSizeFactors(object = dds))
@@ -385,7 +376,6 @@ DA_by_DESeq2 <- function(ref_data, data, groups, oracle_calls = NULL,
   }
   if(!is.null(control_indices)) {
     calls <- call_DA_DESeq2(data, groups,
-                            reference = ref_data,
                             control_indices = control_indices)
   } else {
     calls <- call_DA_DESeq2(data, groups)
