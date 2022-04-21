@@ -33,8 +33,8 @@ for(u in 1:length(all_uuids)) {
   # This is pretty run-specific!
   for(ref in c("oracle")) {
     for(par in c(0)) {
-      #for(method in c("ALDEx2", "DESeq2", "scran", "edgeR", "edgeR_TMM")) {
-      for(method in c("ANCOMBC")) {
+      #for(method in c("ALDEx2", "ANCOMBC", "DESeq2", "scran", "edgeR", "edgeR_TMM", "DESeq2_control")) {
+      for(method in c("edgeR_TMM")) {
         #for(obs in c("cpm")) {
         for(obs in c("relative_abundances")) {
           if(res %>% filter(BASELINE_TYPE == ref & PARTIAL_INFO == par & METHOD == method & OBSERVED_TYPE == obs) %>% count() %>% pull(n) == 0) {

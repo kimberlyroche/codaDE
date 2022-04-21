@@ -101,7 +101,6 @@ call_DA_NB <- function(data, groups) {
 #' @export
 call_DA_DESeq2 <- function(data, groups,
                            reference = NULL,
-                           control_n = 10,
                            control_indices = NULL) {
   sampleData <- data.frame(group = factor(groups))
   dds <- suppressMessages(DESeqDataSetFromMatrix(countData = t(data), colData = sampleData, design = ~ group))
@@ -118,8 +117,9 @@ call_DA_DESeq2 <- function(data, groups,
   dds <- suppressMessages(DESeq2::estimateDispersions(object = dds, fitType = "local"))
   dds <- suppressMessages(DESeq2::nbinomWaldTest(object = dds))
   res <- DESeq2::results(object = dds, alpha = 0.05)
-  pval_df <- data.frame(feature = paste0("gene", 1:nrow(data)),
+  pval_df <- data.frame(feature = paste0("gene", 1:ncol(data)),
                         pval = res$pvalue)
+  pval_df$pval[is.na(pval_df$pval)] <- 1
   pval_df
   # Previously
   # I had been using a Seurat wrapper when many more differential abundance
@@ -466,12 +466,12 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
     DA_calls <- DA_by_ANCOMBC(ref_data, data, groups, oracle_calls = oracle_calls)
   }
   if(method == "DESeq2") {
-    DE_calls <- DA_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls,
+    DA_calls <- DA_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls,
                              control_indices = control_indices)
     if(is.null(oracle_calls)) {
-      oracle_calls <- DE_calls$oracle_calls$pval
+      oracle_calls <- DA_calls$oracle_calls$pval
     }
-    calls <- DE_calls$calls$pval
+    calls <- DA_calls$calls$pval
   }
   if(method == "MAST") {
     DA_calls <- DA_by_MAST(ref_data, data, groups, oracle_calls = oracle_calls)

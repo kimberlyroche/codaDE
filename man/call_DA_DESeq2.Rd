@@ -4,13 +4,7 @@
 \alias{call_DA_DESeq2}
 \title{Evaluate differential abundance with DESeq2 (via Seurat)}
 \usage{
-call_DA_DESeq2(
-  data,
-  groups,
-  reference = NULL,
-  control_n = 10,
-  control_indices = NULL
-)
+call_DA_DESeq2(data, groups, reference = NULL, control_indices = NULL)
 }
 \arguments{
 \item{data}{simulated data set (samples x features)}

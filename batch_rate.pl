@@ -8,7 +8,7 @@ my $input = "input_rate_".$p.".txt";
 my $output = "output_rate_".$p;
 my $start = 1;
 my $end = 1875;
-my $chunks = 20;
+my $chunks = 10;
 
 my $filename = "job.slurm";
 my $n = $end - $start + 1;
@@ -23,7 +23,7 @@ while($i <= $end) {
   print $fh '#SBATCH -J rate_'.$i.'-'.$j."\n";
   print $fh '#SBATCH --mem=12GB'."\n";
   print $fh '#SBATCH --get-user-env'."\n";
-  print $fh '#SBATCH --time=2:00:00'."\n";
+  print $fh '#SBATCH --time=1:00:00'."\n";
   print $fh '#'."\n\n";
 
   print $fh 'cd /data/mukherjeelab/roche/codaDE'."\n\n";

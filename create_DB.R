@@ -6,6 +6,8 @@ library(RSQLite)
 # Create DB (if doesn't exist?)
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
+discard <- dbExecute(conn, "DELETE FROM results WHERE FDR=0.01")
+
 #discard <- dbExecute(conn, paste0("CREATE TABLE da_realized(",
 #                                  "UUID VARCHAR(36), ",
 #                                  "MEASURED_BY VARCHAR(64), ",
@@ -40,7 +42,27 @@ conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 #                                  "FPR REAL, ",
 #                                  "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE));"))
 
-# discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",
+#discard <- dbExecute(conn, paste0("CREATE TABLE results2(",
+#                                  "UUID VARCHAR(36), ",
+#                                  "METHOD VARCHAR(64), ",
+#                                  "PARTIAL_INFO INT, ",
+#                                  "BASELINE_TYPE VARCHAR(16), ",
+#                                  "OBSERVED_TYPE VARCHAR(64), ",
+#                                  "BASELINE_CALLS VARCHAR(100000), ",
+#                                  "CALLS VARCHAR(100000), ",
+#                                  "TPR REAL, ",
+#                                  "FPR REAL, ",
+#                                  "FDR REAL, ",
+#                                  "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, FDR));"))
+
+#discard <- dbExecute(conn, paste0("INSERT INTO results2 SELECT UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, ",
+#                                          "BASELINE_CALLS, CALLS, TPR, FPR, 0.05 FROM results;"))
+
+#discard <- dbExecute(conn, "DROP TABLE results")
+
+#discard <- dbExecute(conn, "ALTER TABLE results2 RENAME TO results")
+
+#discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",
 #                                  "UUID VARCHAR(36),",
 #                                  "PARTIAL INTEGER,",
 #                                  "TYPE VARCHAR(64),",
