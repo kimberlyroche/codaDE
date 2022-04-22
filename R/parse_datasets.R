@@ -321,6 +321,7 @@ parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE) {
   counts <- counts[,reorder]
   groups <- groups[reorder]
   groups <- unname(groups)
+  spike_counts <- spike_counts[reorder]
   
   # View differences in average totals across cell types
   # palette <- generate_highcontrast_palette(40)
@@ -371,6 +372,10 @@ parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE) {
                            which(is.na(mapping$hgnc_symbol == ""))))
   mapping$hgnc_symbol[unidentified] <- mapping$feature_full[unidentified]
   mapping$hgnc_symbol <- toupper(mapping$hgnc_symbol)
+  
+  h_counts <- counts[mapping$hgnc_symbol %in% hkg,]
+  plot(colMeans(h_counts), colMeans(spike_counts))
+  cor(colMeans(h_counts), colMeans(spike_counts))
   
   parsed_obj <- list(counts = counts, groups = groups, tax = mapping$hgnc_symbol)
   return(parsed_obj)
@@ -1080,18 +1085,20 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
   groups <- groups[retain_idx]
   groups <- factor(unname(groups), levels = c("0", "0.3", "0.5", "1"))
   
-  spike_idx <- which(sapply(data$Sample, function(x) str_detect(x, "^ERCC-")))
   gene_IDs <- data$Sample[2:nrow(data)]
   data <- data[2:nrow(data),2:ncol(data)]
-
+  spike_idx <- which(sapply(gene_IDs, function(x) str_detect(x, "^ERCC-")))
+  spike_counts <- data[spike_idx,]
+  
   if(use_cpm) {
     data <- apply(data, 2, function(x) x/sum(x))
     data <- round(data*1e06)
   }
   
   # Here total abundances look pretty informative. Use:
-  #   gapdh_idx <- which(data$Sample == "ENSMUSG00000057666")
+  #   gapdh_idx <- which(gene_IDs == "ENSMUSG00000057666")
   # which returns 16179 to compare Gadph abundance to totals
+
   sf <- compute_sf(data[spike_idx,])
   counts <- data[-spike_idx,]
   gene_IDs <- gene_IDs[-spike_idx]
@@ -1118,7 +1125,19 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
   counts <- counts[,c(A_idx, B_idx)]
   groups <- c(rep("0", length(A_idx)), rep("1", length(B_idx)))
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = gene_IDs)
+  ensembl <- useEnsembl(biomart = "ensembl", mirror = "uswest")
+  
+  G_list <- suppressMessages(getBM(filters = "ensembl_gene_id",
+                                   attributes = c("ensembl_gene_id", "mgi_symbol"),
+                                   # values = feature_names,
+                                   values = gene_IDs,
+                                   mart = useDataset("mmusculus_gene_ensembl", ensembl),
+                                   uniqueRows = FALSE))
+  
+  mapping <- data.frame(feature = gene_IDs) %>%
+    left_join(G_list, by = c("feature" = "ensembl_gene_id"))
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(mapping$mgi_symbol))
   return(parsed_obj)
 }
 
@@ -1341,7 +1360,7 @@ parse_Gruen <- function(absolute = TRUE, use_cpm = FALSE) {
   
   counts <- counts[-ref_idx,]
   gene_IDs <- gene_IDs[-ref_idx]
-  
+
   if(absolute) {
     for(j in 1:ncol(counts)) {
       counts[,j] <- counts[,j]/sf[j]
