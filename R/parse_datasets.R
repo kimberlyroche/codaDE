@@ -241,7 +241,7 @@ parse_Song <- function(absolute = TRUE, use_cpm = FALSE) {
   colnames(counts) <- NULL
   rownames(counts) <- NULL
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = gene_names)
+  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_names))
   return(parsed_obj)
 }
 
@@ -259,7 +259,7 @@ parse_Song <- function(absolute = TRUE, use_cpm = FALSE) {
 #' data
 #' @return named list of counts and group labels
 #' @import stringr
-#' @import edgeR
+#' @import biomaRt
 #' @export
 parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE) {
   file_dir <- file.path("data", "Monaco_2019")
@@ -343,7 +343,16 @@ parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE) {
   # counts <- counts[,c(A_idx, B_idx)]
   # groups <- unname(groups[c(A_idx, B_idx)])
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = feature_names)
+  mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
+  G_list <- suppressMessages(getBM(filters = "ensembl_gene_id_version",
+                                   attributes = c("ensembl_gene_id_version", "hgnc_symbol"),
+                                   values = feature_names,
+                                   mart = mart))
+  gene_names <- G_list$hgnc_symbol
+  unidentified <- which(gene_names == "")
+  gene_names[unidentified] <- G_list$ensembl_gene_id_version[unidentified]
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_names))
   return(parsed_obj)
 }
 
@@ -362,6 +371,7 @@ parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE) {
 #' data
 #' @return named list of counts and group labels
 #' @import stringr
+#' @import biomaRt
 #' @export
 parse_Hagai <- function(absolute = TRUE, use_cpm = FALSE) {
   counts_A <- read.table(file.path("data",
@@ -401,6 +411,7 @@ parse_Hagai <- function(absolute = TRUE, use_cpm = FALSE) {
   spike_counts <- counts[ref_idx,]
   sf <- compute_sf(spike_counts)
   counts <- counts[-ref_idx,]
+  gene_IDs <- gene_IDs[-ref_idx]
   if(absolute) {
     for(j in 1:ncol(counts)) {
       counts[,j] <- counts[,j]/sf[j]
@@ -431,7 +442,30 @@ parse_Hagai <- function(absolute = TRUE, use_cpm = FALSE) {
   #   # TBD
   # }
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  ensembl <- useEnsembl(biomart = "ensembl", mirror = "uswest")
+  mmart <- useDataset("mmusculus_gene_ensembl", ensembl)
+  G_list <- suppressMessages(getBM(filters = "ensembl_gene_id",
+                                   attributes = c("ensembl_gene_id", "mgi_symbol"),
+                                   values = gene_IDs,
+                                   mart = mmart))
+  
+  # The mouse to human gene mapping below should work but it looks like, at the
+  # time of coding, there is a bug in getLDS() that's being worked on:
+  # https://support.bioconductor.org/p/9143371/
+  # gene_map <- getLDS(attributes = c("mgi_symbol"),
+  #                  filters = "mgi_symbol",
+  #                  values = G_list$mgi_symbol,
+  #                  mart = mmart,
+  #                  attributesL = c("hgnc_symbol"),
+  #                  martL = useDataset("hsapiens_gene_ensembl", ensembl),
+  #                  uniqueRows = T)
+  
+  # Most of these symbols are likely to be the same in humans and mice anyway...
+  gene_names <- G_list$mgi_symbol
+  unidentified <- which(gene_names == "")
+  gene_names[unidentified] <- G_list$ensembl_gene_id[unidentified]
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_names))
   return(parsed_obj)
 }
 
@@ -473,6 +507,7 @@ parse_Owens <- function(absolute = TRUE, use_cpm = FALSE) {
   
   spike_counts <- counts[ref_idx,]
   counts <- counts[-ref_idx,]
+  gene_IDs <- gene_IDs[-ref_idx]
   sf <- compute_sf(spike_counts)
 
   if(absolute) {
@@ -496,7 +531,7 @@ parse_Owens <- function(absolute = TRUE, use_cpm = FALSE) {
   rownames(counts) <- NULL
   colnames(counts) <- NULL
 
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  parsed_obj <- list(counts = counts, groups = groups, tax = gene_IDs)
   return(parsed_obj)
 }
 
@@ -644,7 +679,7 @@ parse_Yu <- function(absolute = TRUE, use_cpm = FALSE) {
   }
   counts <- data.matrix(counts)
 
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_IDs))
   return(parsed_obj)
 }
 
@@ -906,6 +941,7 @@ parse_Muraro <- function(absolute = TRUE, use_cpm = FALSE) {
   }
   mapping <- readRDS(assign_fn)
   data <- data_orig[,mapping %>% filter(!is.na(cluster)) %>% pull(idx)]
+  gene_IDs <- rownames(data)
   
   # Pull GCG and INS sequences
   gcg_idx <- which(sapply(rownames(data), function(x) str_detect(x, "^GCG__")))
@@ -954,6 +990,11 @@ parse_Muraro <- function(absolute = TRUE, use_cpm = FALSE) {
   }
   
   counts <- counts[-spikein_seqs,]
+  gene_IDs <- gene_IDs[-spikein_seqs]
+  
+  gene_names <- unname(sapply(gene_IDs, function(x) {
+    str_split(x, "__")[[1]][1]
+  }))
   
   # Not strong
   # plot_df <- data.frame(total = colSums(counts),
@@ -997,7 +1038,7 @@ parse_Muraro <- function(absolute = TRUE, use_cpm = FALSE) {
   colnames(counts) <- NULL
   rownames(counts) <- NULL
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  parsed_obj <- list(counts = counts, groups = groups, tax = gene_names)
   return(parsed_obj)
 }
 
@@ -1043,7 +1084,8 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
   groups <- factor(unname(groups), levels = c("0", "0.3", "0.5", "1"))
   
   spike_idx <- which(sapply(data$Sample, function(x) str_detect(x, "^ERCC-")))
-  data <- data[,2:ncol(data)]
+  gene_IDs <- data$Sample[2:nrow(data)]
+  data <- data[2:nrow(data),2:ncol(data)]
 
   if(use_cpm) {
     data <- apply(data, 2, function(x) x/sum(x))
@@ -1055,7 +1097,8 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
   # which returns 16179 to compare Gadph abundance to totals
   sf <- compute_sf(data[spike_idx,])
   counts <- data[-spike_idx,]
-
+  gene_IDs <- gene_IDs[-spike_idx]
+  
   if(absolute) {
     for(i in 1:ncol(counts)) {
       counts[,i] <- counts[,i] / sf[i]
@@ -1078,7 +1121,18 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
   counts <- counts[,c(A_idx, B_idx)]
   groups <- c(rep("0", length(A_idx)), rep("1", length(B_idx)))
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  ensembl <- useEnsembl(biomart = "ensembl", mirror = "uswest")
+  mmart <- useDataset("mmusculus_gene_ensembl", ensembl)
+  G_list <- suppressMessages(getBM(filters = "ensembl_gene_id",
+                                   attributes = c("ensembl_gene_id", "mgi_symbol"),
+                                   values = gene_IDs,
+                                   mart = mmart))
+  
+  gene_names <- G_list$mgi_symbol
+  unidentified <- which(gene_names == "")
+  gene_names[unidentified] <- G_list$ensembl_gene_id[unidentified]
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_names))
   return(parsed_obj)
 }
 
@@ -1117,6 +1171,7 @@ parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE, use_cpm = F
   # to match
   reorder <- order(colnames(data))
   data <- data[,reorder]
+  gene_names <- rownames(data)
   
   # QC as in the author's analysis
   qc_samples <- meta$mass >= 0 & meta$gene_count >= 500
@@ -1174,7 +1229,7 @@ parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE, use_cpm = F
   groups <- factor(groups, levels = c("1", "2"))
   levels(groups) <- c("low_mass", "high_mass")
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_names))
   return(parsed_obj)
 }
 
@@ -1299,6 +1354,7 @@ parse_Gruen <- function(absolute = TRUE, use_cpm = FALSE) {
   }
   
   counts <- counts[-ref_idx,]
+  gene_IDs <- gene_IDs[-ref_idx]
   
   if(absolute) {
     for(j in 1:ncol(counts)) {
@@ -1323,7 +1379,7 @@ parse_Gruen <- function(absolute = TRUE, use_cpm = FALSE) {
   counts <- counts[,c(A_idx, B_idx)]
   groups <- c(rep("A", length(A_idx)), rep("B", length(B_idx)))
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = NULL)
+  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_IDs))
   return(parsed_obj)
 }
 
