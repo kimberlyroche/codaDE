@@ -343,16 +343,36 @@ parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE) {
   # counts <- counts[,c(A_idx, B_idx)]
   # groups <- unname(groups[c(A_idx, B_idx)])
   
-  mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
-  G_list <- suppressMessages(getBM(filters = "ensembl_gene_id_version",
-                                   attributes = c("ensembl_gene_id_version", "hgnc_symbol"),
-                                   values = feature_names,
-                                   mart = mart))
-  gene_names <- G_list$hgnc_symbol
-  unidentified <- which(gene_names == "")
-  gene_names[unidentified] <- G_list$ensembl_gene_id_version[unidentified]
+  feature_names_noversion <- unname(sapply(feature_names, function(x) {
+    str_split(x, "\\.")[[1]][1]
+  }))
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_names))
+  ensembl <- useEnsembl(biomart = "ensembl", mirror = "uswest")
+
+  G_list <- suppressMessages(getBM(filters = "ensembl_gene_id",
+                                   attributes = c("ensembl_gene_id", "hgnc_symbol"),
+                                   # values = feature_names,
+                                   values = feature_names_noversion,
+                                   mart = useDataset("hsapiens_gene_ensembl", ensembl),
+                                   uniqueRows = FALSE))
+  mapping <- data.frame(feature_full = feature_names,
+                        feature = feature_names_noversion) %>%
+    left_join(G_list, by = c("feature" = "ensembl_gene_id"))
+  # Remove duplicates (a little arbitrary)
+  dupes <- which(table(mapping$feature_full) > 1)
+  for(dupe in names(dupes)) {
+    dupe_idx <- which(mapping$feature_full == dupe)
+    discard_idx <- setdiff(dupe_idx, c(min(dupe_idx)))
+    mapping <- mapping[-discard_idx,]
+  }
+  
+  # Get rid of unknowns
+  unidentified <- unique(c(which(mapping$hgnc_symbol == ""),
+                           which(is.na(mapping$hgnc_symbol == ""))))
+  mapping$hgnc_symbol[unidentified] <- mapping$feature_full[unidentified]
+  mapping$hgnc_symbol <- toupper(mapping$hgnc_symbol)
+  
+  parsed_obj <- list(counts = counts, groups = groups, tax = mapping$hgnc_symbol)
   return(parsed_obj)
 }
 
@@ -442,30 +462,7 @@ parse_Hagai <- function(absolute = TRUE, use_cpm = FALSE) {
   #   # TBD
   # }
   
-  ensembl <- useEnsembl(biomart = "ensembl", mirror = "uswest")
-  mmart <- useDataset("mmusculus_gene_ensembl", ensembl)
-  G_list <- suppressMessages(getBM(filters = "ensembl_gene_id",
-                                   attributes = c("ensembl_gene_id", "mgi_symbol"),
-                                   values = gene_IDs,
-                                   mart = mmart))
-  
-  # The mouse to human gene mapping below should work but it looks like, at the
-  # time of coding, there is a bug in getLDS() that's being worked on:
-  # https://support.bioconductor.org/p/9143371/
-  # gene_map <- getLDS(attributes = c("mgi_symbol"),
-  #                  filters = "mgi_symbol",
-  #                  values = G_list$mgi_symbol,
-  #                  mart = mmart,
-  #                  attributesL = c("hgnc_symbol"),
-  #                  martL = useDataset("hsapiens_gene_ensembl", ensembl),
-  #                  uniqueRows = T)
-  
-  # Most of these symbols are likely to be the same in humans and mice anyway...
-  gene_names <- G_list$mgi_symbol
-  unidentified <- which(gene_names == "")
-  gene_names[unidentified] <- G_list$ensembl_gene_id[unidentified]
-  
-  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_names))
+  parsed_obj <- list(counts = counts, groups = groups, tax = gene_IDs)
   return(parsed_obj)
 }
 
@@ -679,7 +676,7 @@ parse_Yu <- function(absolute = TRUE, use_cpm = FALSE) {
   }
   counts <- data.matrix(counts)
 
-  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_IDs))
+  parsed_obj <- list(counts = counts, groups = groups, tax = gene_IDs)
   return(parsed_obj)
 }
 
@@ -1121,18 +1118,7 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
   counts <- counts[,c(A_idx, B_idx)]
   groups <- c(rep("0", length(A_idx)), rep("1", length(B_idx)))
   
-  ensembl <- useEnsembl(biomart = "ensembl", mirror = "uswest")
-  mmart <- useDataset("mmusculus_gene_ensembl", ensembl)
-  G_list <- suppressMessages(getBM(filters = "ensembl_gene_id",
-                                   attributes = c("ensembl_gene_id", "mgi_symbol"),
-                                   values = gene_IDs,
-                                   mart = mmart))
-  
-  gene_names <- G_list$mgi_symbol
-  unidentified <- which(gene_names == "")
-  gene_names[unidentified] <- G_list$ensembl_gene_id[unidentified]
-  
-  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_names))
+  parsed_obj <- list(counts = counts, groups = groups, tax = gene_IDs)
   return(parsed_obj)
 }
 
