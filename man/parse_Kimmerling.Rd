@@ -9,6 +9,9 @@ parse_Kimmerling(absolute = TRUE, use_spike_ins = FALSE, use_cpm = FALSE)
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance
 data}
+
+\item{use_cpm}{flag indicating whether or not to convert observed counts to
+counts per million (CPM)}
 }
 \value{
 named list of counts and group labels

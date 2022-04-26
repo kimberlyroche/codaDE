@@ -1,5 +1,83 @@
 #' Compute reference-derived per-sample scale factor
 #' 
+#' @param dataset_name short name of validation data set to use (e.g. Barlow)
+#' @param threshold mean count lower limit for feature inclusion
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
+#' @param testing flag indicating whether or not to subsample for (quick) testing
+#' @param hkg_list optional housekeeping gene list; test spike-in abundances
+#' against the abundances of these genes, if present
+#' @return absolute, relative (observed) abundances and feature names after 
+#' filtering out very low abundance features
+#' @export
+wrangle_validation_data <- function(dataset_name, threshold, use_cpm,
+                                    testing = FALSE, hkg_list = NULL) {
+  abs_data <- do.call(paste0("parse_", dataset_name),
+                      list(absolute = TRUE, use_cpm = use_cpm, hkg_list = hkg_list))
+  rel_data <- do.call(paste0("parse_", dataset_name),
+                      list(absolute = FALSE, use_cpm = use_cpm, hkg_list = hkg_list))
+  
+  if(testing & nrow(abs_data$counts) > 500) {
+    k <- 500
+    sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
+    abs_data$counts <- abs_data$counts[sample_idx,]
+    rel_data$counts <- rel_data$counts[sample_idx,]
+  }
+  
+  groups <- abs_data$groups
+  # Subsample if tons of cells/samples
+  downsample_limit <- 100 # was 100
+  set.seed(100)
+  pairs <- table(groups)
+  if(pairs[1] > downsample_limit) {
+    A_sample <- sample(which(groups == names(pairs)[1]), size = downsample_limit)
+    # A_sample <- which(groups == names(pairs)[1])[1:downsample_limit]
+  } else {
+    A_sample <- which(groups == names(pairs)[1])
+  }
+  if(pairs[2] > downsample_limit) {
+    B_sample <- sample(which(groups == names(pairs)[2]), size = downsample_limit)
+    # B_sample <- which(groups == names(pairs)[2])[1:downsample_limit]
+  } else {
+    B_sample <- which(groups == names(pairs)[2])
+  }
+  ref_data <- abs_data$counts[,c(A_sample, B_sample)]
+  data <- rel_data$counts[,c(A_sample, B_sample)]
+  groups <- groups[c(A_sample, B_sample)]
+  
+  # Reorient as (samples x features)
+  ref_data <- t(ref_data)
+  data <- t(data)
+  groups <- factor(groups)
+  tax <- abs_data$tax
+  
+  if(dataset_name == "Barlow") {
+    # The qPCR Barlow data has enormous rescaled abundances (> MAX INT) and the minimum
+    # observed (non-zero) abundance after rescaling is over 7 million. Scale down these
+    # counts such that the minmum observed (non-zero) abundance is 1.
+    rescale <- min(ref_data[ref_data != 0])
+    ref_data <- ref_data/rescale
+  }
+  
+  # Convert to integers, just for DESeq2
+  ref_data <- apply(ref_data, c(1,2), as.integer)
+  data <- apply(data, c(1,2), as.integer)
+  
+  # Look at sparsity; filter out too-low features
+  retain_features <- colMeans(ref_data) >= threshold & colMeans(data) >= threshold
+  ref_data <- ref_data[,retain_features]
+  data <- data[,retain_features]
+  if(!is.null(tax)) {
+    tax <- tax[retain_features]
+  }
+  
+  return(list(ref_data = ref_data, data = data, groups = groups, tax = tax,
+              hkg_present = rel_data$hkg_present, hkg_rho = rel_data$hkg_rho))
+}
+
+
+#' Compute reference-derived per-sample scale factor
+#' 
 #' @param ref_data count matrix of spike-ins (etc.) in feature x sample 
 #' orientation
 #' @return per-sample size factors
@@ -28,6 +106,8 @@ compute_sf <- function(ref_data) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
@@ -91,8 +171,6 @@ parse_VieiraSilva <- function(absolute = TRUE, use_cpm = FALSE) {
     }
   }
   
-  plot(colSums(counts))
-  
   counts <- data.matrix(counts)
   colnames(counts) <- NULL
   rownames(counts) <- NULL
@@ -113,6 +191,8 @@ parse_VieiraSilva <- function(absolute = TRUE, use_cpm = FALSE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
 #' @return named list of counts and group labels
 #' @export
 parse_Barlow <- function(absolute = TRUE, use_cpm = FALSE) {
@@ -192,10 +272,14 @@ parse_Barlow <- function(absolute = TRUE, use_cpm = FALSE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
+#' @param hkg_list optional housekeeping gene list; test spike-in abundances
+#' against the abundances of these genes, if present
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Song <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_Song <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   file_dir <- file.path("data", "Song_2021")
   # Had to first remove a pound sign in the Accession No field name
   headers <- read.table(file.path(file_dir, "GSE161116_series_matrix.txt"),
@@ -211,8 +295,9 @@ parse_Song <- function(absolute = TRUE, use_cpm = FALSE) {
   
   gene_names <- mrna[,1]
   mrna <- mrna[,2:ncol(mrna)]
+  counts <- data.matrix(mrna)
   
-  ref_idx <- unname(which(sapply(gene_names, function(x) str_detect(x, "^POS_"))))
+  ref_idx <- unname(which(sapply(gene_names, function(x) str_detect(x, "^(POS|NEG)_"))))
   
   # mRNA are rows 1:770
   # Negative controls (ERCC spike-ins) are named NEG_A (etc. and have very low
@@ -221,27 +306,32 @@ parse_Song <- function(absolute = TRUE, use_cpm = FALSE) {
   
   # Observed abundances correlate very well to spike-in abundances already;
   # forego renormalization
-
-  counts <- data.matrix(mrna)
-  if(use_cpm) {
-    counts <- apply(counts, 2, function(x) x/sum(x))
-    counts <- round(counts*1e06)
-  }
-
+  
+  spike_counts <- counts[ref_idx,]
+  h_counts <- counts[which(gene_names %in% hkg_list),]
   counts <- counts[-ref_idx,]
-  if(!absolute) {
-    # Shuffle observed abundances
-    set.seed(1000)
-    new_totals <- sample(round(colSums(counts)))
+  gene_names <- gene_names[-ref_idx]
+  
+  if(absolute) {
+    # Rescale
+    sf <- compute_sf(spike_counts)
     for(i in 1:ncol(counts)) {
-      counts[,i] <- rmultinom(1, size = new_totals[i],
-                              prob = counts[,i] / sum(counts[,i]))
+      counts[,i] <- counts[,i] / sf[i]
+    }
+  } else {
+    if(use_cpm) {
+      counts <- apply(counts, 2, function(x) x/sum(x))
+      counts <- round(counts*1e06)
     }
   }
   colnames(counts) <- NULL
   rownames(counts) <- NULL
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_names))
+  parsed_obj <- list(counts = counts,
+                     groups = groups,
+                     tax = gene_names,
+                     hkg_present = gene_names[gene_names %in% hkg_list],
+                     hkg_rho = cor(colMeans(spike_counts), colMeans(h_counts)))
   return(parsed_obj)
 }
 
@@ -257,11 +347,15 @@ parse_Song <- function(absolute = TRUE, use_cpm = FALSE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
+#' @param hkg_list optional housekeeping gene list; test spike-in abundances
+#' against the abundances of these genes, if present
 #' @return named list of counts and group labels
 #' @import stringr
 #' @import biomaRt
 #' @export
-parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   file_dir <- file.path("data", "Monaco_2019")
   
   # Parse data and assignments
@@ -372,12 +466,14 @@ parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE) {
                            which(is.na(mapping$hgnc_symbol == ""))))
   mapping$hgnc_symbol[unidentified] <- mapping$feature_full[unidentified]
   mapping$hgnc_symbol <- toupper(mapping$hgnc_symbol)
+
+  h_counts <- counts[mapping$hgnc_symbol %in% hkg_list,]
   
-  h_counts <- counts[mapping$hgnc_symbol %in% hkg,]
-  plot(colMeans(h_counts), colMeans(spike_counts))
-  cor(colMeans(h_counts), colMeans(spike_counts))
-  
-  parsed_obj <- list(counts = counts, groups = groups, tax = mapping$hgnc_symbol)
+  parsed_obj <- list(counts = counts,
+                     groups = groups,
+                     tax = mapping$hgnc_symbol,
+                     hkg_present = mapping$hgnc_symbol[mapping$hgnc_symbol %in% hkg_list],
+                     hkg_rho = cor(colMeans(spike_counts), colMeans(h_counts)))
   return(parsed_obj)
 }
 
@@ -394,11 +490,15 @@ parse_Monaco <- function(absolute = TRUE, use_cpm = FALSE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
+#' @param hkg_list optional housekeeping gene list; test spike-in abundances
+#' against the abundances of these genes, if present
 #' @return named list of counts and group labels
 #' @import stringr
 #' @import biomaRt
 #' @export
-parse_Hagai <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_Hagai <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   counts_A <- read.table(file.path("data",
                                    "Hagai_2018",
                                    "counts_mouse_unst.txt"),
@@ -467,7 +567,37 @@ parse_Hagai <- function(absolute = TRUE, use_cpm = FALSE) {
   #   # TBD
   # }
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = gene_IDs)
+  ensembl <- useEnsembl(biomart = "ensembl", mirror = "uswest")
+  
+  G_list <- suppressMessages(getBM(filters = "ensembl_gene_id",
+                                   attributes = c("ensembl_gene_id", "mgi_symbol"),
+                                   # values = feature_names,
+                                   values = gene_IDs,
+                                   mart = useDataset("mmusculus_gene_ensembl", ensembl),
+                                   uniqueRows = FALSE))
+  mapping <- data.frame(feature = gene_IDs) %>%
+    left_join(G_list, by = c("feature" = "ensembl_gene_id"))
+  # Remove duplicates (a little arbitrary)
+  dupes <- which(table(mapping$feature) > 1)
+  for(dupe in names(dupes)) {
+    dupe_idx <- which(mapping$feature == dupe)
+    discard_idx <- setdiff(dupe_idx, c(min(dupe_idx)))
+    mapping <- mapping[-discard_idx,]
+  }
+  
+  # Get rid of unknowns
+  unidentified <- unique(c(which(mapping$mgi_symbol == ""),
+                           which(is.na(mapping$mgi_symbol == ""))))
+  mapping$mgi_symbol[unidentified] <- mapping$feature[unidentified]
+  mapping$mgi_symbol <- toupper(mapping$mgi_symbol)
+
+  h_counts <- counts[which(toupper(mapping$mgi_symbol) %in% hkg_list),]
+  
+  parsed_obj <- list(counts = counts,
+                     groups = groups,
+                     tax = mapping$mgi_symbol,
+                     hkg_present = mapping$mgi_symbol[mapping$mgi_symbol %in% hkg_list],
+                     hkg_rho = cor(colMeans(spike_counts), colMeans(h_counts)))
   return(parsed_obj)
 }
 
@@ -483,6 +613,8 @@ parse_Hagai <- function(absolute = TRUE, use_cpm = FALSE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
@@ -551,6 +683,8 @@ parse_Owens <- function(absolute = TRUE, use_cpm = FALSE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
@@ -625,6 +759,8 @@ parse_Klein <- function(absolute = TRUE, use_cpm = FALSE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
@@ -681,7 +817,11 @@ parse_Yu <- function(absolute = TRUE, use_cpm = FALSE) {
   }
   counts <- data.matrix(counts)
 
-  parsed_obj <- list(counts = counts, groups = groups, tax = gene_IDs)
+  gene_IDs <- toupper(gene_IDs)
+  
+  parsed_obj <- list(counts = counts,
+                     groups = groups,
+                     tax = gene_IDs)
   return(parsed_obj)
 }
 
@@ -921,11 +1061,15 @@ parse_Athanasiadou <- function(absolute = TRUE, which_data = "ciona") {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
+#' @param hkg_list optional housekeeping gene list; test spike-in abundances
+#' against the abundances of these genes, if present
 #' @return named list of counts and group labels
 #' @import stringr
 #' @import dplyr
 #' @export
-parse_Muraro <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_Muraro <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   file_dir <- file.path("data", "Muraro_2016")
   
   # Parse data and assignments
@@ -998,31 +1142,6 @@ parse_Muraro <- function(absolute = TRUE, use_cpm = FALSE) {
     str_split(x, "__")[[1]][1]
   }))
   
-  # Not strong
-  # plot_df <- data.frame(total = colSums(counts),
-  #                       group = groups,
-  #                       reference = sf)
-  # plot_df <- plot_df %>%
-  #   filter(total > quantile(plot_df$total, probs = c(0.05)) & total < quantile(plot_df$total, probs = c(0.95))) %>%
-  #   filter(reference > quantile(plot_df$reference, probs = c(0.05)) & reference < quantile(plot_df$reference, probs = c(0.95)))
-  # ggplot(plot_df, aes(x = reference, y = total)) +
-  #   geom_smooth(aes(color = group), formula = y ~ x, method = "lm", alpha = 0.5) +
-  #   geom_point(aes(fill = group), size = 2, shape = 21) +
-  #   scale_fill_manual(values = c("#58D68D", "#9B59B6")) +
-  #   scale_color_manual(values = c("#58D68D", "#9B59B6"), guide = FALSE) +
-  #   theme_bw() +
-  #   labs(x = "Reference (Gadph)", y = "Total abundance", fill = "Group")
-  # ggsave(file.path("output", "images", "Muraro_totals.png"),
-  #        units = "in",
-  #        dpi = 100,
-  #        height = 5,
-  #        width = 7)
-  # for(grp in unique(groups)) {
-  #   r2 <- cor(plot_df[plot_df$group == grp,]$reference,
-  #             plot_df[plot_df$group == grp,]$total)**2
-  #   cat(paste0("R^2 (", grp, "): ", round(r2, 3), "\n"))
-  # }
-  
   if(absolute) {
     for(j in 1:ncol(counts)) {
       counts[,j] <- counts[,j] / sf[j]
@@ -1040,7 +1159,13 @@ parse_Muraro <- function(absolute = TRUE, use_cpm = FALSE) {
   colnames(counts) <- NULL
   rownames(counts) <- NULL
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = gene_names)
+  h_counts <- counts[gene_names %in% hkg_list,]
+  
+  parsed_obj <- list(counts = counts,
+                     groups = groups,
+                     tax = gene_names,
+                     hkg_present = gene_names[gene_names %in% hkg_list],
+                     hkg_rho = cor(colMeans(spikein_counts), colMeans(h_counts)))
   return(parsed_obj)
 }
 
@@ -1059,11 +1184,15 @@ parse_Muraro <- function(absolute = TRUE, use_cpm = FALSE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
+#' @param hkg_list optional housekeeping gene list; test spike-in abundances
+#' against the abundances of these genes, if present
 #' @return named list of counts and group labels
 #' @import stringr
 #' @import edgeR
 #' @export
-parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   # Note that 0 = GFP negative cells (quiescent)
   #           1 = GFP positive cells (cycling)
   #           0.3 = GFP "weak"
@@ -1098,11 +1227,9 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
   # Here total abundances look pretty informative. Use:
   #   gapdh_idx <- which(gene_IDs == "ENSMUSG00000057666")
   # which returns 16179 to compare Gadph abundance to totals
-
-  sf <- compute_sf(data[spike_idx,])
-  counts <- data[-spike_idx,]
-  gene_IDs <- gene_IDs[-spike_idx]
   
+  sf <- compute_sf(data[spike_idx,])
+  counts <- data
   if(absolute) {
     for(i in 1:ncol(counts)) {
       counts[,i] <- counts[,i] / sf[i]
@@ -1115,7 +1242,12 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
                               prob = counts[,i] / sum(counts[,i]))
     }
   }
+  spike_counts <- data[spike_idx,]
+  counts <- data[-spike_idx,]
+  gene_IDs <- gene_IDs[-spike_idx]
+  
   counts <- data.matrix(counts)
+  spike_counts <- data.matrix(spike_counts)
   colnames(counts) <- NULL
   rownames(counts) <- NULL
   
@@ -1123,6 +1255,7 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
   A_idx <- which(groups == "0")
   B_idx <- which(groups == "1")
   counts <- counts[,c(A_idx, B_idx)]
+  spike_counts <- spike_counts[,c(A_idx, B_idx)]
   groups <- c(rep("0", length(A_idx)), rep("1", length(B_idx)))
   
   ensembl <- useEnsembl(biomart = "ensembl", mirror = "uswest")
@@ -1137,7 +1270,24 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
   mapping <- data.frame(feature = gene_IDs) %>%
     left_join(G_list, by = c("feature" = "ensembl_gene_id"))
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(mapping$mgi_symbol))
+  # Correlation: mean spike-in abundance and mean HKG abundance
+  # The list `hkg` (defined in `validate.R`) must exist globally
+  # gapdh_idx <- which(gene_IDs == "ENSMUSG00000057666")
+  # plot(unlist(data[gapdh_idx,]), colMeans(spike_counts))
+  # cor(unlist(data[gapdh_idx,]), colMeans(spike_counts))
+  
+  # h_counts <- counts[toupper(mapping$mgi_symbol) %in% hkg,]
+  # plot(colMeans(h_counts), colMeans(spike_counts))
+  # cor(colMeans(h_counts), colMeans(spike_counts))
+  
+  mapping$mgi_symbol <- toupper(mapping$mgi_symbol)
+  h_counts <- counts[mapping$mgi_symbol %in% hkg_list,]
+  
+  parsed_obj <- list(counts = counts,
+                     groups = groups,
+                     tax = mapping$mgi_symbol,
+                     hkg_present = mapping$mgi_symbol[mapping$mgi_symbol %in% hkg_list],
+                     hkg_rho = cor(colMeans(spike_counts), colMeans(h_counts)))
   return(parsed_obj)
 }
 
@@ -1156,6 +1306,8 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
@@ -1327,10 +1479,14 @@ parse_ESCA <- function(absolute = TRUE) {
 #'
 #' @param absolute flag indicating whether or not to parse absolute abundance
 #' data
+#' @param use_cpm flag indicating whether or not to convert observed counts to
+#' counts per million (CPM)
+#' @param hkg_list optional housekeeping gene list; test spike-in abundances
+#' against the abundances of these genes, if present
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Gruen <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_Gruen <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   counts <- read.table(file.path("data",
                                  "Gruen_2014",
                                  "GSE54695_data_transcript_counts.txt"),
@@ -1382,9 +1538,17 @@ parse_Gruen <- function(absolute = TRUE, use_cpm = FALSE) {
   A_idx <- which(platform == "SC" & condition == "2i")
   B_idx <- which(platform == "SC" & condition == "serum")
   counts <- counts[,c(A_idx, B_idx)]
+  spike_counts <- spike_counts[,c(A_idx,B_idx)]
   groups <- c(rep("A", length(A_idx)), rep("B", length(B_idx)))
   
-  parsed_obj <- list(counts = counts, groups = groups, tax = toupper(gene_IDs))
+  gene_IDs <- toupper(gene_IDs)
+  h_counts <- counts[gene_IDs %in% hkg_list,]
+  
+  parsed_obj <- list(counts = counts,
+                     groups = groups,
+                     tax = gene_IDs,
+                     hkg_present = gene_IDs[gene_IDs %in% hkg_list],
+                     hkg_rho = cor(colMeans(spike_counts), colMeans(h_counts)))
   return(parsed_obj)
 }
 
