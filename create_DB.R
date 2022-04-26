@@ -50,17 +50,20 @@ discard <- dbExecute(conn, "DELETE FROM results WHERE FDR=0.01")
 #                                  "OBSERVED_TYPE VARCHAR(64), ",
 #                                  "BASELINE_CALLS VARCHAR(100000), ",
 #                                  "CALLS VARCHAR(100000), ",
+#                                  "BASELINE_BETAS VARCHAR(100000), ",
+#                                  "BETAS VARCHAR(100000), ",
 #                                  "TPR REAL, ",
 #                                  "FPR REAL, ",
 #                                  "FDR REAL, ",
-#                                  "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, FDR));"))
+#                                  "BETA REAL DEFAULT -1 NOT NULL, ",
+#                                  "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, FDR, BETA));"))
 
 #discard <- dbExecute(conn, paste0("INSERT INTO results2 SELECT UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, ",
-#                                          "BASELINE_CALLS, CALLS, TPR, FPR, 0.05 FROM results;"))
+#                                          "BASELINE_CALLS, CALLS, NULL, NULL, TPR, FPR, FDR, BETA FROM results;"))
 
-#discard <- dbExecute(conn, "DROP TABLE results")
+discard <- dbExecute(conn, "DROP TABLE results")
 
-#discard <- dbExecute(conn, "ALTER TABLE results2 RENAME TO results")
+discard <- dbExecute(conn, "ALTER TABLE results2 RENAME TO results")
 
 #discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",
 #                                  "UUID VARCHAR(36),",
