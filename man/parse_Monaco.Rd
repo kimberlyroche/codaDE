@@ -4,11 +4,17 @@
 \alias{parse_Monaco}
 \title{Parse the Monaco et al. (2019) immune cell data set}
 \usage{
-parse_Monaco(absolute = TRUE, use_cpm = FALSE)
+parse_Monaco(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance
 data}
+
+\item{use_cpm}{flag indicating whether or not to convert observed counts to
+counts per million (CPM)}
+
+\item{hkg_list}{optional housekeeping gene list; test spike-in abundances
+against the abundances of these genes, if present}
 }
 \value{
 named list of counts and group labels

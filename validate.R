@@ -61,80 +61,43 @@ use_totals <- opt$usetotals
 use_renorm_counts <- opt$userenormcounts
 use_cpm <- opt$usecpm
 
-testing <- FALSE
-# methods_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "edgeR_TMM", "scran")
-methods_list <- c("DESeq2_CG")
-
 if(threshold < 0) {
   stop(paste0("Invalid threshold: ", threshold, "!\n"))
 }
+
+testing <- FALSE
+
+# methods_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "edgeR_TMM", "scran")
+methods_list <- c("DESeq2_CG")
+
+hkg <- c("GAPDH",
+         "EEF2",
+         "LMNA",
+         "TBCB", # Padovan-Merhar et al.
+         "ATP5PB", # Panina et al.
+         "EEF1A1",
+         "TBP",
+         "PPIB", # Nazet et al.
+         "CYCS",
+         "PRKG1",
+         "B2M",
+         "HPRT1",
+         "HMBS") # de Kok
+# hkg <- NULL
 
 # ------------------------------------------------------------------------------
 #   Parse and wrangle validation data
 # ------------------------------------------------------------------------------
 
-abs_data <- do.call(paste0("parse_", dataset_name), list(absolute = TRUE, use_cpm = use_cpm))
-rel_data <- do.call(paste0("parse_", dataset_name), list(absolute = FALSE, use_cpm = use_cpm))
-
-#if(use_cpm) {
-#  # Convert to CPM
-#  rel_data$counts <- apply(rel_data$counts, 2, function(x) x/sum(x))
-#  rel_data$counts <- round(rel_data$counts*1e06)
-#}
-
-if(testing & nrow(abs_data$counts) > 500) {
-  k <- 500
-  sample_idx <- sample(1:nrow(abs_data$counts), size = k, replace = FALSE)
-  abs_data$counts <- abs_data$counts[sample_idx,]
-  rel_data$counts <- rel_data$counts[sample_idx,]
-}
-
-groups <- abs_data$groups
-# Subsample if tons of cells/samples
-downsample_limit <- 100 # was 100
-set.seed(100)
-pairs <- table(groups)
-if(pairs[1] > downsample_limit) {
-  A_sample <- sample(which(groups == names(pairs)[1]), size = downsample_limit)
-  # A_sample <- which(groups == names(pairs)[1])[1:downsample_limit]
-} else {
-  A_sample <- which(groups == names(pairs)[1])
-}
-if(pairs[2] > downsample_limit) {
-  B_sample <- sample(which(groups == names(pairs)[2]), size = downsample_limit)
-  # B_sample <- which(groups == names(pairs)[2])[1:downsample_limit]
-} else {
-  B_sample <- which(groups == names(pairs)[2])
-}
-ref_data <- abs_data$counts[,c(A_sample, B_sample)]
-data <- rel_data$counts[,c(A_sample, B_sample)]
-groups <- groups[c(A_sample, B_sample)]
-
-# Reorient as (samples x features)
-ref_data <- t(ref_data)
-data <- t(data)
-groups <- factor(groups)
-tax <- abs_data$tax
-
-if(dataset_name == "Barlow") {
-  # The qPCR Barlow data has enormous rescaled abundances (> MAX INT) and the minimum
-  # observed (non-zero) abundance after rescaling is over 7 million. Scale down these
-  # counts such that the minmum observed (non-zero) abundance is 1.
-  rescale <- min(ref_data[ref_data != 0])
-  ref_data <- ref_data/rescale
-}
-
-# Convert to integers, just for DESeq2
-ref_data <- apply(ref_data, c(1,2), as.integer)
-data <- apply(data, c(1,2), as.integer)
-
-# Look at sparsity; filter out too-low features
-retain_features <- colMeans(ref_data) >= threshold & colMeans(data) >= threshold
-ref_data <- ref_data[,retain_features]
-data <- data[,retain_features]
-if(!is.null(tax)) {
-  tax <- tax[retain_features]
-}
+parsed_obj <- wrangle_validation_data(dataset_name = dataset_name,
+                                      threshold = threshold,
+                                      use_cpm = use_cpm,
+                                      testing = testing,
+                                      hkg_list = hkg)
+ref_data <- parsed_obj$ref_data
+data <- parsed_obj$data
+groups <- parsed_obj$groups
+tax <- parsed_obj$tax
 
 # ------------------------------------------------------------------------------
 #   Call discrepancy by each method; save to file if doesn't already exist
@@ -157,6 +120,7 @@ for(DE_method in methods_list) {
                               dataset_name,
                               "_threshold",
                               threshold,
+                              ifelse(!exists("hkg") | is.null(hkg), "_noHKG", ""),
                               ".rds"))
   if(!file.exists(save_fn)) {
     cat(paste0("Making calls for ", DE_method, " on ", dataset_name, "...\n"))
@@ -167,25 +131,23 @@ for(DE_method in methods_list) {
       oracle_calls <- call_DA_NB(ref_data, groups)$pval
     }
     if(DE_method == "DESeq2_CG") {
-      hkg <- c("GAPDH",
-               "EEF2",
-               "LMNA",
-               "TBCB", # Padovan-Merhar et al.
-               "ATP5PB", # Panina et al.
-               "EEF1A1",
-               "TBP",
-               "PPIB", # Nazet et al.
-               "CYCS",
-               "PRKG1",
-               "B2M",
-               "HPRT1",
-               "HMBS") # de Kok
-      control_indices <- which(tax %in% hkg)
-      if(length(control_indices) < 2) {
-        stop("No housekeeping genes found for DESeq2 control_genes run!")
+      if(!exists("hkg") | is.null(hkg)) {
+        # Cherry pick "stable" features from absolute counts as in simulated data
+        log_ab <- log(t(ref_data) + 0.5)
+        covar <- apply(log_ab, 1, function(x) sd(x)/mean(x))
+        bottom10 <- quantile(abs(covar), probs = c(0.05))
+        control_indices <- sample(which(abs(covar) < bottom10), size = min(sum(abs(covar) < bottom10), 20))
+        all_calls <- DA_wrapper(ref_data, data, groups, "DESeq2", oracle_calls,
+                                control_indices = control_indices)
+      } else {
+        # Use housekeeping genes
+        control_indices <- which(tax %in% hkg)
+        if(length(control_indices) < 2) {
+          stop("No housekeeping genes found for DESeq2 control_genes run!")
+        }
+        all_calls <- DA_wrapper(ref_data, data, groups, "DESeq2", oracle_calls,
+                                control_indices = control_indices)
       }
-      all_calls <- DA_wrapper(ref_data, data, groups, "DESeq2", oracle_calls,
-                              control_indices = control_indices)
     } else {
       all_calls <- DA_wrapper(ref_data, data, groups, DE_method, oracle_calls)
     }

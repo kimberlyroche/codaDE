@@ -12,7 +12,7 @@ call_DA_ALDEx2(data, groups)
 \item{groups}{group (cohort) labels}
 }
 \value{
-unadjusted p-values for all features
+unadjusted p-values and "effect sizes" for DA for all features
 }
 \description{
 Evaluate differential abundance with ALDEx2

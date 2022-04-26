@@ -3,23 +3,35 @@
 #' @param data simulated data set
 #' @param groups group (cohort) labels
 #' @param use_TMM if TRUE, uses the trimmed mean of M-values normalization
-#' @return p-value for DA for all features
+#' @return unadjusted p-values and "effect sizes" for DA for all features
 #' @import phyloseq
 #' @import ANCOMBC
+#' @import stringr
 #' @export
 call_DA_ANCOMBC <- function(data, groups) {
   physeq <- phyloseq(otu_table(data, taxa_are_rows = FALSE),
                      sample_data(data.frame(group = groups)))
   out <- ancombc(phyloseq = physeq, formula = "group", p_adj_method = "BH")
 
+  # Use log regression betas as an effect size in ANCOM-BC
+  beta_df <- data.frame(feature = colnames(otu_table(physeq))) %>%
+    left_join(data.frame(feature = rownames(out$res$beta),
+                         beta = exp(unname(out$res$beta))), by = "feature")
+  beta_df$beta[is.na(beta_df$beta)] <- 0
+  
   # ANCOM will omit some very low abundance features from consideration
   # Re-incorporate these with p-values of 1
   pval_df <- data.frame(feature = colnames(otu_table(physeq))) %>%
     left_join(data.frame(feature = rownames(out$res$p_val),
                          pval = unname(out$res$p_val)), by = "feature")
   pval_df$pval[is.na(pval_df$pval)] <- 1
-  pval_df$feature <- str_replace(pval_df$feature, "sp", "gene")
-  pval_df
+  
+  # Combine these
+  combo_df <- pval_df %>%
+    left_join(beta_df, by = "feature")
+  combo_df$feature <- str_replace(combo_df$feature, "sp", "gene")
+  
+  combo_df
 }
 
 #' Evaluate differential abundance with edgeR
@@ -27,7 +39,7 @@ call_DA_ANCOMBC <- function(data, groups) {
 #' @param data simulated data set
 #' @param groups group (cohort) labels
 #' @param use_TMM if TRUE, uses the trimmed mean of M-values normalization
-#' @return p-value for DA for all features
+#' @return unadjusted p-values and "effect sizes" for DA for all features
 #' @import edgeR
 #' @export
 call_DA_edgeR <- function(data, groups, use_TMM = FALSE) {
@@ -44,21 +56,24 @@ call_DA_edgeR <- function(data, groups, use_TMM = FALSE) {
   dge_obj <- estimateGLMTagwiseDisp(dge_obj, design)
   fit <- glmFit(dge_obj, design)
   lrt <- glmLRT(fit, coef = 2)
-  data.frame(feature = paste0("gene", 1:nrow(data)),
-             pval = lrt$table$PValue)
+  pval_df <- data.frame(feature = paste0("gene", 1:nrow(data)),
+             pval = lrt$table$PValue,
+             beta = exp(unname(unlist(fit$coefficients[,2]))))
+  pval_df
 }
 
 #' Evaluate differential abundance with a negative binomial GLM (via MASS)
 #'
 #' @param data simulated data set (samples x features)
 #' @param groups group (cohort) labels
-#' @return unadjusted p-values for all features
+#' @return unadjusted p-values and "effect sizes" for DA for all features
 #' @import MASS
 #' @import dplyr
 #' @export
 call_DA_NB <- function(data, groups) {
   pval_df <- data.frame(feature = paste0("gene", 1:ncol(data)),
-                        pval = 1)
+                        pval = 1,
+                        beta = 0)
   data <- spike_in_ones(data, groups)
   for(feature_idx in 1:ncol(data)) {
     gene_data <- data.frame(counts = data[,feature_idx], groups = groups)
@@ -79,10 +94,12 @@ call_DA_NB <- function(data, groups) {
     }
     if(!is.null(fit)) {
       pval_df[feature_idx,]$pval <- coef(summary(fit))[2,4]
+      pval_df[feature_idx,]$beta <- exp(coef(summary(fit))[2,1])
     } else {
       cat(paste0("Fit failed on feature",feature_idx,"\n"))
     }
   }
+
   pval_df
 }
 
@@ -92,7 +109,7 @@ call_DA_NB <- function(data, groups) {
 #' @param groups group (cohort) labels
 #' @param control_indices if specified, these features are used as the stable 
 #' features against which to normalize observed abundances (DESeq2-only)
-#' @return unadjusted p-values for all features
+#' @return unadjusted p-values and "effect sizes" for DA for all features
 #' @import DESeq2
 #' @import dplyr
 #' @export
@@ -109,9 +126,12 @@ call_DA_DESeq2 <- function(data, groups,
   dds <- suppressMessages(DESeq2::nbinomWaldTest(object = dds))
   res <- DESeq2::results(object = dds, alpha = 0.05)
   pval_df <- data.frame(feature = paste0("gene", 1:ncol(data)),
-                        pval = res$pvalue)
+                        pval = res$pvalue,
+                        beta = 2**(res$log2FoldChange))
   pval_df$pval[is.na(pval_df$pval)] <- 1
+  pval_df$beta[is.na(pval_df$beta)] <- 0
   pval_df
+  
   # Previously
   # I had been using a Seurat wrapper when many more differential abundance
   # testing methods - including MAST - were in use. FindMarkers() was a 
@@ -201,7 +221,7 @@ call_DA_MAST <- function(data, groups) {
 #'
 #' @param data simulated data set (samples x features)
 #' @param groups group (cohort) labels
-#' @return unadjusted p-values for all features
+#' @return unadjusted p-values and "effect sizes" for DA for all features
 #' @import ALDEx2
 #' @import dplyr
 #' @export
@@ -215,7 +235,8 @@ call_DA_ALDEx2 <- function(data, groups) {
   
   results <- suppressMessages(aldex(count_table, groups, denom = "iqlr"))
   pval_df <- data.frame(feature = rownames(results),
-                        pval = results$we.ep)
+                        pval = results$we.ep,
+                        beta = exp(results$effect))
   
   # Interpreting the output:
   # we.ep - Expected P value of Welch's t test
@@ -232,7 +253,7 @@ call_DA_ALDEx2 <- function(data, groups) {
 #'
 #' @param data simulated data set (samples x features)
 #' @param groups group (cohort) labels
-#' @return unadjusted p-values for all features
+#' @return unadjusted p-values and "effect sizes" for DA for all features
 #' @import SingleCellExperiment
 #' @import scran
 #' @import scater
@@ -302,6 +323,22 @@ call_DA_scran <- function(data, groups) {
                        data.frame(feature = rownames(results),
                                   pval = results$p.value),
                        by = "feature")
+  
+  # getMarkerEffects(results) doesn't seem to work - returns empty list
+  # I'll do something a little cruder: scale the counts by hand (by scran's
+  # computed scaling factor) and take the mean fold change across groups
+  sf <- sizeFactors(sce)
+  norm_counts <- counts(sce)
+  for(i in 1:ncol(norm_counts)) {
+    norm_counts[,i] <- norm_counts[,i]/sf
+  }
+  groups <- factor(groups)
+  est <- numeric(nrow(norm_counts))
+  for(i in 1:nrow(norm_counts)) {
+    est[i] <- mean(norm_counts[i,groups == levels(groups)[2]])/mean(norm_counts[i,groups == levels(groups)[1]])
+  }
+  pval_df$beta <- est
+  
   pval_df
 }
 
@@ -458,10 +495,6 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
   if(method == "DESeq2") {
     DA_calls <- DA_by_DESeq2(ref_data, data, groups, oracle_calls = oracle_calls,
                              control_indices = control_indices)
-    if(is.null(oracle_calls)) {
-      oracle_calls <- DA_calls$oracle_calls$pval
-    }
-    calls <- DA_calls$calls$pval
   }
   if(method == "MAST") {
     DA_calls <- DA_by_MAST(ref_data, data, groups, oracle_calls = oracle_calls)
@@ -482,9 +515,11 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
                             oracle_calls = oracle_calls, use_TMM = TRUE)
   }
   if(is.null(oracle_calls)) {
-    oracle_calls <- DA_calls$oracle_calls$pval
+    # oracle_calls <- DA_calls$oracle_calls$pval
+    oracle_calls <- DA_calls$oracle_calls
   }
-  calls <- DA_calls$calls$pval
+  # calls <- DA_calls$calls$pval
+  calls <- DA_calls$calls
   
   return(list(calls = calls, oracle_calls = oracle_calls))
 }
@@ -498,24 +533,37 @@ DA_wrapper <- function(ref_data, data, groups, method = "NBGLM",
 #' string that can be parsed into one) made on the absolute abundances
 #' @param adjusted flag indicating whether or not to perform multiple test
 #' correction
+#' @param alpha significance threshold after FD adjustment
+#' @param beta optional effect size threshold at the scale of the original 
+#' abundances (i.e. not log scale)
 #' @return named list of all calls, TPR, and FPR
 #' @export
-calc_DA_discrepancy <- function(calls, oracle_calls, adjusted = TRUE, alpha = 0.05) {
-  if(typeof(calls) == "character") {
-    calls <- as.numeric(strsplit(calls, ";")[[1]])
+calc_DA_discrepancy <- function(calls, oracle_calls, adjusted = TRUE,
+                                alpha = 0.05, beta = NULL) {
+  if(typeof(calls$pval) == "character") {
+    calls$pval <- as.numeric(strsplit(calls$pval, ";")[[1]])
   }
-  if(typeof(oracle_calls) == "character") {
-    oracle_calls <- as.numeric(strsplit(oracle_calls, ";")[[1]])
+  if(typeof(calls$beta) == "character") {
+    calls$beta <- as.numeric(strsplit(calls$beta, ";")[[1]])
+  }
+  if(typeof(oracle_calls$pval) == "character") {
+    oracle_calls$pval <- as.numeric(strsplit(oracle_calls$pval, ";")[[1]])
+  }
+  if(typeof(oracle_calls$beta) == "character") {
+    oracle_calls$beta <- as.numeric(strsplit(oracle_calls$beta, ";")[[1]])
   }
   
   if(adjusted) {
-    # Calls on observed
-    de <- p.adjust(calls, method = "BH") < alpha
-    # Calls on original abundances
-    sim_de <- p.adjust(oracle_calls, method = "BH") < alpha
+    calls$pval <- p.adjust(calls$pval, method = "BH")
+    oracle_calls$pval <- p.adjust(oracle_calls$pval, method = "BH")
+  }
+  
+  if(!is.null(beta)) {
+    de <- calls$pval < alpha & (calls$beta < 1/beta | calls$beta > beta)
+    sim_de <- oracle_calls$pval < alpha & (oracle_calls$beta < 1/beta | oracle_calls$beta > beta)
   } else {
-    de <- calls < alpha
-    sim_de <- oracle_calls < alpha
+    de <- calls$pval < alpha
+    sim_de <- oracle_calls$pval < alpha
   }
 
   TP_calls <- de & sim_de

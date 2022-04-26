@@ -14,7 +14,7 @@ call_DA_edgeR(data, groups, use_TMM = FALSE)
 \item{use_TMM}{if TRUE, uses the trimmed mean of M-values normalization}
 }
 \value{
-p-value for DA for all features
+unadjusted p-values and "effect sizes" for DA for all features
 }
 \description{
 Evaluate differential abundance with edgeR
