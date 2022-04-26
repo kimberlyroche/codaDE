@@ -5,7 +5,13 @@
 \title{Calculates the discrepancy between differential abundance calls made on
 absolute and relative abundances}
 \usage{
-calc_DA_discrepancy(calls, oracle_calls, adjusted = TRUE, alpha = 0.05)
+calc_DA_discrepancy(
+  calls,
+  oracle_calls,
+  adjusted = TRUE,
+  alpha = 0.05,
+  beta = NULL
+)
 }
 \arguments{
 \item{calls}{calls (as a numeric vector of p-values or a character string 
@@ -16,6 +22,11 @@ string that can be parsed into one) made on the absolute abundances}
 
 \item{adjusted}{flag indicating whether or not to perform multiple test
 correction}
+
+\item{alpha}{significance threshold after FD adjustment}
+
+\item{beta}{optional effect size threshold at the scale of the original 
+abundances (i.e. not log scale)}
 }
 \value{
 named list of all calls, TPR, and FPR

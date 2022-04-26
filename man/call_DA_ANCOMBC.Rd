@@ -14,7 +14,7 @@ call_DA_ANCOMBC(data, groups)
 \item{use_TMM}{if TRUE, uses the trimmed mean of M-values normalization}
 }
 \value{
-p-value for DA for all features
+unadjusted p-values and "effect sizes" for DA for all features
 }
 \description{
 Evaluate differential abundance with ANCOM-BC

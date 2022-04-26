@@ -15,7 +15,7 @@ call_DA_DESeq2(data, groups, control_indices = NULL)
 features against which to normalize observed abundances (DESeq2-only)}
 }
 \value{
-unadjusted p-values for all features
+unadjusted p-values and "effect sizes" for DA for all features
 }
 \description{
 Evaluate differential abundance with DESeq2 (via Seurat)
