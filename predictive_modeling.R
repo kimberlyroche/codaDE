@@ -38,8 +38,8 @@ use_totals <- opt$usetotals
 use_renorm_counts <- opt$userenormcounts
 use_cpm <- opt$cpm
 
-#DE_methods <- c("ALDEx2", "DESeq2", "scran")
-DE_methods <- c("edgeR_TMM")
+#DE_methods <- c("ALDEx2", "DESeq2", "scran", "edgeR_TMM")
+DE_methods <- c("ANCOMBC")
 
 model_dir <- ifelse(use_self_baseline, "self", "oracle")
 

@@ -25,18 +25,21 @@ file_list <- list.files(dir, pattern = "output_eval")
 for(file in file_list) {
   results <- read.table(file.path(dir, file), sep = "\t", header = TRUE)
   # Fix messed up headers
-  colnames(results) <- c("id", "uuid", "baseline", "partial_info", "method", "observed_type", "baseline_calls", "calls")
+  colnames(results) <- c("id", "uuid", "baseline", "partial_info", "method", "observed_type", "baseline_calls", "baseline_betas", "calls", "betas")
   for(i in 1:nrow(results)) {
     job <- results[i,]
-    if(!any(is.na(job %>% select(-baseline_calls)))) {
-      insertions <- insertions + dbExecute(conn, paste0("INSERT OR IGNORE INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, BASELINE_CALLS, CALLS) VALUES (",
+    if(!any(is.na(job %>% select(-c(baseline_calls, baseline_betas, betas))))) {
+      insertions <- insertions + dbExecute(conn, paste0("INSERT OR IGNORE INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, ",
+                                                        "BASELINE_CALLS, BASELINE_BETAS, CALLS, BETAS) VALUES (",
                                                         "'",job$uuid,"', ",
                                                         "'",job$method,"', ",
                                                         job$partial_info,", ",
                                                         "'",job$baseline,"', ",
                                                         "'",job$observed_type,"', ",
                                                         ifelse(is.na(job$baseline_calls), "NULL, ", paste0("'", job$baseline_calls,"', ")),
-                                                        "'",job$calls,"')"))
+                                                        ifelse(is.na(job$baseline_betas), "NULL, ", paste0("'", job$baseline_betas,"', ")),
+                                                        "'",job$calls,"', ",
+                                                        ifelse(is.na(job$betas), "NULL, ", paste0("'",job$betas,"')"))))
     }
   }
   cat(paste0("Succeeded on ", insertions, " rows\n"))

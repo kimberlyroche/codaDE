@@ -49,7 +49,9 @@ writeLines(paste0(c("ID",
                     "method",
                     "observed_type",
                     "baseline_calls",
-                    "calls"), collapse = "\t"),
+                    "baseline_betas",
+                    "calls",
+                    "betas"), collapse = "\t"),
            output_file)
 close(output_file)
 
@@ -148,13 +150,15 @@ for(i in 1:nrow(wishlist)) {
       # to refer back to the datasets table to find the oracle calls.
       results_row <- cbind(job,
                            baseline_calls = NA,
-                           calls = paste0(round(all_calls$calls, 10), collapse = ";")) #,
-#                           observed_type = job$observed_type)
+                           baseline_betas = NA,
+                           calls = paste0(round(all_calls$calls$pval, 10), collapse = ";"),
+                           betas = paste0(round(all_calls$calls$beta, 10), collapse = ";"))
     } else {
       results_row <- cbind(job,
-                           baseline_calls = paste0(round(all_calls$oracle_calls, 10), collapse = ";"),
-                           calls = paste0(round(all_calls$calls, 10), collapse = ";")) #,
-#                           observed_type = job$observed_type)
+                           baseline_calls = paste0(round(all_calls$oracle_calls$pval, 10), collapse = ";"),
+                           baseline_betas = paste0(round(all_calls$oracle_calls$beta, 10), collapse = ";"),
+                           calls = paste0(round(all_calls$calls$pval, 10), collapse = ";"),
+                           betas = paste0(round(all_calls$calls$beta, 10), collapse = ";"))
     }
 
     # Add to output file

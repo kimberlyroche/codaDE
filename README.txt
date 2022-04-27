@@ -36,6 +36,10 @@ results in the `temp` folder.
 
 3) Run `store_rate_results.R` to write results (in `temp`) to the database.
 
+4) Run (perhaps modifying!) `cleanup_rates.R`. This is necessary to remove any rows in the results table
+where TPR/FPR/FDR/BETA are NA - i.e. placeholder rows. I need a better system to capturing accuracy rates
+in the long term (!).
+
 # --------------------------------------------------------------------------------------------------------
 #   CHARACTERIZING DATA SETS
 # --------------------------------------------------------------------------------------------------------

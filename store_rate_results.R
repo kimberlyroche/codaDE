@@ -41,20 +41,24 @@ for(file in file_list) {
     if(this_round == 0) {
       # Attempt to insert new row
       # First we'll need to pull some extra info from comparable results
-      res <- dbGetQuery(conn, paste0("SELECT BASELINE_CALLS, CALLS FROM results WHERE UUID='", job$uuid, "'",
+      res <- dbGetQuery(conn, paste0("SELECT BASELINE_CALLS, BASELINE_BETAS, CALLS, BETAS FROM results WHERE UUID='", job$uuid, "'",
                                      " AND METHOD='", job$method, "' AND PARTIAL_INFO=", job$partial_info,
                                      " AND BASELINE_TYPE='", job$baseline, "' AND OBSERVED_TYPE='", job$type, "' LIMIT 1"))
-      this_round <- dbExecute(conn, paste0("INSERT OR IGNORE INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, BASELINE_CALLS, CALLS, TPR, FPR, FDR) VALUES (",
+      this_round <- dbExecute(conn, paste0("INSERT OR IGNORE INTO RESULTS(UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, ",
+                                           "BASELINE_CALLS, BASELINE_BETAS, CALLS, BETAS, TPR, FPR, FDR, BETA) VALUES (",
                                                         "'",job$uuid,"', ",
                                                         "'",job$method,"', ",
                                                         job$partial_info,", ",
                                                         "'",job$baseline,"', ",
                                                         "'",job$type,"', ",
                                                         ifelse(is.na(res$BASELINE_CALLS), "NULL, ", paste0("'", res$BASELINE_CALLS,"', ")),
+                                                        ifelse(is.na(res$BASELINE_BETAS), "NULL, ", paste0("'", res$BASELINE_BETAS,"', ")),
                                                         "'",res$CALLS,"', ",
+                                                        ifelse(is.na(res$BETAS), "NULL, ", paste0("'", res$BETAS,"', ")),
                                                         job$tpr,", ",
                                                         job$fpr,", ",
-                                                        job$fdr,")"))
+                                                        job$fdr,", ",
+                                                        job$beta, ")"))
     }
     updates <- updates + this_round
   }

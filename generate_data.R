@@ -64,6 +64,7 @@ writeLines(paste0(c("UUID",
                     "FC_RELATIVE",
                     "FC_PARTIAL",
                     "BASELINE_CALLS",
+                    "BASELINE_BETAS",
                     "MED_ABS_TOTAL",
                     "MED_REL_TOTAL",
                     "PERCENT_DIFF_SIM",
@@ -142,8 +143,10 @@ for(i in 1:nrow(wishlist)) {
   fc_rel <- calc_fc(sim_data$observed_counts1)
   fc_par <- calc_fc(sim_data$observed_counts2)
   
-  calls <- call_DA_NB(sim_data$abundances, sim_data$groups)$pval
-  
+  calls_obj <- call_DA_NB(sim_data$abundances, sim_data$groups)
+  calls <- calls_obj$pval
+  betas <- calls_obj$betas
+
   med_abs <- mean(rowSums(sim_data$abundances))
   med_rel <- mean(rowSums(sim_data$observed_counts1))
   
@@ -170,6 +173,7 @@ for(i in 1:nrow(wishlist)) {
                          FC_RELATIVE = fc_rel,
                          FC_PARTIAL = fc_par,
                          BASELINE_CALLS = paste0(round(calls, 10), collapse = ";"),
+                         BASELINE_BETAS = paste0(round(betas, 10), collapse = ";"),
                          MED_ABS_TOTAL = med_abs,
                          MED_REL_TOTAL = med_rel,
                          PERCENT_DIFF_SIM = job$PERCENT_DIFF,

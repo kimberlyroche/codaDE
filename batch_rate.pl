@@ -7,8 +7,8 @@ my $p = 5000;
 my $input = "input_rate_".$p.".txt";
 my $output = "output_rate_".$p;
 my $start = 1;
-my $end = 1875;
-my $chunks = 10;
+my $end = 2;
+my $chunks = 1;
 
 my $filename = "job.slurm";
 my $n = $end - $start + 1;

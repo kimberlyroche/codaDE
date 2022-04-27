@@ -6,8 +6,6 @@ library(RSQLite)
 # Create DB (if doesn't exist?)
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
-discard <- dbExecute(conn, "DELETE FROM results WHERE FDR=0.01")
-
 #discard <- dbExecute(conn, paste0("CREATE TABLE da_realized(",
 #                                  "UUID VARCHAR(36), ",
 #                                  "MEASURED_BY VARCHAR(64), ",
@@ -30,22 +28,37 @@ discard <- dbExecute(conn, "DELETE FROM results WHERE FDR=0.01")
 #                                  "PERCENT_DIFF_SIM REAL, ",
 #                                  "PERCENT_DIFF_REALIZ REAL)"))
 
+#discard <- dbExecute(conn, paste0("CREATE TABLE datasets2(",
+#                                  "UUID VARCHAR(36) PRIMARY KEY, ",
+#                                  "P INTEGER, ",
+#                                  "CORRP INTEGER, ",
+#                                  "LOG_MEAN REAL, ",
+#                                  "PERTURBATION REAL, ",
+#                                  "REP_NOISE REAL, ",
+#                                  "FC_ABSOLUTE REAL, ",
+#                                  "FC_RELATIVE REAL, ",
+#                                  "FC_PARTIAL REAL, ",
+#                                  "BASELINE_CALLS VARCHAR(100000), ",
+#                                  "BASELINE_BETAS VARCHAR(100000), ",
+#                                  "MED_ABS_TOTAL REAL, ",
+#                                  "MED_REL_TOTAL REAL, ",
+#                                  "PERCENT_DIFF_SIM REAL, ",
+#                                  "PERCENT_DIFF_REALIZ REAL)"))
+
+#discard <- dbExecute(conn, paste0("INSERT INTO datasets2 SELECT UUID, P, CORRP, LOG_MEAN, PERTURBATION, REP_NOISE, ",
+#                                          "FC_ABSOLUTE, FC_RELATIVE, FC_PARTIAL, BASELINE_CALLS, NULL, MED_ABS_TOTAL, ",
+#                                          "MED_REL_TOTAL, PERCENT_DIFF_SIM, PERCENT_DIFF_REALIZ FROM datasets;"))
+
+#discard <- dbExecute(conn, "DROP TABLE datasets")
+
+#discard <- dbExecute(conn, "ALTER TABLE datasets2 RENAME TO datasets")
+
+#discard <- dbExecute(conn, "ALTER TABLE results RENAME TO results_backup")
+
 #discard <- dbExecute(conn, paste0("CREATE TABLE results(",
 #                                  "UUID VARCHAR(36), ",
 #                                  "METHOD VARCHAR(64), ",
-#                                  "PARTIAL_INFO INT, ",
-#                                  "BASELINE_TYPE VARCHAR(16), ",
-#                                  "OBSERVED_TYPE VARCHAR(64), ",
-#                                  "BASELINE_CALLS VARCHAR(100000), ",
-#                                  "CALLS VARCHAR(100000), ",
-#                                  "TPR REAL, ",
-#                                  "FPR REAL, ",
-#                                  "PRIMARY KEY (UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE));"))
-
-#discard <- dbExecute(conn, paste0("CREATE TABLE results2(",
-#                                  "UUID VARCHAR(36), ",
-#                                  "METHOD VARCHAR(64), ",
-#                                  "PARTIAL_INFO INT, ",
+#                                  "PARTIAL_INFO INT DEFAULT 0 NOT NULL, ",
 #                                  "BASELINE_TYPE VARCHAR(16), ",
 #                                  "OBSERVED_TYPE VARCHAR(64), ",
 #                                  "BASELINE_CALLS VARCHAR(100000), ",
@@ -61,9 +74,9 @@ discard <- dbExecute(conn, "DELETE FROM results WHERE FDR=0.01")
 #discard <- dbExecute(conn, paste0("INSERT INTO results2 SELECT UUID, METHOD, PARTIAL_INFO, BASELINE_TYPE, OBSERVED_TYPE, ",
 #                                          "BASELINE_CALLS, CALLS, NULL, NULL, TPR, FPR, FDR, BETA FROM results;"))
 
-discard <- dbExecute(conn, "DROP TABLE results")
+#discard <- dbExecute(conn, "DROP TABLE results")
 
-discard <- dbExecute(conn, "ALTER TABLE results2 RENAME TO results")
+#discard <- dbExecute(conn, "ALTER TABLE results2 RENAME TO results")
 
 #discard <- dbExecute(conn, paste0("CREATE TABLE characteristics(",
 #                                  "UUID VARCHAR(36),",
