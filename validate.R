@@ -67,23 +67,23 @@ if(threshold < 0) {
 
 testing <- FALSE
 
-# methods_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "edgeR_TMM", "scran")
-methods_list <- c("DESeq2_CG")
+methods_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "edgeR_TMM", "scran")
+# methods_list <- c("DESeq2_CG")
 
-hkg <- c("GAPDH",
-         "EEF2",
-         "LMNA",
-         "TBCB", # Padovan-Merhar et al.
-         "ATP5PB", # Panina et al.
-         "EEF1A1",
-         "TBP",
-         "PPIB", # Nazet et al.
-         "CYCS",
-         "PRKG1",
-         "B2M",
-         "HPRT1",
-         "HMBS") # de Kok
-# hkg <- NULL
+# hkg <- c("GAPDH",
+#          "EEF2",
+#          "LMNA",
+#          "TBCB", # Padovan-Merhar et al.
+#          "ATP5PB", # Panina et al.
+#          "EEF1A1",
+#          "TBP",
+#          "PPIB", # Nazet et al.
+#          "CYCS",
+#          "PRKG1",
+#          "B2M",
+#          "HPRT1",
+#          "HMBS") # de Kok
+hkg <- NULL
 
 # ------------------------------------------------------------------------------
 #   Parse and wrangle validation data
@@ -106,7 +106,7 @@ tax <- parsed_obj$tax
 # ------------------------------------------------------------------------------
 
 # Save this estimate for later; we'll print it out with other statistics
-percent_DE <- NULL
+# percent_DE <- NULL
 for(DE_method in methods_list) {
   # Pull saved calls on this data set x method if these exist
   save_fn <- file.path("output",
@@ -128,7 +128,7 @@ for(DE_method in methods_list) {
     if(use_self_baseline) {
       oracle_calls <- NULL
     } else {
-      oracle_calls <- call_DA_NB(ref_data, groups)$pval
+      oracle_calls <- call_DA_NB(ref_data, groups)
     }
     if(DE_method == "DESeq2_CG") {
       if(!exists("hkg") | is.null(hkg)) {
@@ -155,10 +155,10 @@ for(DE_method in methods_list) {
     save_obj <- list(all_calls = all_calls, rates = rates)
     saveRDS(save_obj, save_fn)
   }
-  if(is.null(percent_DE)) {
-    oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < 0.05
-    percent_DE <- sum(oracle_calls) / length(oracle_calls)
-  }
+  # if(is.null(percent_DE)) {
+  #   oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < 0.05
+  #   percent_DE <- sum(oracle_calls) / length(oracle_calls)
+  # }
 }
 
 # ------------------------------------------------------------------------------
@@ -367,6 +367,7 @@ for(use_result_type in c("TPR", "FPR")) {
                                   dataset_name,
                                   "_threshold",
                                   threshold,
+                                  ifelse(!exists("hkg") | is.null(hkg), "_noHKG", ""),
                                   ".rds"))
       if(!file.exists(save_fn)) {
         stop(paste0("Missing file ", save_fn, "!"))

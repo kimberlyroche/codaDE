@@ -23,7 +23,7 @@ beta <- opt$beta
 file <- paste0("input_rate_", p, ".txt")
 
 #methods_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "scran", "edgeR", "edgeR_TMM", "DESeq2_control")
-methods_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "scran", "edgeR_TMM")
+methods_list <- c("scran")
 
 conn <- dbConnect(RSQLite::SQLite(), file.path("output", "simulations.db"))
 
