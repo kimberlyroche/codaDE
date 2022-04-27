@@ -4,7 +4,7 @@
 \alias{parse_Owens}
 \title{Parse the Owens et al. (2016) zebrafish developmental series}
 \usage{
-parse_Owens(absolute = TRUE, use_cpm = FALSE)
+parse_Owens(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance
@@ -12,6 +12,8 @@ data}
 
 \item{use_cpm}{flag indicating whether or not to convert observed counts to
 counts per million (CPM)}
+
+\item{hkg_list}{dummy argument for control features (not used)}
 }
 \value{
 named list of counts and group labels

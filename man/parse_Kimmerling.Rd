@@ -4,7 +4,12 @@
 \alias{parse_Kimmerling}
 \title{Parse the Kimmerling et al. (2018) fibroblast data set}
 \usage{
-parse_Kimmerling(absolute = TRUE, use_spike_ins = FALSE, use_cpm = FALSE)
+parse_Kimmerling(
+  absolute = TRUE,
+  use_spike_ins = FALSE,
+  use_cpm = FALSE,
+  hkg_list = NULL
+)
 }
 \arguments{
 \item{absolute}{flag indicating whether or not to parse absolute abundance
@@ -12,6 +17,8 @@ data}
 
 \item{use_cpm}{flag indicating whether or not to convert observed counts to
 counts per million (CPM)}
+
+\item{hkg_list}{dummy list of control features (not used)}
 }
 \value{
 named list of counts and group labels

@@ -108,10 +108,11 @@ compute_sf <- function(ref_data) {
 #' data
 #' @param use_cpm flag indicating whether or not to convert observed counts to
 #' counts per million (CPM)
+#' @param hkg_list dummy argument for control features (not used)
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_VieiraSilva <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_VieiraSilva <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   file_dir <- file.path("data", "Vieira-Silva_2019")
   
   data <- read.table(file.path(file_dir, "QMP.matrix.tsv"))
@@ -193,9 +194,10 @@ parse_VieiraSilva <- function(absolute = TRUE, use_cpm = FALSE) {
 #' data
 #' @param use_cpm flag indicating whether or not to convert observed counts to
 #' counts per million (CPM)
+#' @param hkg_list dummy argument for control features (not used)
 #' @return named list of counts and group labels
 #' @export
-parse_Barlow <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_Barlow <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   file_dir <- file.path("data", "Barlow_2020")
   
   if(absolute) {
@@ -615,10 +617,11 @@ parse_Hagai <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
 #' data
 #' @param use_cpm flag indicating whether or not to convert observed counts to
 #' counts per million (CPM)
+#' @param hkg_list dummy argument for control features (not used)
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Owens <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_Owens <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   counts <- read.table(file.path("data",
                                  "Owens_2016",
                                  "clutchA_polya_relative_TPM_gene_isoform.txt"),
@@ -685,10 +688,11 @@ parse_Owens <- function(absolute = TRUE, use_cpm = FALSE) {
 #' data
 #' @param use_cpm flag indicating whether or not to convert observed counts to
 #' counts per million (CPM)
+#' @param hkg_list dummy argument for control features (not used)
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Klein <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_Klein <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   counts_A <- read.table(file.path("data",
                                    "Klein_2015",
                                    "GSM1599494_ES_d0_main.csv",
@@ -761,10 +765,11 @@ parse_Klein <- function(absolute = TRUE, use_cpm = FALSE) {
 #' data
 #' @param use_cpm flag indicating whether or not to convert observed counts to
 #' counts per million (CPM)
+#' @param hkg_list dummy list of control features (not used)
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Yu <- function(absolute = TRUE, use_cpm = FALSE) {
+parse_Yu <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL) {
   # type <- c("Adr", "Brn", "Hrt", "Kdn", "Lng", "Lvr", "Msc", "Spl", "Thm", "Tst", "Utr")
   # Brain and liver are the most differential in terms of sample abundance
   type <- c("Brn", "Lvr")
@@ -1308,10 +1313,12 @@ parse_Hashimshony <- function(absolute = TRUE, use_cpm = FALSE, hkg_list = NULL)
 #' data
 #' @param use_cpm flag indicating whether or not to convert observed counts to
 #' counts per million (CPM)
+#' @param hkg_list dummy list of control features (not used)
 #' @return named list of counts and group labels
 #' @import stringr
 #' @export
-parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE, use_cpm = FALSE) {
+parse_Kimmerling <- function(absolute = TRUE, use_spike_ins = FALSE, use_cpm = FALSE,
+                             hkg_list = NULL) {
   file_dir <- file.path("data", "Kimmerling_2018")
   
   data <- read.table(file.path(file_dir, "fl5_serial_rsem3.txt"),
