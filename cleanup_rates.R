@@ -33,3 +33,6 @@ for(i in 1:nrow(remove)) {
 }
 
 dbDisconnect(conn)
+
+cat(paste0(ops, " rows updated\n"))
+
