@@ -26,8 +26,11 @@ pull_data <- function(qq, use_baseline = "self", use_cpm = TRUE) {
                                  "PARTIAL_INFO, ",
                                  "BASELINE_TYPE, ",
                                  "datasets.BASELINE_CALLS AS ORACLE_BASELINE, ",
+                                 "datasets.BASELINE_BETAS AS ORACLE_BETAS, ",
                                  "CALLS, ",
                                  "results.BASELINE_CALLS AS SELF_BASELINE, ",
+                                 "BETAS, ",
+                                 "results.BASELINE_BETAS AS SELF_BETAS, ",
                                  "P, ",
                                  "CORRP, ",
                                  "LOG_MEAN, ",
@@ -41,7 +44,8 @@ pull_data <- function(qq, use_baseline = "self", use_cpm = TRUE) {
                                  "PERCENT_DIFF_REALIZ, ",
                                  "TPR, ",
                                  "FPR, ",
-                                 "FDR ",
+                                 "FDR, ",
+                                 "BETA ",
                                  "FROM results LEFT JOIN datasets ON ",
                                  "results.UUID=datasets.UUID ",
                                  "WHERE PARTIAL_INFO=0 ",
@@ -164,7 +168,7 @@ plot_ROC_percentDE <- function(data, method, p = NULL) {
   pl <- pl +
     xlim(c(-0.025,1.025)) +
     ylim(c(-0.025,1.025)) +
-    labs(x = paste0(method, " specificitity (1-FPR)"),
+    labs(x = paste0(method, " specificity (1-FPR)"),
          y = paste0(method, " sensitivity"),
          fill = "Proportion differentially abundant features     ") +
     theme_bw() +
@@ -346,10 +350,10 @@ ggsave(file.path(output_dir, "roc_edgeR-absent.svg"),
 # ------------------------------------------------------------------------------
 
 # Main text version
-# use_fdr <- 0.05
+use_fdr <- 0.01
 
 # Supplemental, higher-stringency version
-use_fdr <- 0.001
+# use_fdr <- 0.001
 
 method_list <- c("ALDEx2", "ANCOM-BC", "DESeq2", "edgeR (TMM)", "scran")
 temp <- data %>%
@@ -469,7 +473,6 @@ ggsave(file.path("output", "images", fn),
 # ------------------------------------------------------------------------------
 
 by_pde <- TRUE
-DESeq2_only <- TRUE
 
 p1_1 <- NULL; p1_2 <- NULL; p1_3 <- NULL
 p2_1 <- NULL; p2_2 <- NULL; p2_3 <- NULL
@@ -477,8 +480,8 @@ p3_1 <- NULL; p3_2 <- NULL; p3_3 <- NULL
 p4_1 <- NULL; p4_2 <- NULL; p4_3 <- NULL
 p5_1 <- NULL; p5_2 <- NULL; p5_3 <- NULL
 legend <- NULL
-for(i in 1:(length(method_list) + 1)) {
-  method <- c(method_list, "DESeq2 (CG)")[i]
+for(i in 1:length(method_list)) {
+  method <- method_list[i]
   setting_label <- "n/a"
   for(j in 1:3) { # iterate settings
     subdata <- temp
@@ -539,7 +542,7 @@ pgrid <- plot_grid(prow1, prow2, prow3, prow4, prow5,
                    nrow = 5, labels = c("a", "b", "c", "d", "e"),
                    label_size = 17, label_y = 1.02)
 pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, 0.08))
-ggsave(file.path("output", "images", ifelse(by_pde, "F1.svg", "F2.svg")),
+ggsave(file.path("output", "images", ifelse(by_pde, "F1_alt.svg", "F2.svg")),
        plot = pl,
        units = "in",
        height = 12,

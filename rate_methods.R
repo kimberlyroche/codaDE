@@ -62,7 +62,9 @@ wishlist <- wishlist[start:end,]
 counter <- 1
 for(i in 1:nrow(wishlist)) {
   job <- wishlist[i,]
-  rates <- calc_DA_discrepancy(job$calls, job$baseline_calls, alpha = job$fdr)
+  all_calls <- list(calls = list(pval = job$calls, betas = job$betas),
+                    oracle_calls = list(pval = job$baseline_calls, betas = job$baseline_betas))
+  rates <- calc_DA_discrepancy(all_calls$calls, all_calls$oracle_calls, alpha = job$fdr, beta = job$beta)
   results_row <- data.frame(ID = counter,
                             uuid = job$uuid,
                             baseline = job$baseline,
@@ -71,7 +73,8 @@ for(i in 1:nrow(wishlist)) {
                             method = job$method,
                             tpr = rates$TPR,
                             fpr = rates$FPR,
-                            fdr = job$fdr)
+                            fdr = job$fdr,
+                            beta = job$beta)
   write_delim(results_row, output_fn, delim = "\t", append = TRUE)
   counter <- counter + 1
 }
