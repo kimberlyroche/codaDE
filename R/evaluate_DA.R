@@ -330,7 +330,7 @@ call_DA_scran <- function(data, groups) {
   sf <- sizeFactors(sce)
   norm_counts <- counts(sce)
   for(i in 1:ncol(norm_counts)) {
-    norm_counts[,i] <- norm_counts[,i]/sf
+    norm_counts[,i] <- norm_counts[,i]/sf[i]
   }
   groups <- factor(groups)
   est <- numeric(nrow(norm_counts))

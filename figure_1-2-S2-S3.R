@@ -542,7 +542,7 @@ pgrid <- plot_grid(prow1, prow2, prow3, prow4, prow5,
                    nrow = 5, labels = c("a", "b", "c", "d", "e"),
                    label_size = 17, label_y = 1.02)
 pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, 0.08))
-ggsave(file.path("output", "images", ifelse(by_pde, "F1_alt.svg", "F2.svg")),
+ggsave(file.path("output", "images", ifelse(by_pde, "F1_alt2.svg", "F2.svg")),
        plot = pl,
        units = "in",
        height = 12,
