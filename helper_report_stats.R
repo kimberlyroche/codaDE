@@ -1,85 +1,88 @@
 source("path_fix.R")
 
-datasets <- c("VieiraSilva", "Muraro", "Hagai", "Hashimshony", "Gruen", "Kimmerling",
-              "Song", "Monaco", "Yu", "Klein", "Owens", "Barlow")
-thresholds <- c(rep(1, length(datasets)-1), 0)
+datasets <- c("Barlow", "Gruen", "Hagai", "Hashimshony", "Kimmerling", "Klein",
+              "Monaco", "Muraro", "Owens", "Song", "VieiraSilva", "Yu")
+
+thresholds <- c(0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+
+print_names <- c("Barlow et al. (2020)",
+                 'Gr\\"un et al. (2014)',
+                 "Hagai et al. (2018)",
+                 "Hashimshony et al. (2016)",
+                 "Kimmerling et al. (2018)",
+                 "Klein et al. (2015)",
+                 "Monaco et al. (2019)",
+                 "Muraro et al. (2016)",
+                 "Owens et al. (2016)",
+                 "Song et al. (2021)",
+                 "Vieira-Silva et al. (2019)",
+                 "Yu et al. (2014)")
+
+blurbs <- c("single cell sequencing of zebrafish embryos; early vs. late time course samples drawn",
+            "single cell RNA-sequencing of quiescent and cycling mouse fibroblasts",
+            "nCounter array of human primary lung cancer vs. brain metastases",
+            "single cell expression profiling of rat brain and liver tissue",
+            "mouse embryonic stem cells cultured in serum and a two-inhibitor solution",
+            "16S metagenomics from human gut samples of control and Crohn’s disease patients",
+            "bulk RNA sequencing of both unstimulated and mock-viral infected mouse fibroblasts",
+            "single cell RNA-seq of pancreatic islet cells",
+            "immune cell profiling in human humans via bulk RNA-seq",
+            "single cell RNA-sequencing of normally developing and leukemia inhibitory factor-treated mouse ESCs",
+            "cycling, stimulated CD8+ T cells",
+            "16S metagenomics from ketogenic diet and control mice")
+
+canonical_ordering <- c(3,4,10,7,11,1,2,8,5,12,9,6)
+
+out <- NULL
 
 for(i in 1:length(datasets)) {
   dataset_name <- datasets[i]
-  data_obj <- readRDS(file.path("output",
-                                paste0("filtered_data_",dataset_name,"_threshold",thresholds[i],".rds")))
-  ref_data <- data_obj$absolute
-  data <- data_obj$relative
-  groups <- data_obj$groups
-  if(dataset_name == "VieiraSilva") {
-    counts_A <- data[groups == "mHC",]; counts_B <- data[groups == "CD",]
-    counts_A_abs <- ref_data[groups == "mHC",]; counts_B_abs <- ref_data[groups == "CD",]
-  }
-  if(dataset_name == "Barlow") {
-    counts_A <- data[groups == "control",]; counts_B <- data[groups == "keto",]
-    counts_A_abs <- ref_data[groups == "control",]; counts_B_abs <- ref_data[groups == "keto",]
-  }
-  if(dataset_name == "Song") {
-    counts_A <- data[groups == "lung",]; counts_B <- data[groups == "brain",]
-    counts_A_abs <- ref_data[groups == "lung",]; counts_B_abs <- ref_data[groups == "brain",]
-  }
-  if(dataset_name == "Monaco") {
-    counts_A <- data[groups == "CD4_naive",]; counts_B <- data[groups == "PBMC",]
-    counts_A_abs <- ref_data[groups == "CD4_naive",]; counts_B_abs <- ref_data[groups == "PBMC",]
-  }
-  if(dataset_name == "Hagai") {
-    counts_A <- data[groups == "unstimulated",]; counts_B <- data[groups == "pIC4",]
-    counts_A_abs <- ref_data[groups == "unstimulated",]; counts_B_abs <- ref_data[groups == "pIC4",]
-  }
-  if(dataset_name == "Owens") {
-    counts_A <- data[groups == "early_series",]; counts_B <- data[groups == "late_series",]
-    counts_A_abs <- ref_data[groups == "early_series",]; counts_B_abs <- ref_data[groups == "late_series",]
-  }
-  if(dataset_name == "Klein") {
-    counts_A <- data[groups == "unstimulated",]; counts_B <- data[groups == "LIF-2hr",]
-    counts_A_abs <- ref_data[groups == "unstimulated",]; counts_B_abs <- ref_data[groups == "LIF-2hr",]
-  }
-  if(dataset_name == "Yu") {
-    counts_A <- data[groups == "Brn",]; counts_B <- data[groups == "Lvr",]
-    counts_A_abs <- ref_data[groups == "Brn",]; counts_B_abs <- ref_data[groups == "Lvr",]
-  }
-  if(dataset_name == "Muraro") {
-    counts_A <- data[groups == "alpha",]; counts_B <- data[groups == "beta",]
-    counts_A_abs <- ref_data[groups == "alpha",]; counts_B_abs <- ref_data[groups == "beta",]
-  }
-  if(dataset_name == "Hashimshony") {
-    counts_A <- data[groups == "0",]; counts_B <- data[groups == "1",]
-    counts_A_abs <- ref_data[groups == "0",]; counts_B_abs <- ref_data[groups == "1",]
-  }
-  if(dataset_name == "Kimmerling") {
-    counts_A <- data[groups == "low_mass",]; counts_B <- data[groups == "high_mass",]
-    counts_A_abs <- ref_data[groups == "low_mass",]; counts_B_abs <- ref_data[groups == "high_mass",]
-  }
-  if(dataset_name == "Gruen") {
-    counts_A <- data[groups == "A",]; counts_B <- data[groups == "B",]
-    counts_A_abs <- ref_data[groups == "A",]; counts_B_abs <- ref_data[groups == "B",]
-  }
+  threshold <- thresholds[i]
   
-  # Report stats on this data set
-  cat(paste0("Dataset: ", dataset_name, "\n"))
-  cat(paste0("\tNumber of features (after filtering): ", ncol(counts_A), "\n"))
-  # cat(paste0("\tNumber of samples: ", length(groups), "\n"))
-  cat(paste0("\tSamples per condition (A, B): ", sum(groups == levels(groups)[1]), ", ",
-             sum(groups == levels(groups)[2]), "\n"))
-  cat(paste0("\tPercent zeros: ", round(sum(data == 0)/(nrow(data)*ncol(data))*100), "%\n"))
+  cat(paste0("Parsing data set ", print_name[i], "\n"))
+  
+  parsed_obj <- wrangle_validation_data(dataset_name = dataset_name,
+                                        threshold = threshold,
+                                        use_cpm = FALSE,
+                                        testing = FALSE,
+                                        hkg_list = NULL)
+  ref_data <- parsed_obj$ref_data
+  data <- parsed_obj$data
+  groups <- parsed_obj$groups
+  tax <- parsed_obj$tax
+  
+  counts_A <- data[groups == levels(groups)[1],]
+  counts_B <- data[groups == levels(groups)[2],]
+  counts_A_abs <- ref_data[groups == levels(groups)[1],]
+  counts_B_abs <- ref_data[groups == levels(groups)[2],]
+  
   sA <- mean(rowSums(counts_A_abs))
   sB <- mean(rowSums(counts_B_abs))
   fc <- max(sA, sB) / min(sA, sB)
-  cat(paste0("\tApprox. fold change between conditions: ", round(fc, 1), "\n"))
   
   save_fn <- file.path("output",
                        "real_data_calls",
                        "no_norm",
-                       paste0("calls_oracle_ALDEx2_",dataset_name,"_threshold",thresholds[i],".rds"))
-  oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < 0.05
+                       paste0("calls_oracle_ALDEx2_",dataset_name,"_threshold",thresholds[i],"_noHKG.rds"))
+  oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls$pval, method = "BH") < 0.05
   percent_DE <- sum(oracle_calls) / length(oracle_calls)
-  cat(paste0("\tApprox. percent differential features: ", round(percent_DE*100), "%\n"))
+  
+  out <- rbind(out,
+               data.frame(name = print_names[i],
+                          blurb = blurbs[i],
+                          n_feat = ncol(counts_A),
+                          n_samp = paste0(sum(groups == levels(groups)[1]), ", ",
+                                          sum(groups == levels(groups)[2])),
+                          percent_zeros = paste0(round(sum(data == 0)/(nrow(data)*ncol(data))*100), "\\%"),
+                          fc = round(fc, 1),
+                          pde = paste0(round(percent_DE*100), "\\%")))
 }
 
-
+out <- out %>%
+  arrange(pde, fc)
+str_out <- ""
+for(i in 1:nrow(out)) {
+  str_out <- paste0(str_out, paste0(out[i,], collapse = " & "), " \\\\ \\hline \n")
+}
+writeLines(str_out, file.path("output", "scratch.txt"))
 

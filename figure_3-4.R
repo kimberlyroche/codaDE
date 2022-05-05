@@ -114,16 +114,16 @@ visualize_totals <- function(dataset, group_labels = NULL, min_relab = 0.01) {
 
 # Note: these take at least 10 min. render
 plots <- list()
-plots[[1]] <- visualize_totals(dataset = "VieiraSilva",
-                               group_labels = list(mHC = "Control", CD = "Crohn's disease"))
-plots[[2]] <- visualize_totals(dataset = "Hagai",
+plots[[1]] <- visualize_totals(dataset = "Hagai",
                                group_labels = list(unstimulated = "Unstimulated fibroblasts", pIC4 = "pIC4"))
-plots[[3]] <- visualize_totals(dataset = "Hashimshony",
+plots[[2]] <- visualize_totals(dataset = "Hashimshony",
                                group_labels = list("0" = "Quiescent", "1" = "Cycling"))
-plots[[4]] <- visualize_totals(dataset = "Song",
+plots[[3]] <- visualize_totals(dataset = "Song",
                                group_labels = list(brain = "Brain metastasis", lung = "Lung primary tumor"))
-plots[[5]] <- visualize_totals(dataset = "Monaco",
+plots[[4]] <- visualize_totals(dataset = "Monaco",
                                group_labels = list(CD4_naive = "Naive CD4 cells", PBMC = "PBMC cells"))
+plots[[5]] <- visualize_totals(dataset = "VieiraSilva",
+                               group_labels = list(mHC = "Control", CD = "Crohn's disease"))
 plots[[6]] <- visualize_totals(dataset = "Barlow",
                                group_labels = list(control = "Control diet", keto = "Ketogenic diet"))
 plots[[7]] <- visualize_totals(dataset = "Gruen",

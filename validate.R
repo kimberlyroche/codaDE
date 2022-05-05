@@ -67,22 +67,22 @@ if(threshold < 0) {
 
 testing <- FALSE
 
-methods_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "edgeR_TMM", "scran")
-# methods_list <- c("DESeq2_CG")
+# methods_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "edgeR_TMM", "scran")
+methods_list <- c("DESeq2_CG")
 
-# hkg <- c("GAPDH",
-#          "EEF2",
-#          "LMNA",
-#          "TBCB", # Padovan-Merhar et al.
-#          "ATP5PB", # Panina et al.
-#          "EEF1A1",
-#          "TBP",
-#          "PPIB", # Nazet et al.
-#          "CYCS",
-#          "PRKG1",
-#          "B2M",
-#          "HPRT1",
-#          "HMBS") # de Kok
+hkg <- c("GAPDH",
+         "EEF2",
+         "LMNA",
+         "TBCB", # Padovan-Merhar et al.
+         "ATP5PB", # Panina et al.
+         "EEF1A1",
+         "TBP",
+         "PPIB", # Nazet et al.
+         "CYCS",
+         "PRKG1",
+         "B2M",
+         "HPRT1",
+         "HMBS") # de Kok
 hkg <- NULL
 
 # ------------------------------------------------------------------------------
@@ -108,6 +108,14 @@ tax <- parsed_obj$tax
 # Save this estimate for later; we'll print it out with other statistics
 # percent_DE <- NULL
 for(DE_method in methods_list) {
+  if(DE_method == "DESeq2_CG" & (!exists("hkg") | is.null(hkg))) {
+    save_tag <- "_lowvar"
+  } else if(DE_method == "DESeq2_CG" & !is.null(hkg)) {
+    save_tag <- ""
+  } else {
+    save_tag <- "_noHKG"
+  }
+  
   # Pull saved calls on this data set x method if these exist
   save_fn <- file.path("output",
                        "real_data_calls",
@@ -120,7 +128,7 @@ for(DE_method in methods_list) {
                               dataset_name,
                               "_threshold",
                               threshold,
-                              ifelse(!exists("hkg") | is.null(hkg), "_noHKG", ""),
+                              save_tag,
                               ".rds"))
   if(!file.exists(save_fn)) {
     cat(paste0("Making calls for ", DE_method, " on ", dataset_name, "...\n"))
@@ -159,6 +167,10 @@ for(DE_method in methods_list) {
   #   oracle_calls <- p.adjust(readRDS(save_fn)$all_calls$oracle_calls, method = "BH") < 0.05
   #   percent_DE <- sum(oracle_calls) / length(oracle_calls)
   # }
+}
+
+if(length(setdiff("DESeq2_CG", methods_list)) == 0) {
+  quit()
 }
 
 # ------------------------------------------------------------------------------
@@ -296,10 +308,6 @@ if(use_renorm_counts) {
   features <- cbind(features, features_DESeq2)
 }
 
-if(length(setdiff("DESeq2_CG", methods_list)) == 0) {
-  quit()
-}
-
 # ------------------------------------------------------------------------------
 #   Make predictions on simulations and real data and visualize these together
 # ------------------------------------------------------------------------------
@@ -367,7 +375,7 @@ for(use_result_type in c("TPR", "FPR")) {
                                   dataset_name,
                                   "_threshold",
                                   threshold,
-                                  ifelse(!exists("hkg") | is.null(hkg), "_noHKG", ""),
+                                  "no_HKG",
                                   ".rds"))
       if(!file.exists(save_fn)) {
         stop(paste0("Missing file ", save_fn, "!"))

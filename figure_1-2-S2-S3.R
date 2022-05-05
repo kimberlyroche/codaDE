@@ -189,14 +189,14 @@ plot_ROC_percentDE <- function(data, method, p = NULL) {
 }
 
 # Method-labeling palette
-palette <- c("#46A06B", "#FF5733", "#EF82BB", "#9B59B6", "#E3C012", "#C70039", "#467BBC")
+palette <-        c("#FF5733", "#46A06B", "#EF82BB", "#E3C012", "#5094d4", "#C70039", "#9B59B6")
 names(palette) <- c("ALDEx2", "ANCOM-BC", "DESeq2", "edgeR (TMM)", "scran", "DESeq2 (CG)", "edgeR")
 
 # Visualize this palette
-# ggplot(data.frame(x = 1:7, y = 1:7, method = names(palette)), aes(x = x, y = y, fill = method)) +
-#   geom_point(size = 5, shape = 21) +
-#   scale_fill_manual(values = palette) +
-#   theme_bw()
+ggplot(data.frame(x = 1:7, y = 1:7, method = names(palette)), aes(x = x, y = y, fill = method)) +
+  geom_point(size = 5, shape = 21) +
+  scale_fill_manual(values = palette) +
+  theme_bw()
 
 # ------------------------------------------------------------------------------
 #   Initialize output directory and generate a color palette for levels of fold
@@ -235,15 +235,74 @@ levels(data$METHOD)[4] <- "DESeq2 (CG)"
 levels(data$METHOD)[6] <- "edgeR (TMM)"
 
 # ------------------------------------------------------------------------------
+#   ROC plot: edgeR without normalization is terrible
+# ------------------------------------------------------------------------------
+
+p <- ggplot(data %>% filter(METHOD == "edgeR"),
+            aes(x = specificity, y = sensitivity, fill = factor(P))) +
+  geom_point(size = 2, shape = 21) +
+  theme_bw() +
+  labs(x = "\nfalse positive rate",
+       y = "true positive rate\n",
+       fill = "feature number") +
+  scale_fill_brewer(palette = "Reds") +
+  theme(legend.position = "bottom")
+pm <- ggMarginal(p, margins = "both", type = "histogram", bins = 50,
+                 fill = "#888888", color = "#333333", size = 20)
+
+ggsave(file.path(output_dir, "roc_edgeR-only.svg"),
+       pm,
+       dpi = 100,
+       units = "in",
+       height = 6,
+       width = 6)
+
+# ------------------------------------------------------------------------------
+#   ROC plot: all normalization-based methods together
+# ------------------------------------------------------------------------------
+
+# p <- ggplot(data %>% filter(METHOD %in% method_list),
+#             aes(x = FPR, y = TPR, fill = factor(P))) +
+#   geom_point(size = 2, shape = 21) +
+#   theme_bw() +
+#   labs(x = "false positive rate",
+#        y = "true positive rate",
+#        fill = "feature number") +
+#   scale_fill_brewer(palette = "Reds") +
+#   theme(legend.position = "bottom")
+# pm <- ggMarginal(p, margins = "both", type = "histogram", bins = 50,
+#                  fill = "#888888", color = "#333333", size = 20)
+# 
+# ggsave(file.path(output_dir, "roc_edgeR-absent.svg"),
+#        pm,
+#        dpi = 100,
+#        units = "in",
+#        height = 6,
+#        width = 6)
+
+# ------------------------------------------------------------------------------
+#   Ridges plot: all normalization-based methods x FPR
+# ------------------------------------------------------------------------------
+
+# Main text version
+use_fdr <- 0.05
+
+# Supplemental, higher-stringency version
+# use_fdr <- 0.01
+
+# method_list <- c("ALDEx2", "ANCOM-BC", "DESeq2", "edgeR (TMM)", "scran")
+method_list <- c("edgeR", "ALDEx2", "ANCOM-BC", "DESeq2", "edgeR (TMM)", "scran")
+temp <- data %>%
+  filter(METHOD %in% method_list) %>%
+  filter(FDR == use_fdr)
+
+# ------------------------------------------------------------------------------
 #   Calculate some overall statistics
 # ------------------------------------------------------------------------------
 
 if(FALSE) {
-  # k
-  threshold <- 0.5
-  
   # Exceeding k% FPR by SETTING
-  data %>%
+  out <- temp %>%
     select(METHOD, P, PERTURBATION, FPR) %>%
     mutate(setting = ifelse(P <= 1000 & PERTURBATION >= 1.2,
                             "1: Microbial",
@@ -252,28 +311,83 @@ if(FALSE) {
                                    ifelse(P == 5000 & PERTURBATION <= 0.8,
                                           "3: Bulk transcriptomic",
                                           NA)))) %>%
-    mutate(high_FPR = ifelse(FPR > threshold, 1, 0)) %>%
-    mutate(low_FPR = ifelse(FPR <= threshold, 1, 0)) %>%
+    mutate(high_FPR = ifelse(FPR > 0.05, 1, 0),
+           low_FPR = ifelse(FPR <= 0.05, 1, 0),
+           high_FPR2 = ifelse(FPR > 0.5, 1, 0),
+           low_FPR2 = ifelse(FPR <= 0.5, 1, 0)) %>%
     group_by(METHOD, setting) %>%
     summarize(median_specificity = 1 - median(FPR),
               n_high_FPR = sum(high_FPR),
-              n_low_FPR = sum(low_FPR)) %>%
-    mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2)) %>%
+              n_low_FPR = sum(low_FPR),
+              n_high_FPR2 = sum(high_FPR2),
+              n_low_FPR2 = sum(low_FPR2)) %>%
+    mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2),
+           prop2 = round(n_high_FPR2 / (n_high_FPR2 + n_low_FPR2), 2)) %>%
     arrange(setting, METHOD) %>%
-    filter(METHOD != "edgeR" & !is.na(setting))
+    filter(!is.na(setting)) %>%
+    select(METHOD, setting, median_specificity, prop, prop2)
+
+  str_out <- ""
+  for(i in 1:nrow(out)) {
+    str_out <- paste0(str_out,
+                      substr(out[i,]$setting, 4, str_length(out[i,]$setting)),
+                      " & ",
+                      out[i,]$METHOD,
+                      " & ",
+                      round(out[i,]$median_specificity, 3),
+                      " & ",
+                      round((out[i,]$prop)*100), "\\%",
+                      " & ",
+                      round((out[i,]$prop2)*100), "\\%",
+                      " \\\\ \\hline\n")
+  }
+  writeLines(str_out, file.path("output", "scratch.txt"))
   
-  # Exceeding k% FPR by FEATURE NUMBER
-  data %>%
-    select(METHOD, P, FPR) %>%
-    mutate(high_FPR = ifelse(FPR > threshold, 1, 0)) %>%
-    mutate(low_FPR = ifelse(FPR <= threshold, 1, 0)) %>%
+  out <- temp %>%
+    select(METHOD, P, PERTURBATION, FPR) %>%
+    mutate(high_FPR = ifelse(FPR > 0.05, 1, 0),
+           low_FPR = ifelse(FPR <= 0.05, 1, 0),
+           high_FPR2 = ifelse(FPR > 0.5, 1, 0),
+           low_FPR2 = ifelse(FPR <= 0.5, 1, 0)) %>%
     group_by(METHOD, P) %>%
     summarize(median_specificity = 1 - median(FPR),
               n_high_FPR = sum(high_FPR),
-              n_low_FPR = sum(low_FPR)) %>%
-    mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2)) %>%
+              n_low_FPR = sum(low_FPR),
+              n_high_FPR2 = sum(high_FPR2),
+              n_low_FPR2 = sum(low_FPR2)) %>%
+    mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2),
+           prop2 = round(n_high_FPR2 / (n_high_FPR2 + n_low_FPR2), 2)) %>%
     arrange(P, METHOD) %>%
-    filter(METHOD != "edgeR")
+    select(METHOD, P, median_specificity, prop, prop2)
+  
+  str_out <- ""
+  for(i in 1:nrow(out)) {
+    str_out <- paste0(str_out,
+                      out[i,]$P,
+                      " & ",
+                      out[i,]$METHOD,
+                      " & ",
+                      round(out[i,]$median_specificity, 3),
+                      " & ",
+                      round((out[i,]$prop)*100), "\\%",
+                      " & ",
+                      round((out[i,]$prop2)*100), "\\%",
+                      " \\\\ \\hline\n")
+  }
+  writeLines(str_out, file.path("output", "scratch.txt"))
+  
+  # Exceeding k% FPR by FEATURE NUMBER
+  # temp %>%
+  #   select(METHOD, P, FPR) %>%
+  #   mutate(high_FPR = ifelse(FPR > threshold, 1, 0)) %>%
+  #   mutate(low_FPR = ifelse(FPR <= threshold, 1, 0)) %>%
+  #   group_by(METHOD, P) %>%
+  #   summarize(median_specificity = 1 - median(FPR),
+  #             n_high_FPR = sum(high_FPR),
+  #             n_low_FPR = sum(low_FPR)) %>%
+  #   mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2)) %>%
+  #   arrange(P, METHOD) %>%
+  #   filter(METHOD != "edgeR")
   
   # # 80% of data sets with modest change had FPR of 10% or less
   # quantile(data %>%
@@ -299,111 +413,136 @@ if(FALSE) {
   #   mutate(prop = round(n_high_FPR / (n_high_FPR + n_low_FPR), 2))
 }
 
-# ------------------------------------------------------------------------------
-#   ROC plot: edgeR without normalization is terrible
-# ------------------------------------------------------------------------------
-
-p <- ggplot(data %>% filter(METHOD == "DESeq2"),
-            aes(x = FPR, y = TPR, fill = factor(P))) +
-  geom_point(size = 2, shape = 21) +
-  theme_bw() +
-  labs(x = "false positive rate",
-       y = "true positive rate",
-       fill = "feature number") +
-  scale_fill_brewer(palette = "Reds") +
-  theme(legend.position = "bottom")
-pm <- ggMarginal(p, margins = "both", type = "histogram", bins = 50,
-                 fill = "#888888", color = "#333333", size = 20)
-
-ggsave(file.path(output_dir, "roc_edgeR-only.svg"),
-       pm,
-       dpi = 100,
-       units = "in",
-       height = 6,
-       width = 6)
-
-# ------------------------------------------------------------------------------
-#   ROC plot: all normalization-based methods together
-# ------------------------------------------------------------------------------
-
-p <- ggplot(data %>% filter(METHOD %in% method_list),
-            aes(x = FPR, y = TPR, fill = factor(P))) +
-  geom_point(size = 2, shape = 21) +
-  theme_bw() +
-  labs(x = "false positive rate",
-       y = "true positive rate",
-       fill = "feature number") +
-  scale_fill_brewer(palette = "Reds") +
-  theme(legend.position = "bottom")
-pm <- ggMarginal(p, margins = "both", type = "histogram", bins = 50,
-                 fill = "#888888", color = "#333333", size = 20)
-
-ggsave(file.path(output_dir, "roc_edgeR-absent.svg"),
-       pm,
-       dpi = 100,
-       units = "in",
-       height = 6,
-       width = 6)
-
-# ------------------------------------------------------------------------------
-#   Ridges plot: all normalization-based methods x FPR
-# ------------------------------------------------------------------------------
-
-# Main text version
-use_fdr <- 0.01
-
-# Supplemental, higher-stringency version
-# use_fdr <- 0.001
-
-method_list <- c("ALDEx2", "ANCOM-BC", "DESeq2", "edgeR (TMM)", "scran")
-temp <- data %>%
-  filter(METHOD %in% method_list) %>%
-  filter(FDR == use_fdr)
 temp$METHOD <- factor(temp$METHOD, levels = method_list[5:1])
 
-p <- ggplot(temp, aes(x = FPR, y = METHOD, fill = METHOD)) +
-  geom_density_ridges(stat = "binline", bins = 40, scale = 1) +
-  theme_bw() +
-  theme(axis.title.y = element_blank()) +
-  scale_y_discrete(expand = expansion(add = c(0.2, 1.1))) +
-  coord_cartesian(clip = "off") +
-  guides(fill = "none") +
-  labs(x = "false positive rate") +
-  scale_fill_manual(values = palette)
+# ------------------------------------------------------------------------------
+#   Ridges plot: per-method FPR
+# ------------------------------------------------------------------------------
 
-ggsave(file.path(output_dir, "ridges_fpr_methods.svg"),
-       p,
-       dpi = 100,
-       units = "in",
-       height = 4,
-       width = 4.5)
+# p <- ggplot(temp, aes(x = FPR, y = METHOD, fill = METHOD)) +
+#   geom_density_ridges(stat = "binline", bins = 40, scale = 1) +
+#   theme_bw() +
+#   theme(axis.title.y = element_blank()) +
+#   scale_y_discrete(expand = expansion(add = c(0.2, 1.1))) +
+#   coord_cartesian(clip = "off") +
+#   guides(fill = "none") +
+#   labs(x = "false positive rate") +
+#   scale_fill_manual(values = palette)
+# 
+# ggsave(file.path(output_dir, "ridges_fpr_methods.svg"),
+#        p,
+#        dpi = 100,
+#        units = "in",
+#        height = 4,
+#        width = 4.5)
 
 # ------------------------------------------------------------------------------
 #   Ridges plot: FPR x P
 # ------------------------------------------------------------------------------
 
-p <- ggplot(temp, aes(x = FPR, y = factor(P))) +
-  geom_density_ridges(stat = "binline", bins = 40, scale = 1) +
-  theme_bw() +
-  theme(axis.title.y = element_blank()) +
-  scale_y_discrete(expand = expansion(add = c(0.2, 1.1))) +
-  coord_cartesian(clip = "off") +
-  guides(fill = "none") +
-  labs(x = "false positive rate")
+# p <- ggplot(temp, aes(x = FPR, y = factor(P))) +
+#   geom_density_ridges(stat = "binline", bins = 40, scale = 1) +
+#   theme_bw() +
+#   theme(axis.title.y = element_blank()) +
+#   scale_y_discrete(expand = expansion(add = c(0.2, 1.1))) +
+#   coord_cartesian(clip = "off") +
+#   guides(fill = "none") +
+#   labs(x = "false positive rate")
+# 
+# ggsave(file.path(output_dir, "ridges_fpr_P.svg"),
+#        p,
+#        dpi = 100,
+#        units = "in",
+#        height = 4,
+#        width = 4)
 
-ggsave(file.path(output_dir, "ridges_fpr_P.svg"),
-       p,
-       dpi = 100,
+# ------------------------------------------------------------------------------
+#   Sensitivity x specificity plot labeled by SETTINGS
+# ------------------------------------------------------------------------------
+
+by_pde <- FALSE
+
+p1_1 <- NULL; p1_2 <- NULL; p1_3 <- NULL
+p2_1 <- NULL; p2_2 <- NULL; p2_3 <- NULL
+p3_1 <- NULL; p3_2 <- NULL; p3_3 <- NULL
+p4_1 <- NULL; p4_2 <- NULL; p4_3 <- NULL
+p5_1 <- NULL; p5_2 <- NULL; p5_3 <- NULL
+legend <- NULL
+for(i in 1:length(method_list)) {
+  method <- method_list[i]
+  setting_label <- "n/a"
+  for(j in 1:3) { # iterate settings
+    subdata <- temp
+    if(j == 1) {
+      subdata <- subdata %>%
+        filter(P <= 1000 & PERTURBATION >= 1.2)
+      setting_label <- "Microbial"
+    } else if(j == 2) {
+      subdata <- subdata %>%
+        filter(P >= 1000 & PERTURBATION >= 0.8 & PERTURBATION <= 1.2)
+      setting_label <- "Transcriptomic"
+    } else if(j == 3) {
+      subdata <- subdata %>%
+        filter(P == 5000 & PERTURBATION <= 0.8)
+      setting_label <- "Bulk transcriptomic"
+    }
+    # prop_high_fpr <- subdata %>%
+    #   filter(METHOD == method) %>%
+    #   mutate(high_FPR = ifelse(FPR < 0.95, "high", "low")) %>%
+    #   group_by(high_FPR) %>%
+    #   tally() %>%
+    #   mutate(prop = n/sum(n)) %>%
+    #   filter(high_FPR == "high") %>%
+    #   pull(prop)
+    if(by_pde) {
+      plot_pieces <- plot_ROC_percentDE(subdata, method)
+    } else {
+      plot_pieces <- plot_ROC_fc(subdata, method)
+    }
+    pl <- plot_pieces$pl
+    if(is.null(legend)) {
+      legend <- plot_pieces$legend
+    }
+    if(i == 1 & j == 1) p1_1 <<- pl
+    if(i == 1 & j == 2) p1_2 <<- pl
+    if(i == 1 & j == 3) p1_3 <<- pl
+    if(i == 2 & j == 1) p2_1 <<- pl
+    if(i == 2 & j == 2) p2_2 <<- pl
+    if(i == 2 & j == 3) p2_3 <<- pl
+    if(i == 3 & j == 1) p3_1 <<- pl
+    if(i == 3 & j == 2) p3_2 <<- pl
+    if(i == 3 & j == 3) p3_3 <<- pl
+    if(i == 4 & j == 1) p4_1 <<- pl
+    if(i == 4 & j == 2) p4_2 <<- pl
+    if(i == 4 & j == 3) p4_3 <<- pl
+    if(i == 5 & j == 1) p5_1 <<- pl
+    if(i == 5 & j == 2) p5_2 <<- pl
+    if(i == 5 & j == 3) p5_3 <<- pl
+  }
+}
+
+prow1 <- plot_grid(p1_1, p1_2, p1_3, ncol = 3)
+prow2 <- plot_grid(p2_1, p2_2, p2_3, ncol = 3)
+prow3 <- plot_grid(p3_1, p3_2, p3_3, ncol = 3)
+prow4 <- plot_grid(p4_1, p4_2, p4_3, ncol = 3)
+prow5 <- plot_grid(p5_1, p5_2, p5_3, ncol = 3)
+pgrid <- plot_grid(prow1, prow2, prow3, prow4, prow5,
+                   nrow = 5, labels = c("a", "b", "c", "d", "e"),
+                   label_size = 17, label_y = 1.02)
+pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, 0.08))
+ggsave(file.path("output", "images", ifelse(by_pde, "F1.svg", "F2.svg")),
+       plot = pl,
        units = "in",
-       height = 4,
-       width = 4)
+       height = 12,
+       width = 7.75,
+       bg = "white")
 
 # ------------------------------------------------------------------------------
 #   Sensitivity x specificity plot labeled by percent of features differentially
 #   abundant
 # ------------------------------------------------------------------------------
 
-by_pde <- TRUE
+by_pde <- FALSE
 
 p1_100 <- NULL; p1_1000 <- NULL; p1_5000 <- NULL
 p2_100 <- NULL; p2_1000 <- NULL; p2_5000 <- NULL
@@ -462,87 +601,6 @@ if(by_pde & use_fdr == 0.05) {
   fn <- "S4_alt-fdr.svg"
 }
 ggsave(file.path("output", "images", fn),
-       plot = pl,
-       units = "in",
-       height = 12,
-       width = 7.75,
-       bg = "white")
-
-# ------------------------------------------------------------------------------
-#   Same plot by "settings"
-# ------------------------------------------------------------------------------
-
-by_pde <- TRUE
-
-p1_1 <- NULL; p1_2 <- NULL; p1_3 <- NULL
-p2_1 <- NULL; p2_2 <- NULL; p2_3 <- NULL
-p3_1 <- NULL; p3_2 <- NULL; p3_3 <- NULL
-p4_1 <- NULL; p4_2 <- NULL; p4_3 <- NULL
-p5_1 <- NULL; p5_2 <- NULL; p5_3 <- NULL
-legend <- NULL
-for(i in 1:length(method_list)) {
-  method <- method_list[i]
-  setting_label <- "n/a"
-  for(j in 1:3) { # iterate settings
-    subdata <- temp
-    if(j == 1) {
-      subdata <- subdata %>%
-        filter(P <= 1000 & PERTURBATION >= 1.2)
-      setting_label <- "Microbial"
-    } else if(j == 2) {
-      subdata <- subdata %>%
-        filter(P >= 1000 & PERTURBATION >= 0.8 & PERTURBATION <= 1.2)
-      setting_label <- "Transcriptomic"
-    } else if(j == 3) {
-      subdata <- subdata %>%
-        filter(P == 5000 & PERTURBATION <= 0.8)
-      setting_label <- "Bulk transcriptomic"
-    }
-    prop_high_fpr <- subdata %>%
-      filter(METHOD == method) %>%
-      mutate(high_FPR = ifelse(FPR < 0.95, "high", "low")) %>%
-      group_by(high_FPR) %>%
-      tally() %>%
-      mutate(prop = n/sum(n)) %>%
-      filter(high_FPR == "high") %>%
-      pull(prop)
-    if(by_pde) {
-      plot_pieces <- plot_ROC_percentDE(subdata, method)
-    } else {
-      plot_pieces <- plot_ROC_fc(subdata, method)
-    }
-    pl <- plot_pieces$pl
-    if(is.null(legend)) {
-      legend <- plot_pieces$legend
-    }
-    if(i == 1 & j == 1) p1_1 <<- pl
-    if(i == 1 & j == 2) p1_2 <<- pl
-    if(i == 1 & j == 3) p1_3 <<- pl
-    if(i == 2 & j == 1) p2_1 <<- pl
-    if(i == 2 & j == 2) p2_2 <<- pl
-    if(i == 2 & j == 3) p2_3 <<- pl
-    if(i == 3 & j == 1) p3_1 <<- pl
-    if(i == 3 & j == 2) p3_2 <<- pl
-    if(i == 3 & j == 3) p3_3 <<- pl
-    if(i == 4 & j == 1) p4_1 <<- pl
-    if(i == 4 & j == 2) p4_2 <<- pl
-    if(i == 4 & j == 3) p4_3 <<- pl
-    if(i == 5 & j == 1) p5_1 <<- pl
-    if(i == 5 & j == 2) p5_2 <<- pl
-    if(i == 5 & j == 3) p5_3 <<- pl
-  }
-}
-
-prow1 <- plot_grid(p1_1, p1_2, p1_3, ncol = 3)
-prow2 <- plot_grid(p2_1, p2_2, p2_3, ncol = 3)
-prow3 <- plot_grid(p3_1, p3_2, p3_3, ncol = 3)
-prow4 <- plot_grid(p4_1, p4_2, p4_3, ncol = 3)
-prow5 <- plot_grid(p5_1, p5_2, p5_3, ncol = 3)
-pgrid <- plot_grid(prow1, prow2, prow3, prow4, prow5,
-                   nrow = 5, labels = c("a", "b", "c", "d", "e"),
-                   label_size = 17, label_y = 1.02)
-pl <- plot_grid(pgrid, legend, ncol = 1, rel_heights = c(1, 0.08))
-ggsave(file.path("output", "images", ifelse(by_pde, "F1_alt2.svg", "F2.svg")),
        plot = pl,
        units = "in",
        height = 12,
@@ -642,6 +700,20 @@ ggsave(file.path(output_dir, "control_genes.svg"),
        height = 9,
        width = 8)
 
+# Median improvement in "bad" cases
+temp <- data %>%
+  filter(FDR == 0.05 & METHOD == "DESeq2" & FPR > 0.2) %>%
+  dplyr::select(c(UUID, specificity)) %>%
+  left_join(data %>%
+              filter(FDR == 0.05 & METHOD == "DESeq2 (CG)") %>%
+              dplyr::select(c(UUID, specificity)), by = "UUID") %>%
+  mutate(delta = specificity.y - specificity.x) %>%
+  filter(complete.cases(.))
+
+hist(temp$delta, breaks = 30)
+
+cat(paste0("Increase in median specificity: ", round(median(temp$specificity.y) - median(temp$specificity.x), 3)*100, "%\n"))
+
 # ------------------------------------------------------------------------------
 #   Box plots: false positive count vs. % differential features
 # ------------------------------------------------------------------------------
@@ -653,33 +725,59 @@ if(!exists("fp")) {
   fp <- numeric(nrow(data))
   for(i in 1:nrow(data)) {
     if(i %% 10000 == 0) {
-      cat(paste0("Iteration ", i, "\n"))
+      cat(paste0("Iteration ", i, " / ", nrow(data), "\n"))
     }
     x <- as.numeric(str_split(data[i,]$ORACLE_BASELINE, ";")[[1]])
     y <- as.numeric(str_split(data[i,]$CALLS, ";")[[1]])
+    x_b <- as.numeric(str_split(data[i,]$ORACLE_BETAS, ";")[[1]])
+    y_b <- as.numeric(str_split(data[i,]$BETAS, ";")[[1]])
     
     x <- p.adjust(x, method = "BH")
     y <- p.adjust(y, method = "BH")
     
-    x_d <- factor(x < 0.001)
-    levels(x_d) <- c("not DE", "DE")
-    y_d <- factor(y < 0.001)
-    levels(y_d) <- c("not DE", "DE")
+    if(data[i,]$FDR == 0.05) {
+      x_d <- factor(x < 0.05)
+      levels(x_d) <- c("not DE", "DE")
+      y_d <- factor(y < 0.05)
+      levels(y_d) <- c("not DE", "DE")
+    } else {
+      x_d <- factor(x < data[i,]$FDR & (x_b < 1/data[i,]$BETA | x_b > data[i,]$BETA))
+      levels(x_d) <- c("not DE", "DE")
+      y_d <- factor(y < data[i,]$FDR & (y_b < 1/data[i,]$BETA | y_b > data[i,]$BETA))
+      levels(y_d) <- c("not DE", "DE")
+    }
     
     fp[i] <- sum(y_d == "DE" & x_d == "not DE")
   }
   data$FP_n <- fp
 }
 
+# Trash this
+# data %>%
+#   filter(FDR == 0.05) %>%
+#   group_by(METHOD) %>%
+#   summarize(median(specificity),
+#             median(sensitivity))
+
+# Average change in median FPR for each method after switching FDR 0.05 -> 0.01
+# data %>%
+#   group_by(METHOD, P, FDR) %>%
+#   summarize(fpn = median(FP_n)) %>%
+#   pivot_wider(id_cols = c(METHOD, P), names_from = FDR, values_from = fpn) %>%
+#   mutate(delta = `0.01` - `0.05`) %>%
+#   filter(!is.na(delta)) %>%
+#   group_by(METHOD) %>%
+#   summarize(mean(delta))
+
 if(edgeR_only) {
   temp2 <- data %>%
     filter(METHOD %in% c("edgeR", "edgeR (TMM)")) %>%
-    filter(FDR == 0.05)
+    filter(FDR == use_fdr)
   temp2$METHOD <- factor(temp2$METHOD, levels = c("edgeR (TMM)", "edgeR"))
 } else {
   temp2 <- data %>%
     filter(METHOD %in% method_list) %>%
-    filter(FDR == 0.05)
+    filter(FDR == use_fdr)
 }
 temp2$P <- paste0(temp2$P, " features")
 temp2 <- temp2 %>%
@@ -692,8 +790,12 @@ temp2 <- temp2 %>%
   ))
 temp2$PDIFF_DISCRETE <- factor(temp2$PDIFF_DISCRETE,
                                levels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
+temp2$METHOD <- factor(temp2$METHOD, levels = method_list)
 
-temp2$title <- paste0(temp2$METHOD, " x ", temp2$P)
+#temp2$title <- paste0(temp2$METHOD, " x ", temp2$P)
+titles <- expand.grid(method_list, c("100 features", "1000 features", "5000 features"))
+titles <- paste0(titles$Var1, " x ", titles$Var2)
+temp2$title <- factor(paste0(temp2$METHOD, " x ", temp2$P), levels = titles)
 p1 <- ggplot(temp2 %>% filter(P == "100 features"), aes(x = PDIFF_DISCRETE, y = FP_n, fill = METHOD)) +
   geom_boxplot(outlier.shape = NA) +
   facet_wrap(. ~ title, ncol = 1) + #, scales = "free_y") +
@@ -730,11 +832,21 @@ p1_padded <- plot_grid(p1, NULL, ncol = 1, rel_heights = c(1, ifelse(edgeR_only,
 p3_padded <- plot_grid(p3, NULL, ncol = 1, rel_heights = c(1, ifelse(edgeR_only, 0.1, 0.05)))
 p <- plot_grid(p1_padded, p2, p3_padded, ncol = 3, rel_widths = c(1, 0.85, 0.85))
 
-ggsave(file.path(output_dir, ifelse(edgeR_only, "F3_edgeR.svg", "F3.svg")),
+save_fn <- ""
+if(edgeR_only) {
+  save_fn <- "F3_edgeR"
+} else {
+  save_fn <- "F3"
+}
+if(use_fdr != 0.05) {
+  save_fn <- paste0(save_fn, "-altFDR")
+}
+save_fn <- paste0(save_fn, ".svg")
+ggsave(file.path(output_dir, save_fn),
        p,
        dpi = 100,
        units = "in",
-       height = ifelse(edgeR_only, 4, 8),
+       height = ifelse(edgeR_only, 4, ifelse(use_fdr == 0.05, 9, 8)),
        width = 8)
 
 # ------------------------------------------------------------------------------
@@ -743,21 +855,54 @@ ggsave(file.path(output_dir, ifelse(edgeR_only, "F3_edgeR.svg", "F3.svg")),
 
 dpalette <- colorRampPalette(brewer.pal(12, "Paired"))(12)
 
+method_list <- c("ALDEx2", "ANCOMBC", "DESeq2", "edgeR_TMM", "scran")
+
+datasets <- c("Barlow", "Gruen", "Hagai", "Hashimshony", "Kimmerling", "Klein",
+              "Monaco", "Muraro", "Owens", "Song", "VieiraSilva", "Yu")
+
+thresholds <- c(0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+
+print_names <- c("Barlow et al.",
+                 "Gruen et al.",
+                 "Hagai et al.",
+                 "Hashimshony et al.",
+                 "Kimmerling et al.",
+                 "Klein et al.",
+                 "Monaco et al.",
+                 "Muraro et al.",
+                 "Owens et al.",
+                 "Song et al.",
+                 "Vieira-Silva et al.",
+                 "Yu et al.")
+
+canonical_ordering <- c(3,4,10,7,11,1,2,8,5,12,9,6)
+
+datasets <- datasets[canonical_ordering]
+thresholds <- thresholds[canonical_ordering]
+print_names <- print_names[canonical_ordering]
+
 real_calls <- NULL
-real_files <- list.files(path = "output/real_data_calls/no_norm", pattern = ".*\\.rds", full.names = TRUE)
-for(file in real_files) {
-  calls <- readRDS(file)
-  file <- str_replace(file, "edgeR_TMM", "edgeR (TMM)")
-  pieces <- str_split(str_split(str_split(file, "\\/")[[1]][4], "\\.")[[1]][1], "_")[[1]]
-  real_calls <- rbind(real_calls,
-                      data.frame(method = pieces[3],
-                                 dataset = pieces[4],
-                                 tpr = calls$rates$TPR,
-                                 fpr = calls$rates$FPR,
-                                 fp = sum(calls$rates$FP_calls),
-                                 tp = sum(calls$rates$TP_calls),
-                                 true_diff = sum(p.adjust(calls$all_calls$oracle_calls, method = "BH") < 0.05),
-                                 n = length(calls$all_calls$oracle_calls)))
+for(i in 1:length(datasets)) {
+  for(j in 1:length(method_list)) {
+    file <- file.path("output",
+                      "real_data_calls",
+                      "no_norm",
+                      paste0("calls_oracle_",method_list[j],"_",datasets[i],"_threshold",thresholds[i],"_noHKG.rds"))
+    calls <- readRDS(file)
+    file <- str_replace(file, "ANCOMBC", "ANCOM-BC")
+    file <- str_replace(file, "edgeR_TMM", "edgeR (TMM)")
+    pieces <- str_split(str_split(str_split(file, "\\/")[[1]][4], "\\.")[[1]][1], "_")[[1]]
+    real_calls <- rbind(real_calls,
+                        data.frame(method = pieces[3],
+                                   # dataset = pieces[4],
+                                   dataset = str_replace(print_names[i], " \\(\\.*?\\)", ""),
+                                   tpr = calls$rates$TPR,
+                                   fpr = calls$rates$FPR,
+                                   fp = sum(calls$rates$FP_calls),
+                                   tp = sum(calls$rates$TP_calls),
+                                   true_diff = sum(p.adjust(calls$all_calls$oracle_calls$pval, method = "BH") < 0.05),
+                                   n = length(calls$all_calls$oracle_calls$pval)))
+  }
 }
 
 temp <- real_calls %>%
@@ -772,10 +917,10 @@ temp <- temp %>%
     TRUE ~ "sc"
   ))
 
-dummy_df <- data.frame(x = c(1,2,3,4), y = c(1,2,3,4), method = c("ALDEx2", "DESeq2", "edgeR (TMM)", "scran"))
+dummy_df <- data.frame(x = 1:5, y = 1:5, method = c("ALDEx2", "ANCOM-BC", "DESeq2", "edgeR (TMM)", "scran"))
 p0 <- ggplot(dummy_df, aes(x = x, y = y, shape = method)) +
   geom_point(fill = "black") +
-  scale_shape_manual(values = c(21,22,24,25)) +
+  scale_shape_manual(values = c(21,22,23,24,25)) +
   theme(legend.position = "bottom")
 shape_legend <- get_legend(p0)
 
@@ -791,10 +936,17 @@ p <- ggplot() +
   theme(legend.position = "bottom")
 legend <- get_legend(p)
 p <- p +
-  geom_jitter(data = temp %>% filter(method == "DESeq2"),
+  geom_jitter(data = temp %>% filter(method == "ANCOM-BC"),
               mapping = aes(x = true_diff_percent*100, y = fp/n*100, fill = dataset),
               size = point_sz - 0.5,
               shape = 22,
+              width = jitter) +
+  theme(legend.position = "none")
+p <- p +
+  geom_jitter(data = temp %>% filter(method == "DESeq2"),
+              mapping = aes(x = true_diff_percent*100, y = fp/n*100, fill = dataset),
+              size = point_sz - 0.5,
+              shape = 23,
               width = jitter) +
   theme(legend.position = "none")
 p <- p +
@@ -824,6 +976,39 @@ ggsave(file.path(output_dir, "F8.svg"),
        units = "in",
        height = 7,
        width = 7)
+
+# Print results table
+str_out <- ""
+for(i in 1:length(datasets)) {
+  str_out <- paste0(str_out,
+                    print_names[i],
+                    " & ",
+                    paste0(
+                      real_calls %>%
+                        filter(dataset == print_names[i]) %>%
+                        arrange(method) %>%
+                        pull(tpr) %>%
+                        round(., 3),
+                      collapse = " & "),
+                    " \\\\ \\hline \n")
+}
+writeLines(str_out, file.path("output", "scratch.txt"))
+
+# Print results table
+str_out <- ""
+for(i in 1:length(datasets)) {
+  str_out <- paste0(str_out,
+                    print_names[i],
+                    " & ",
+                    paste0(
+                      round(1 - real_calls %>%
+                        filter(dataset == print_names[i]) %>%
+                        arrange(method) %>%
+                        pull(fpr), 3),
+                      collapse = " & "),
+                    " \\\\ \\hline \n")
+}
+writeLines(str_out, file.path("output", "scratch.txt"))
 
 # ------------------------------------------------------------------------------
 #
